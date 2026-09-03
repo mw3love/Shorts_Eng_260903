@@ -7,7 +7,7 @@
  *   3. GET  /api/index   모아보기용 가벼운 전체 목록(제목·차수만, 카드 본문 없음)
  *   4. GET  /api/card    id 하나의 전체 본문(원본 블록) 반환 — 모아보기에서 되짚어볼 때
  *   5. GET  /api/sync    Notion → 카드 변환을 "예산만큼만" 진행하고 커서를 남김
- *   6. POST /api/grade   채점을 KV(원본) + Notion 속성(미러) 양쪽에 기록
+ *   6. POST /api/grade   채점을 KV(원본) + Notion 속성(미러) 양쪽에 기록. body.undo:true면 직전 1건 되돌리기
  *
  * ⚠ 왜 Worker가 반드시 필요한가 — api.notion.com은 Access-Control-Allow-Origin을
  *   보내지 않는다(2026-09-03 실측). 크롬 확장은 host_permissions로 CORS를 면제받아
@@ -260,7 +260,7 @@ async function syncStep(env, token, dbId) {
         const p = r.properties || {};
         const front = rt(p[schema.title]?.title);
         if (!front) continue;
-        rows.push({ id: r.id, front, edited: r.last_edited_time, url: schema.url ? (p[schema.url]?.url || null) : null });
+        rows.push({ id: r.id, front, edited: r.last_edited_time, created: r.created_time, url: schema.url ? (p[schema.url]?.url || null) : null });
       }
       cursor = data.has_more ? data.next_cursor : null;
       if (cursor && budget.used + 2 > budget.max) {
@@ -284,7 +284,7 @@ async function syncStep(env, token, dbId) {
         const p = r.properties || {};
         const front = rt(p[st.schema.title]?.title);
         if (!front) continue;
-        st.rows.push({ id: r.id, front, edited: r.last_edited_time, url: st.schema.url ? (p[st.schema.url]?.url || null) : null });
+        st.rows.push({ id: r.id, front, edited: r.last_edited_time, created: r.created_time, url: st.schema.url ? (p[st.schema.url]?.url || null) : null });
       }
       cursor = data.has_more ? data.next_cursor : null;
       if (cursor && budget.used + 2 > budget.max) {
@@ -321,7 +321,7 @@ async function syncStep(env, token, dbId) {
           curOldBucket = { num: prevItem.bucket, byId: Object.fromEntries(cards.map((c) => [c.id, c])) };
         }
         const old = curOldBucket.byId[row.id];
-        if (old && old.parserVersion === PARSER_VERSION) card = { ...old, front: row.front, url: row.url };
+        if (old && old.parserVersion === PARSER_VERSION) card = { ...old, front: row.front, url: row.url, created: row.created };
       }
 
       if (!card) {
@@ -333,7 +333,7 @@ async function syncStep(env, token, dbId) {
         const { context, hint, detail } = splitBody(blocks);
         card = {
           id: row.id, key: cardKey(row.front), front: row.front,
-          context, hint, detail, url: row.url,
+          context, hint, detail, url: row.url, created: row.created,
           fetchedAt: new Date().toISOString(), parserVersion: PARSER_VERSION,
         };
       } else {
@@ -383,7 +383,11 @@ function progressOptionFor(options, step) {
   return options.find((o) => new RegExp('^' + Math.min(step, 3) + '차').test(o)) || null;
 }
 
-const optionPayload = (type, name) => (type === 'select' ? { select: { name } } : { status: { name } });
+// name === null이면 속성을 비운다(되돌리기가 "한 번도 채점 안 한 상태"로 복구할 때 씀).
+const optionPayload = (type, name) =>
+  name == null
+    ? (type === 'select' ? { select: null } : { status: null })
+    : (type === 'select' ? { select: { name } } : { status: { name } });
 
 /**
  * 채점 한 번 = 완료도(진도) 한 칸 승급/제자리/강등 + 상태(난이도) 갱신 + 복습 횟수 +1.
@@ -414,6 +418,52 @@ async function writeGrade(env, token, dbId, { pageId, key, grade }) {
     if (schema.difficulty) {
       const opt = schema.difficultyOptions.find((o) => GRADE_HINT[grade]?.test(o));
       if (opt) props[schema.difficulty] = optionPayload(schema.difficultyType, opt);
+    }
+    if (schema.progress) {
+      const opt = progressOptionFor(schema.progressOptions, step);
+      if (opt) props[schema.progress] = optionPayload(schema.progressType, opt);
+    }
+    if (Object.keys(props).length) {
+      await notion(token, `/pages/${pageId}`, { method: 'PATCH', body: JSON.stringify({ properties: props }) });
+      notionOk = true;
+    }
+  } catch (e) { /* 삼키고 notionOk:false로 정직하게 알린다 */ }
+
+  return { ok: true, n, step, notionOk };
+}
+
+/**
+ * 되돌리기 — 직전 채점 한 건만 취소(단발성, 히스토리 없음). "잘못 매긴 채점 복구"가
+ * 목적이라 복습 횟수(n)까지 되돌린다 — writeGrade의 "횟수는 단조증가" 원칙의 유일한
+ * 예외(2026-09-03 사용자 결정). prev가 null이면 "한 번도 채점 안 한 상태"로 복구하는
+ * 것이라 Notion 속성도 실제로 비운다(옵션 미설정).
+ */
+async function undoGrade(env, token, dbId, { pageId, key, prev }) {
+  const all = JSON.parse((await env.KV.get(K_GRADES)) || '{}');
+  if (prev) all[key] = { grade: prev.grade, n: prev.n, step: prev.step, at: Date.now() };
+  else delete all[key];
+  await env.KV.put(K_GRADES, JSON.stringify(all));
+
+  let notionOk = false;
+  try {
+    let schema = JSON.parse((await env.KV.get(K_SCHEMA)) || 'null');
+    if (!schema) {
+      schema = await discoverSchema(token, dbId);
+      await env.KV.put(K_SCHEMA, JSON.stringify(schema));
+    }
+    const n = prev ? prev.n : 0;
+    const step = prev ? prev.step : 0;
+    const props = {};
+    if (schema.count) props[schema.count] = { number: n };
+    if (schema.difficulty) {
+      if (prev) {
+        // 옵션을 못 찾으면(스키마 드리프트) writeGrade처럼 건드리지 않고 넘어간다 —
+        // "한 번도 채점 안 한 상태"가 아닌 한 함부로 비우지 않는다.
+        const opt = schema.difficultyOptions.find((o) => GRADE_HINT[prev.grade]?.test(o));
+        if (opt) props[schema.difficulty] = optionPayload(schema.difficultyType, opt);
+      } else {
+        props[schema.difficulty] = optionPayload(schema.difficultyType, null);
+      }
     }
     if (schema.progress) {
       const opt = progressOptionFor(schema.progressOptions, step);
@@ -493,7 +543,7 @@ async function handleCards(env, url) {
     const byId = Object.fromEntries(JSON.parse(raw).cards.map((c) => [c.id, c]));
     for (const id of ids) {
       const c = byId[id];
-      if (c) cards.push({ ...c, prevGrade: grades[c.key]?.grade || null, step: grades[c.key]?.step || 0 });
+      if (c) cards.push({ ...c, prevGrade: grades[c.key]?.grade || null, step: grades[c.key]?.step || 0, n: grades[c.key]?.n || 0 });
     }
   }
 
@@ -562,7 +612,9 @@ export default {
       if (!token || !dbId) return json({ error: 'NOTION_TOKEN / NOTION_DB_ID 미설정' }, 500);
       try {
         const body = await request.json();
-        if (!body.key || !body.grade) return json({ error: 'key·grade 필요' }, 400);
+        if (!body.key) return json({ error: 'key 필요' }, 400);
+        if (body.undo) return json(await undoGrade(env, token, dbId, body));
+        if (!body.grade) return json({ error: 'grade 필요' }, 400);
         return json(await writeGrade(env, token, dbId, body));
       } catch (e) { return json({ error: String(e.message || e) }, 500); }
     }

@@ -13,7 +13,7 @@
   :root{
     --ink:#0B0D10; --ink3:#1E252D;
     --paper:#EFF2F6; --body-text:#C9D1DC; --muted:#8B95A3; --faint:#5A6472;
-    --know:#3DD68C; --fuzzy:#F0B342; --dunno:#FF6B5B; --gold:#E4C271;
+    --know:#3DD68C; --fuzzy:#F0B342; --dunno:#FF6B5B; --gold:#E4C271; --coral:#FF8F6B;
     --serif:"Newsreader",Georgia,"Times New Roman",serif;
     --sans:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo",sans-serif;
     --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
@@ -26,45 +26,55 @@
     -webkit-user-select:none;user-select:none;
   }
   #app{
-    position:fixed;inset:0;display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;
+    position:fixed;inset:0;height:100dvh;display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;
     max-width:520px;margin:0 auto;
     padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
   }
-  .rail{display:flex;align-items:center;gap:10px;padding:12px 20px 8px}
+  .rail{display:flex;align-items:center;gap:8px;padding:12px 20px 8px}
   .iconbtn{background:none;border:0;color:var(--muted);font-size:18px;line-height:1;padding:4px;cursor:pointer}
-  .gauge{flex:1;height:3px;border-radius:2px;background:var(--ink3);overflow:hidden}
+  .iconbtn:disabled{opacity:.28;pointer-events:none}
+  .gauge{flex:1;height:3px;border-radius:2px;background:var(--ink3);overflow:hidden;min-width:14px}
   .gaugebar{height:100%;width:0;background:var(--gold);transition:width .3s ease}
-  .counter{font-family:var(--mono);font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .counter{font-family:var(--mono);font-size:11.5px;color:var(--paper);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .counter .dim{color:var(--faint)}
+  .counter b{font-weight:500}
+  .counter .g-know{color:var(--know)}
+  .counter .g-fuzzy{color:var(--fuzzy)}
+  .counter .g-dunno{color:var(--dunno)}
+  .counter .g-none{color:var(--faint)}
+  .counter a{color:var(--muted);text-decoration:none}
 
   .titlebar{padding:2px 22px 2px}
   .titlebar .en{font-family:var(--serif);font-weight:300;line-height:1.14;letter-spacing:-.015em;font-size:clamp(26px,6.6vw,40px);text-wrap:balance;margin:0}
 
   .stage{position:relative;overflow:hidden}
-  .card{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;gap:16px;padding:0 22px;touch-action:none;will-change:transform;-webkit-touch-callout:none}
+  .card{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:flex-start;gap:16px;padding:10px 22px 0;touch-action:none;will-change:transform;-webkit-touch-callout:none}
   .card.bonus::before{content:"";position:absolute;inset:10px 4px;border:1px solid var(--gold);border-radius:20px;opacity:.45;pointer-events:none}
   .chip{
     align-self:flex-start;font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;
     color:var(--gold);border:1px solid color-mix(in srgb,var(--gold) 45%,transparent);padding:3px 8px;border-radius:99px;
   }
-  .ctx{font-family:var(--serif);font-style:italic;font-size:14.5px;line-height:1.5;color:var(--faint);border-left:2px solid var(--ink3);padding-left:12px;margin:0}
   .tapcue{font-size:12.5px;color:var(--faint);display:flex;align-items:center;gap:7px;animation:breathe 3.4s ease-in-out infinite}
   .tapcue i{display:block;width:5px;height:5px;border-radius:50%;background:var(--faint)}
   @keyframes breathe{0%,100%{opacity:.45}50%{opacity:1}}
 
   .reader{position:absolute;inset:0;display:none;flex-direction:column;padding:0 22px 16px;touch-action:pan-y}
-  .stage.reading .card{visibility:hidden}
+  .stage.reading .card{opacity:0;pointer-events:none}
   .stage.reading .reader{display:flex}
   #app.reading .legend{visibility:hidden}
+  .readerhead{display:flex;justify-content:flex-end;gap:6px;padding-top:8px}
+  .fontbtn{background:var(--ink3);border:0;color:var(--paper);font-family:var(--sans);font-size:11px;width:26px;height:24px;border-radius:6px;cursor:pointer}
+  .fontbtn:active{background:color-mix(in srgb,var(--ink3) 60%,var(--paper) 10%)}
   .readerbody{
-    overflow-y:auto;touch-action:pan-y;padding-top:12px;border-top:1px solid var(--ink3);
+    overflow-y:auto;touch-action:pan-y;padding-top:8px;border-top:1px solid var(--ink3);
     -webkit-user-select:text;user-select:text;display:flex;flex-direction:column;gap:9px;
-    font-size:14.5px;line-height:1.62;color:var(--body-text);
+    font-size:calc(14.5px * var(--rfs,1));line-height:1.62;color:var(--body-text);
   }
-  .readerbody .lhint,.readerbody p.lhint{font-size:16px;font-weight:600;color:var(--paper);margin:0 0 2px}
+  .readerbody .lhint,.readerbody p.lhint{font-size:1.1em;font-weight:600;color:var(--paper);margin:0 0 2px}
   .readerbody p{margin:0}
-  .readerbody h3{font-family:var(--serif);font-weight:400;font-size:20px;margin:14px 0 4px;color:var(--paper)}
-  .readerbody h4{font-family:var(--serif);font-weight:400;font-size:17px;margin:12px 0 4px;color:var(--paper)}
-  .readerbody h5{font-size:14px;margin:10px 0 3px;color:var(--paper);font-weight:600}
+  .readerbody h3{font-family:var(--serif);font-weight:400;font-size:1.38em;margin:14px 0 4px;color:var(--paper)}
+  .readerbody h4{font-family:var(--serif);font-weight:400;font-size:1.17em;margin:12px 0 4px;color:var(--paper)}
+  .readerbody h5{font-size:.97em;margin:10px 0 3px;color:var(--paper);font-weight:600}
   .readerbody ul,.readerbody ol{margin:2px 0;padding-left:20px}
   .readerbody li{margin:3px 0}
   .readerbody blockquote{border-left:2px solid var(--gold);padding-left:12px;margin:6px 0;color:var(--faint);font-style:italic}
@@ -72,8 +82,8 @@
   .readerbody hr{border:0;border-top:1px solid var(--ink3);margin:10px 0}
   .readerbody pre{background:var(--ink3);border-radius:8px;padding:10px 12px;overflow-x:auto;margin:4px 0}
   .readerbody pre code{background:none;color:var(--paper);padding:0}
-  .readerbody code{background:color-mix(in srgb,var(--gold) 22%,transparent);color:var(--gold);padding:1px 5px;border-radius:4px;font-family:var(--mono);font-size:.9em}
-  .readerbody table{width:100%;border-collapse:collapse;margin:6px 0;font-size:13px}
+  .readerbody code{background:color-mix(in srgb,var(--coral) 22%,transparent);color:var(--coral);padding:1px 5px;border-radius:4px;font-family:var(--mono);font-size:.9em}
+  .readerbody table{width:100%;border-collapse:collapse;margin:6px 0;font-size:.9em}
   .readerbody th,.readerbody td{border:1px solid var(--ink3);padding:6px 8px;text-align:left;vertical-align:top}
   .readerbody th{color:var(--gold);font-weight:500;background:color-mix(in srgb,var(--gold) 8%,transparent)}
   .src{align-self:flex-start;font-family:var(--mono);font-size:11px;color:var(--faint);text-decoration:none;border-bottom:1px solid var(--ink3);padding-bottom:2px;margin-top:4px}
@@ -88,12 +98,11 @@
   }
 
   .legend{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--ink3);border-top:1px solid var(--ink3);font-family:var(--mono)}
-  .legend div{background:var(--ink);padding:9px 6px 10px;text-align:center;color:var(--paper);font-size:12px}
-  .legend b{display:block;font-size:13px;margin-bottom:2px;font-weight:400}
-  .legend em{display:block;font-style:normal;font-size:9.5px;color:var(--faint);margin-top:2px}
-  .legend .k b{color:var(--know)}
-  .legend .f b{color:var(--fuzzy)}
-  .legend .d b{color:var(--dunno)}
+  .legend button{background:var(--ink);border:0;padding:12px 6px;text-align:center;color:var(--paper);font-size:13px;font-family:var(--mono);cursor:pointer;-webkit-tap-highlight-color:transparent}
+  .legend button:active{background:var(--ink3)}
+  .legend .k{color:var(--know)}
+  .legend .f{color:var(--fuzzy)}
+  .legend .d{color:var(--dunno)}
 
   .sheet{position:absolute;inset:0;display:none;flex-direction:column;justify-content:center;gap:26px;padding:0 26px;background:var(--ink);z-index:3}
   .sheet.on{display:flex}
@@ -122,7 +131,7 @@
   .lstep.s1{background:color-mix(in srgb,var(--fuzzy) 30%,transparent);color:var(--fuzzy)}
   .lstep.s2,.lstep.s3{background:color-mix(in srgb,var(--know) 30%,transparent);color:var(--know)}
   .lbody{margin-top:10px;font-size:13.5px;line-height:1.6;color:var(--body-text)}
-  .lbody code{background:color-mix(in srgb,var(--gold) 22%,transparent);color:var(--gold);padding:1px 5px;border-radius:4px;font-family:var(--mono);font-size:.9em}
+  .lbody code{background:color-mix(in srgb,var(--coral) 22%,transparent);color:var(--coral);padding:1px 5px;border-radius:4px;font-family:var(--mono);font-size:.9em}
   .lbody table{width:100%;border-collapse:collapse;margin:6px 0;font-size:12.5px}
   .lbody th,.lbody td{border:1px solid var(--ink3);padding:5px 7px;text-align:left}
   .lempty{color:var(--faint);font-size:13px;padding:30px 0;text-align:center}
@@ -134,6 +143,7 @@
 <div id="app">
   <div class="rail">
     <button class="iconbtn" id="listBtn" aria-label="모아보기">&#9776;</button>
+    <button class="iconbtn" id="undoBtn" aria-label="되돌리기" disabled>&#8634;</button>
     <div class="gauge"><div class="gaugebar" id="gaugebar"></div></div>
     <div class="counter" id="counter">&middot;</div>
   </div>
@@ -145,15 +155,18 @@
     <div class="card" id="card">
       <div class="front" id="front"></div>
     </div>
-    <div class="reader" id="reader"><div class="readerbody" id="readerBody"></div></div>
+    <div class="reader" id="reader">
+      <div class="readerhead"><button class="fontbtn" id="fontDown">가-</button><button class="fontbtn" id="fontUp">가+</button></div>
+      <div class="readerbody" id="readerBody"></div>
+    </div>
     <div class="verdict" id="verdict"></div>
     <div class="sheet on" id="loading"><h2>불러오는 중</h2><p id="loadmsg">Notion에서 카드를 가져옴</p></div>
   </div>
 
   <div class="legend">
-    <div class="d"><b>&larr;</b>모름<em>왼쪽으로 밀기</em></div>
-    <div class="f"><b>누르기</b>애매<em>롱프레스</em></div>
-    <div class="k"><b>&rarr;</b>이해<em>오른쪽으로 밀기</em></div>
+    <button class="d" id="btnDunno">모름</button>
+    <button class="f" id="btnFuzzy">애매</button>
+    <button class="k" id="btnKnow">이해</button>
   </div>
 </div>
 
@@ -241,11 +254,6 @@ function hintHtml(c){
   if (typeof c.hint === 'string') return escBr(c.hint);
   return richHtml(c.hint.rich || []);
 }
-function ctxHtml(c){
-  if (c.context == null) return null;
-  if (typeof c.context === 'string') return esc(c.context);
-  return richHtml(c.context.rich || []);
-}
 function detailHtml(c){
   if (!c.detail || !c.detail.length) return '';
   if (typeof c.detail[0] === 'string') return c.detail.map((t) => '<p>' + escBr(t) + '</p>').join('');
@@ -253,7 +261,7 @@ function detailHtml(c){
 }
 
 /* ── 상태 ───────────────────────────────────────────────── */
-let deck = [], idx = 0, remaining = 0, total = 0, sessionPromotions = 0, reading = false;
+let deck = [], idx = 0, remaining = 0, total = 0, reading = false;
 
 /* ── 카드 공급 ──────────────────────────────────────────── */
 async function fetchBatch(n){
@@ -308,10 +316,33 @@ function pushRecent(c){
 /* ── 렌더 ───────────────────────────────────────────────── */
 function updateGauge(){
   $('gaugebar').style.width = total ? (100 * (1 - remaining / Math.max(total, 1))) + '%' : '0%';
-  $('counter').textContent = remaining + ' / ' + total + (sessionPromotions ? ' · 승급 ' + sessionPromotions : '');
 }
 
 function isWeak(c){ return c.prevGrade === 'dunno'; }
+
+// 카드 한 장에 딸린 Notion 속성 요약 — 세션 진행률보다 "지금 이 카드"에 집중하기 위해
+// 상단 rail의 숫자 카운터 자리를 이걸로 대체한다(전체 진행률은 모아보기에서 확인).
+const GRADE_LABEL = { know: ['이해', 'g-know'], fuzzy: ['애매', 'g-fuzzy'], dunno: ['모름', 'g-dunno'] };
+const STEP_LABEL = ['0', '1차', '2차', '3차'];
+function fmtDate(iso){
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (isNaN(d)) return null;
+  return String(d.getFullYear()).slice(2) + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + String(d.getDate()).padStart(2, '0');
+}
+function renderCardInfo(c){
+  const g = GRADE_LABEL[c.prevGrade] || ['—', 'g-none'];
+  const parts = [
+    '<b class="' + g[1] + '">' + g[0] + '</b>',
+    (c.n || 0) + '회',
+    STEP_LABEL[Math.min(c.step || 0, 3)],
+  ];
+  const date = fmtDate(c.created);
+  if (date) parts.push(date);
+  let html = parts.join(' <span class="dim">&middot;</span> ');
+  if (c.url) html += ' <span class="dim">&middot;</span> <a href="' + esc(c.url) + '" target="_blank" rel="noopener">&#8599;</a>';
+  $('counter').innerHTML = html;
+}
 
 function showCurrent(){
   const c = deck[idx];
@@ -320,11 +351,10 @@ function showCurrent(){
   $('cardTitle').textContent = c.front;
   const weak = isWeak(c);
   $('card').classList.toggle('bonus', weak);
-  const ctx = ctxHtml(c);
   $('front').innerHTML =
     (weak ? '<div class="chip">다시 만남</div>' : '') +
-    (ctx ? '<p class="ctx">' + ctx + '</p>' : '') +
     '<div class="tapcue"><i></i>탭하면 전문</div>';
+  renderCardInfo(c);
   updateGauge();
   pushRecent(c);
   ensureQueue();
@@ -341,19 +371,30 @@ function renderReader(){
 }
 
 /* ── 채점 ───────────────────────────────────────────────── */
+// 되돌리기(직전 1건만) — Slidebox 참고. "잘못 매긴 채점 복구"가 목적이라 복습횟수(n)까지
+// 되돌린다(2026-09-03 사용자 결정, 서버 writeGrade의 "횟수 단조증가" 원칙의 유일한 예외).
+let lastAction = null;
+function updateUndoBtn(){ $('undoBtn').disabled = !lastAction; }
+
 function doGrade(g){
   const c = deck[idx];
   const key = c.key || cardKeyOf(c.front);
   const prevStep = c.step || 0;
+  const prevGrade = c.prevGrade || null;
+  const lg = local.get('sd_grades', {});
+  const prevN = lg[key]?.n || 0;
   let step = prevStep;
   if (g === 'know') step = Math.min(prevStep + 1, 3);
   else if (g === 'dunno') step = Math.max(prevStep - 1, 0);
-  if (prevStep === 0 && step > 0) { remaining = Math.max(0, remaining - 1); sessionPromotions++; }
-  else if (prevStep > 0 && step === 0) { remaining = Math.min(total, remaining + 1); }
-  c.prevGrade = g; c.step = step;
 
-  const lg = local.get('sd_grades', {});
-  lg[key] = { grade: g, n: (lg[key]?.n || 0) + 1, step, at: Date.now() };
+  lastAction = { cardIdx: idx, key, pageId: c.id, prevStep, prevGrade, prevN, prevRemaining: remaining };
+  updateUndoBtn();
+
+  if (prevStep === 0 && step > 0) remaining = Math.max(0, remaining - 1);
+  else if (prevStep > 0 && step === 0) remaining = Math.min(total, remaining + 1);
+  c.prevGrade = g; c.step = step; c.n = prevN + 1;
+
+  lg[key] = { grade: g, n: prevN + 1, step, at: Date.now() };
   local.set('sd_grades', lg);
 
   fetch('/api/grade', {
@@ -366,16 +407,43 @@ function doGrade(g){
   showCurrent();
 }
 
+function undo(){
+  if (!lastAction) return;
+  const a = lastAction;
+  lastAction = null; updateUndoBtn();
+
+  idx = a.cardIdx;
+  const c = deck[idx];
+  c.prevGrade = a.prevGrade; c.step = a.prevStep; c.n = a.prevN;
+  remaining = a.prevRemaining;
+
+  const lg = local.get('sd_grades', {});
+  if (a.prevGrade == null && a.prevN === 0) delete lg[a.key];
+  else lg[a.key] = { grade: a.prevGrade, n: a.prevN, step: a.prevStep, at: Date.now() };
+  local.set('sd_grades', lg);
+
+  const prev = (a.prevGrade == null && a.prevN === 0) ? null : { grade: a.prevGrade, n: a.prevN, step: a.prevStep };
+  fetch('/api/grade', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pageId: a.pageId, key: a.key, undo: true, prev }),
+  }).catch(() => {});
+
+  updateGauge();
+  showCurrent();
+}
+$('undoBtn').addEventListener('click', undo);
+
 function step(dir){
   if (dir > 0){ idx++; }
   else if (dir < 0 && idx > 0){ idx--; }
   showCurrent();
 }
 
-/* ── 1단(카드) 제스처: 좌/우=이해·모름, 상/하=다음·이전(채점 없음), 롱프레스=애매, 탭=전문 ── */
+/* ── 1단(카드) 제스처: 좌/우=이전·다음 이동(채점 없음), 아래→위=전문 열기, 위→아래=무동작.
+   채점(모름/애매/이해)은 아래 버튼으로만 한다(2026-09-03 결정 — 스와이프·롱프레스 채점 폐기). ── */
 const card = $('card'), wash = $('wash'), verdict = $('verdict'), stage = $('stage'), app = $('app');
-const TH = 90, LP_MS = 420;
-let sx = 0, sy = 0, dx = 0, dy = 0, dragging = false, moved = false, lpTimer = null, lpFired = false;
+const TH = 90;
+let sx = 0, sy = 0, dx = 0, dy = 0, dragging = false, moved = false;
 
 function show(color, label, t){
   wash.style.background = 'radial-gradient(120% 80% at 50% 50%, color-mix(in srgb, ' + color + ' 26%, transparent), transparent 72%)';
@@ -392,61 +460,90 @@ function exitAndGrade(g){
   card.style.transform = 'translateX(' + (dir * 120) + '%) rotate(' + (dir * 8) + 'deg)';
   setTimeout(() => { card.style.transition = 'none'; card.style.transform = ''; doGrade(g); }, 190);
 }
-function exitAndStep(dir){
-  card.style.transition = 'transform .2s cubic-bezier(.2,.7,.3,1)';
-  card.style.transform = 'translateY(' + (dir * 120) + '%)';
-  setTimeout(() => { card.style.transition = 'none'; card.style.transform = ''; step(dir); }, 190);
-}
-function fireLongpress(){
-  lpFired = true; hide();
-  show('var(--fuzzy)', '애매', 1);
+function exitAndFuzzy(){
   card.style.transition = 'transform .16s ease, opacity .16s ease';
   card.style.transform = 'scale(.95)'; card.style.opacity = '0.35';
   setTimeout(() => {
     card.style.transition = 'none'; card.style.transform = ''; card.style.opacity = '';
-    hide(); doGrade('fuzzy');
+    doGrade('fuzzy');
   }, 170);
 }
+function exitAndStepH(dir){ // dir: 1=다음(왼쪽으로 밀기), -1=이전(오른쪽으로 밀기)
+  card.style.transition = 'transform .2s cubic-bezier(.2,.7,.3,1)';
+  card.style.transform = 'translateX(' + (dir * -120) + '%) rotate(' + (dir * -6) + 'deg)';
+  setTimeout(() => { card.style.transition = 'none'; card.style.transform = ''; step(dir); }, 190);
+}
+function exitToReader(){
+  card.style.transition = 'transform .16s ease, opacity .16s ease';
+  card.style.transform = 'translateY(-18px) scale(.97)'; card.style.opacity = '0.4';
+  setTimeout(() => {
+    card.style.transition = 'none'; card.style.transform = ''; card.style.opacity = '';
+    hide(); openReader();
+  }, 150);
+}
+
+$('btnDunno').addEventListener('click', () => { if (!reading) exitAndGrade('dunno'); });
+$('btnFuzzy').addEventListener('click', () => { if (!reading) exitAndFuzzy(); });
+$('btnKnow').addEventListener('click', () => { if (!reading) exitAndGrade('know'); });
 
 card.addEventListener('pointerdown', (e) => {
   if (reading || $('loading').classList.contains('on')) return;
-  dragging = true; moved = false; lpFired = false;
+  dragging = true; moved = false;
   sx = e.clientX; sy = e.clientY; dx = 0; dy = 0;
   card.setPointerCapture(e.pointerId);
   card.style.transition = 'none';
-  lpTimer = setTimeout(() => { if (dragging && !moved) fireLongpress(); }, LP_MS);
 });
 card.addEventListener('pointermove', (e) => {
-  if (!dragging || lpFired) return;
+  if (!dragging) return;
   dx = e.clientX - sx; dy = e.clientY - sy;
-  if (Math.abs(dx) > 6 || Math.abs(dy) > 6){ moved = true; clearTimeout(lpTimer); }
-  card.style.transform = 'translate(' + dx + 'px,' + dy + 'px) rotate(' + (dx * 0.02) + 'deg)';
+  if (Math.abs(dx) > 6 || Math.abs(dy) > 6) moved = true;
   const vert = Math.abs(dy) > Math.abs(dx);
-  const t = Math.min(Math.max(Math.abs(dx), Math.abs(dy)) / TH, 1);
-  if (vert && Math.abs(dy) > 24) show('#8B95A3', dy < 0 ? '다음' : '이전', t);
-  else if (!vert && dx > 24) show('var(--know)', '이해', t);
-  else if (!vert && dx < -24) show('var(--dunno)', '모름', t);
-  else hide();
+  if (vert && dy < 0){ // 아래→위만 반응(전문 열기 예고). 위→아래는 무동작이라 되돌린다.
+    card.style.transform = 'translateY(' + dy + 'px)';
+    show('#8B95A3', '펼치기', Math.min(Math.abs(dy) / TH, 1));
+  } else if (!vert){
+    card.style.transform = 'translate(' + dx + 'px,0) rotate(' + (dx * 0.02) + 'deg)';
+    const t = Math.min(Math.abs(dx) / TH, 1);
+    if (dx < -24) show('#8B95A3', '다음', t);
+    else if (dx > 24) show('#8B95A3', '이전', t);
+    else hide();
+  } else {
+    card.style.transform = ''; hide();
+  }
 });
 card.addEventListener('pointerup', () => {
-  clearTimeout(lpTimer);
   if (!dragging) return;
   dragging = false;
-  if (lpFired) return;
   hide();
   card.style.transition = 'transform .2s cubic-bezier(.2,.7,.3,1)';
   if (!moved){ card.style.transform = ''; openReader(); return; }
   const vert = Math.abs(dy) > Math.abs(dx);
-  if (vert && Math.abs(dy) > TH) exitAndStep(dy < 0 ? 1 : -1);
-  else if (!vert && dx > TH) exitAndGrade('know');
-  else if (!vert && dx < -TH) exitAndGrade('dunno');
+  if (vert){
+    if (dy < -TH) exitToReader(); else card.style.transform = '';
+    return;
+  }
+  if (dx < -TH) exitAndStepH(1);
+  else if (dx > TH) exitAndStepH(-1);
   else card.style.transform = '';
 });
-card.addEventListener('pointercancel', () => { clearTimeout(lpTimer); dragging = false; hide(); card.style.transform = ''; });
+card.addEventListener('pointercancel', () => { dragging = false; hide(); card.style.transform = ''; });
 
 /* ── 2단(읽기) 열기/닫기 ─────────────────────────────────── */
 function openReader(){ reading = true; app.classList.add('reading'); stage.classList.add('reading'); renderReader(); }
 function closeReader(){ reading = false; app.classList.remove('reading'); stage.classList.remove('reading'); }
+
+// 2단 글자크기 — 0.85~1.5배, localStorage에 기억
+let readerScale = local.get('sd_fontscale', 1);
+function applyReaderScale(){ document.documentElement.style.setProperty('--rfs', readerScale); }
+applyReaderScale();
+$('fontDown').addEventListener('click', () => {
+  readerScale = Math.max(0.85, +(readerScale - 0.1).toFixed(2));
+  local.set('sd_fontscale', readerScale); applyReaderScale();
+});
+$('fontUp').addEventListener('click', () => {
+  readerScale = Math.min(1.5, +(readerScale + 0.1).toFixed(2));
+  local.set('sd_fontscale', readerScale); applyReaderScale();
+});
 
 const readerBody = $('readerBody'), reader = $('reader');
 let rsx = 0, rsy = 0, rdx = 0, rdy = 0, rDragging = false, rAtTop = false, rAtBottom = false, rMode = null;
@@ -465,21 +562,40 @@ readerBody.addEventListener('pointermove', (e) => {
   }
   if (rMode === 'h') reader.style.transform = 'translateX(' + rdx + 'px)';
   else if (rMode === 'v'){
-    if (rdy > 0 && rAtTop) reader.style.transform = 'translateY(' + Math.min(rdy, 140) * 0.5 + 'px)';
-    else if (rdy < 0 && rAtBottom) reader.style.transform = 'translateY(' + Math.max(rdy, -140) * 0.5 + 'px)';
+    // 가장자리 오버스크롤 — 손을 떼기 전까지 2단↔1단이 디졸브(크로스페이드)로 이어진다.
+    // 임계값을 못 넘기고 떼면 이 상태 그대로 2단으로 되돌아간다(rMode==='v'의 else 분기 없음 = 라이브 되돌림).
+    let d = 0;
+    if (rdy > 0 && rAtTop) d = Math.min(rdy, 140);
+    else if (rdy < 0 && rAtBottom) d = Math.max(rdy, -140);
+    if (d !== 0){
+      reader.style.transform = 'translateY(' + d * 0.5 + 'px)';
+      const p = Math.min(Math.abs(d) / TH, 1);
+      reader.style.opacity = 1 - p * 0.9;
+      card.style.opacity = p;
+    } else {
+      reader.style.transform = ''; reader.style.opacity = ''; card.style.opacity = '';
+    }
   }
 });
 readerBody.addEventListener('pointerup', () => {
   if (!rDragging) return; rDragging = false;
-  reader.style.transition = 'transform .18s ease';
+  reader.style.transition = 'transform .18s ease, opacity .18s ease';
+  card.style.transition = 'opacity .18s ease';
   const closeH = rMode === 'h' && Math.abs(rdx) > TH;
   const closeV = rMode === 'v' && Math.abs(rdy) > TH && ((rdy > 0 && rAtTop) || (rdy < 0 && rAtBottom));
   reader.style.transform = '';
-  if (closeH || closeV) closeReader();
-  setTimeout(() => { reader.style.transition = ''; }, 200);
+  if (closeH || closeV){
+    reader.style.opacity = ''; card.style.opacity = '';
+    closeReader();
+  } else if (rMode === 'v'){
+    reader.style.opacity = ''; card.style.opacity = ''; // 임계값 못 넘김 — 2단으로 복귀
+  }
+  setTimeout(() => { reader.style.transition = ''; card.style.transition = ''; }, 200);
   rMode = null;
 });
-readerBody.addEventListener('pointercancel', () => { rDragging = false; reader.style.transform = ''; rMode = null; });
+readerBody.addEventListener('pointercancel', () => {
+  rDragging = false; reader.style.transform = ''; reader.style.opacity = ''; card.style.opacity = ''; rMode = null;
+});
 
 /* ── 모아보기 ───────────────────────────────────────────── */
 let indexItems = null, listFilter = 'all', listQuery = '', expandedId = null, expandedCache = {};
