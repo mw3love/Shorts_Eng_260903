@@ -1,0 +1,20 @@
+name = "shorts-deck"
+main = "src/worker.js"
+compatibility_date = "2026-09-01"
+
+# 앱과 API를 같은 출처에서 서빙 — CORS 문제가 아예 생기지 않는다.
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+# 카드 캐시 + 학습 이력(grades). `wrangler kv namespace create KV`로 만든 id를 넣을 것.
+[[kv_namespaces]]
+binding = "KV"
+id = "PUT_KV_NAMESPACE_ID_HERE"
+
+[vars]
+NOTION_DB_ID = "277763872455804ebc00cb991e8e3247"
+
+# NOTION_TOKEN은 vars가 아니라 secret이다:
+#   npx wrangler secret put NOTION_TOKEN
+# 로컬 개발은 .dev.vars 파일에 NOTION_TOKEN=... (gitignore됨)

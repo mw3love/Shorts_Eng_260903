@@ -1,0 +1,320 @@
+<title>Shorts Deck</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;1,6..72,300&family=IBM+Plex+Sans+KR:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --ink:#0B0D10; --ink2:#151A20; --ink3:#1E252D;
+    --paper:#EFF2F6; --muted:#8B95A3; --faint:#5A6472;
+    --know:#3DD68C; --fuzzy:#F0B342; --dunno:#FF6B5B; --gold:#E4C271;
+    --serif:"Newsreader",Georgia,"Times New Roman",serif;
+    --sans:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo",sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;background:var(--ink);color:var(--paper);font-family:var(--sans);
+    overscroll-behavior:none;-webkit-tap-highlight-color:transparent;
+  }
+  #app{
+    position:fixed;inset:0;display:grid;
+    grid-template-rows:auto minmax(0,1fr) auto;
+    max-width:520px;margin:0 auto;
+    padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+  }
+
+  .rail{display:flex;align-items:center;gap:12px;padding:14px 20px 10px}
+  .dots{display:flex;gap:5px;flex:1}
+  .dot{height:3px;flex:1;border-radius:2px;background:var(--ink3);transition:background .25s}
+  .dot.know{background:var(--know)}
+  .dot.fuzzy{background:var(--fuzzy)}
+  .dot.dunno{background:var(--dunno)}
+  .streak{font-family:var(--mono);font-size:12px;letter-spacing:.04em;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .streak b{color:var(--know);font-weight:500}
+
+  .stage{position:relative;overflow:hidden;display:flex}
+  .card{
+    position:absolute;inset:0;display:grid;grid-template-rows:1fr auto;
+    padding:8px 22px 0;touch-action:none;will-change:transform;
+  }
+  .card.bonus::before{
+    content:"";position:absolute;inset:10px 14px;border:1px solid var(--gold);
+    border-radius:20px;opacity:.45;pointer-events:none;
+  }
+  .front{display:flex;flex-direction:column;justify-content:center;gap:18px;min-height:0}
+  .chip{
+    align-self:flex-start;font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--gold);
+    border:1px solid color-mix(in srgb,var(--gold) 45%,transparent);
+    padding:3px 8px;border-radius:99px;
+  }
+  .en{
+    font-family:var(--serif);font-weight:300;line-height:1.16;letter-spacing:-.015em;
+    font-size:clamp(30px,7.4vw,46px);text-wrap:balance;margin:0;
+  }
+  .ctx{
+    font-family:var(--serif);font-style:italic;font-size:14.5px;line-height:1.5;
+    color:var(--faint);border-left:2px solid var(--ink3);padding-left:12px;margin:0;
+  }
+  .tapcue{
+    font-size:12.5px;color:var(--faint);display:flex;align-items:center;gap:7px;
+    animation:breathe 3.4s ease-in-out infinite;
+  }
+  .tapcue i{display:block;width:5px;height:5px;border-radius:50%;background:var(--faint);font-style:normal}
+  @keyframes breathe{0%,100%{opacity:.45}50%{opacity:1}}
+
+  .back{display:none;flex-direction:column;gap:14px;min-height:0;padding-bottom:14px}
+  .back.on{display:flex}
+  .hint{
+    font-size:19px;line-height:1.45;font-weight:500;color:var(--paper);margin:0;
+    border-top:1px solid var(--ink3);padding-top:16px;
+  }
+  .detail{
+    overflow-y:auto;touch-action:pan-y;display:flex;flex-direction:column;gap:9px;
+    font-size:14px;line-height:1.62;color:var(--muted);
+    -webkit-mask-image:linear-gradient(180deg,#000 88%,transparent);
+            mask-image:linear-gradient(180deg,#000 88%,transparent);
+  }
+  .detail p{margin:0}
+  .more{
+    align-self:flex-start;background:none;border:1px solid var(--ink3);color:var(--muted);
+    font-family:var(--sans);font-size:12.5px;padding:7px 13px;border-radius:99px;cursor:pointer;
+  }
+  .more:hover{border-color:var(--faint);color:var(--paper)}
+  .src{
+    align-self:flex-start;font-family:var(--mono);font-size:11px;letter-spacing:.05em;
+    color:var(--faint);text-decoration:none;border-bottom:1px solid var(--ink3);padding-bottom:2px;
+  }
+  .src:hover{color:var(--dunno);border-color:var(--dunno)}
+  a:focus-visible,button:focus-visible{outline:2px solid var(--know);outline-offset:3px}
+
+  .wash{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .1s}
+  .verdict{
+    position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(.85);
+    font-family:var(--mono);font-size:15px;letter-spacing:.22em;text-transform:uppercase;
+    padding:10px 20px;border:1.5px solid currentColor;border-radius:6px;
+    opacity:0;pointer-events:none;transition:opacity .1s,transform .1s;white-space:nowrap;
+  }
+
+  .legend{
+    display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--ink3);
+    border-top:1px solid var(--ink3);font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;
+  }
+  .legend div{background:var(--ink);padding:9px 6px 10px;text-align:center;color:var(--paper);font-size:12px}
+  .legend b{display:block;font-size:13px;margin-bottom:2px;font-weight:400;letter-spacing:.02em}
+  .legend em{display:block;font-style:normal;font-size:9.5px;letter-spacing:0;color:var(--faint);margin-top:2px}
+  .legend .k b{color:var(--know)}
+  .legend .f b{color:var(--fuzzy)}
+  .legend .d b{color:var(--dunno)}
+
+  .done{position:absolute;inset:0;display:none;flex-direction:column;justify-content:center;gap:26px;padding:0 26px;background:var(--ink)}
+  .done.on{display:flex}
+  .done h2{font-family:var(--serif);font-weight:300;font-size:38px;margin:0;line-height:1.1}
+  .tally{display:flex;gap:26px;font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .tally div{display:flex;flex-direction:column;gap:5px}
+  .tally span{font-size:34px;line-height:1}
+  .tally em{font-size:11px;letter-spacing:.12em;color:var(--faint);font-style:normal;text-transform:uppercase}
+  .again{
+    align-self:flex-start;background:var(--paper);color:var(--ink);border:0;border-radius:99px;
+    font-family:var(--sans);font-size:15px;font-weight:600;padding:14px 30px;cursor:pointer;
+  }
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div id="app">
+  <div class="rail">
+    <div class="dots" id="dots"></div>
+    <div class="streak">연속 <b id="streak">0</b></div>
+  </div>
+
+  <div class="stage" id="stage">
+    <div class="wash" id="wash"></div>
+    <div class="card" id="card">
+      <div class="front" id="front"></div>
+      <div class="back" id="back"></div>
+    </div>
+    <div class="verdict" id="verdict"></div>
+    <div class="done" id="done">
+      <h2>한 판 끝.</h2>
+      <div class="tally" id="tally"></div>
+      <button class="again" id="again">한 판 더</button>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div class="k"><b>&uarr;</b>이해<em>안 보고 넘김</em></div>
+    <div class="f"><b>&rarr;</b>애매<em>헷갈림</em></div>
+    <div class="d"><b>탭 &rarr; &uarr;</b>모름<em>뜻 보고 넘김</em></div>
+  </div>
+</div>
+
+<script>
+const CARDS = [{"id": "3ce76387-2455-81b9-8cbc-fee2e9590307", "front": "Small potatoes", "context": null, "hint": "Small potatoes 시시한 것, 하찮은 것, 푼돈", "detail": ["주로 사람, 일, 금액 등이 중요하지 않거나 대단하지 않음을 비유할 때 사용합니다.", "어원 및 유래", "구분", "내용", "유래", "19세기 미국에서 크기가 작은 감자는 가치가 없고 주로 가축의 사료로 쓰였던 것에서 유래했습니다.", "핵심 이미지", "'먹을 것 없는 자잘한 감자'", "예문", "Don't worry about losing that money; it's just small potatoes. (그 돈 잃어버린 것 걱정마, 그냥 푼돈이야.)", "Compared to his previous job, this problem is small potatoes. (그의 이전 직장에 비하면, 이 문제는 별거 아니야.)"], "url": "https://www.youtube.com/shorts/3XFssvYF56k"}, {"id": "3ce76387-2455-81ca-ab76-cce82f50a051", "front": "XOXO", "context": null, "hint": "XOXO 허그와 키스 (포옹과 입맞춤)", "detail": ["X는 포옹(Hugs)을, O는 키스(Kisses)를 의미합니다. 주로 편지나 메시지의 끝맺음에 친근함과 애정을 표현하기 위해 사용합니다.", "어원 및 유래", "문자", "의미", "유래", "X", "포옹 (Hug)", "중세 시대에 글을 쓰지 못하는 사람들이 서류에 서명 대신 십자가(X)를 그리고 그 위에 입을 맞추던 관습에서 유래했습니다.", "O", "키스 (Kiss)", "유대계 이민자들이 서류에 서명할 때 기독교의 십자가(X) 모양을 거부하고 동그라미(O)를 그린 것에서 유래했다는 설이 있습니다. 또 다른 설으로는 입술을 오므렸을 때의 모양에서 유래했다고도 합니다.", "중심 이미지 > \"두 팔로 감싸 안는 형태와 입술을 내민 모양\"", "이 표현을 관통하는 중심 이미지는 '상대방을 향한 신체적 접촉과 따뜻한 애정의 기호화'입니다. 글자 형태 자체가 포옹과 키스의 시각적 상징이 되어, 디지털이나 지면 위에서 물리적인 스킨십과 온기를 전달하는 유연한 도구로 확장되어 사용됩니다."], "url": "https://www.youtube.com/shorts/3XFssvYF56k"}, {"id": "3ce76387-2455-81a0-a802-dc37221b7b4c", "front": "And thank you for giving me such a wonderful send-off.", "context": "And so we have asked if you wouldn't mind reading a few of them with the classic Gossip Girl send-off. And thank you again.", "hint": "And thank you for giving me such a wonderful send-off. 당신이 나에게 그렇게 멋진 송별회를 열어준 것에 대해 감사드립니다.", "detail": ["단어 설명", "구성: 동사 send(보내다) + 부사/전치사 off(떠나게 하다)가 결합된 명사형 표현입니다.", "의미: (어딘가로 떠나는 사람을) 환송함, 송별회, (출발을 축하하는) 마지막 행사나 인사.", "문맥적 의미: 가십걸(Gossip Girl) 드라마 특유의 마무리 인사(마지막 대사나 나레이션)를 의미합니다.", "관통하는 하나의 이미지 > \"배웅하며 손을 흔들어 멀리 떠나보내는 순간\" > (기차나 배가 떠날 때 플랫폼에서 손을 흔드는 모습, 혹은 운동장에서 선수를 경기 밖으로 내보내는 모습을 연상하면 됩니다. 이 이미지를 바탕으로 물리적인 사람의 이동뿐만 아니라, 방송의 마무리, 인생의 전환점 등 '어떤 대상이 끝을 맺고 떠나거나 마무리되는 모든 순간'으로 유연하게 확장됩니다.)", "구분", "설명", "예시", "어원 및 유래", "19세기 철도나 항해 시절, 여행을 떠나는 사람을 정거장이나 항구까지 따라가서 \"잘 가라\"고 배웅하던 관행에서 유래했습니다.", "배웅하며 손을 흔드는 행위", "사람의 환송", "직장을 떠나는 동료나 졸업하는 학생을 위한 송별회", "환송회, 송별 파티", "작품/행사의 마무리", "프로그램의 마지막 방송, 은퇴하는 선수의 마지막 경기 등", "고별 무대, 마지막 인사"], "url": "https://www.youtube.com/shorts/3XFssvYF56k"}, {"id": "3ce76387-2455-81b1-86ae-fa92c3077aaf", "front": ">> We feel as though a lot of Donald Trump tweets feel very gossipy.", "context": null, "hint": "We feel as though a lot of Donald Trump tweets feel very gossipy. 우리는 도널드 트럼프의 트윗 중 많은 부분이 매우 가십거리처럼 느껴진다고 느낀다.", "detail": ["핵심 이미지", "'마치 ~인 것처럼'이라는 가정이나 주관적인 심리적 상태를 나타낼 때 사용합니다. 현실과 다를 수 있지만, 내 머릿속이나 감정 안에서는 그렇게 느껴지는 '가상의 안경'을 쓴 상태를 의미합니다.", "문법 구조 및 유의어", "구분", "표현", "뉘앙스 차이", "현재 표현", "as though", "격식 있고 문학적인 표현으로, 화자의 주관적인 느낌을 강조", "동의어 1", "as if", "as though와 완벽히 호환되며 더 흔하게 쓰임", "비교 표현", "like", "구어체(회화)에서 주로 사용되며 캐주얼한 느낌"], "url": "https://www.youtube.com/shorts/3XFssvYF56k"}, {"id": "3ce76387-2455-8112-91f5-f6f29bbbdbe6", "front": "I was a fiend.", "context": "Yes, it's real. I was a fiend. I was obsessed with the Spice Girls, and they taught me about girl power, and I love them. Who would you say is your favorite Spice Girl?", "hint": "Yes, it's real. I was a fiend. 그래, 진짜야. 나는 열렬한 팬이었어.", "detail": ["관통하는 이미지", "'중독자, 푹 빠진 사람' (어떤 대상에 정신을 못 차릴 정도로 강하게 끌려있는 상태)", "어원 설명", "고대 영어 fēond에서 유래했으며, 원래는 '적(enemy)', '악마(devil)'라는 뜻이었습니다. 종교적 맥락에서 '악마의 지배를 받는 자'를 뜻하다가, 시간이 흐르면서 어떤 것에 '악마적으로(지독하게) 사로잡힌 사람', 즉 '광팬'이나 '중독자'라는 의미로 확장되었습니다.", "주요 의미 및 활용", "의미", "설명", "예문", "광팬, 열성 팬", "특정 음악, 연예인, 취미 등에 푹 빠진 사람", "He is a fitness fiend. (그는 운동광이야.)", "중독자", "약물, 알코올, 카페인 등에 의존하는 사람", "She is a coffee fiend. (그는 커피 중독자야.)", "악마, 마귀", "(문학적/비유적) 악한 존재", "He acts like a fiend. (그는 악마처럼 행동해.)"], "url": "https://www.youtube.com/shorts/xlN9pxbyInY"}, {"id": "3ce76387-2455-815a-886f-f35a3f7cc211", "front": "How come you didn't call me?", "context": null, "hint": "How come 너 나한테 전화 안 했어? vs Why 너 나한테 전화 안 했어?", "detail": ["구분", "Why", "How come", "어조 및 뉘앙스", "직설적, 논리적, 때로 따지는 느낌 (어째서)", "호기심, 의아함, 캐묻지 않는 부드러움 (어떻게 된게/어쩌다가)", "문법적 구조", "의문사 + 동사 + 주어 (Why did you...)", "의문사 + 주어 + 동사 (How come you...)", "상황", "이유를 직접적으로 추궁하거나 학술적/논리적 원인을 물을 때", "상황 전체가 이해되지 않아 자연스럽게 이유가 궁금할 때", "하나의 이미지 표현: '카메라의 줌 아웃(Zoom-out)'", "Why가 사건의 특정 원인(Why)에 초점을 딱 맞추는 현미경이라면, How come은 \"도대체 이 상황이 어떻게(How) 벌어지게(come) 된 거야?\"라며 사건을 둘러싼 전체 상황을 멀리서 바라보는 카메라입니다.", "따라서 How come을 쓰면 상대를 직접적으로 비난하기보다 \"이런 상황이 된 영문을 모르겠네\"라는 뉘앙스가 되어, 말싸움이 될 확률을 줄여줍니다."], "url": "https://www.youtube.com/shorts/UuX92Sf4jYU"}, {"id": "3ce76387-2455-813d-a3c3-df6f0b261219", "front": "I blocked it out.", "context": ">> I can't remember. I blocked it out.", "hint": "I blocked it out. 기억을 지워버렸어. / 일부러 기억 안 나게 묻어뒀어.", "detail": ["핵심 이미지: '마음에 방음벽을 치다'", "'block out'의 관통하는 이미지는 '어떤 것(빛, 소리, 시야, 생각 등)이 들어오지 못하도록 물리적이거나 심리적인 차단막(block)을 세우는 것'입니다. 외부의 괴로운 기억이나 충격적인 감정이 내 의식 속으로 밀려오지 못하도록 마음의 문을 굳게 닫고 방음벽을 쳐버리는 모습을 뜻합니다.", "뉘앙스 차이 (유연한 해석)", "심리적 방어: 너무 고통스러워서 뇌가 스스로 기억을 지우려 할 때 (해리, 억압)", "의도적 회피: 그 기억을 떠올리고 싶지 않아서 일부러 머릿속에서 지워버리려고 노력할 때", "관련 표현 비교", "표현", "중심 이미지", "뉘앙스", "I blocked it out.", "방음벽을 쳐서 아예 차단함", "괴로운 기억으로부터 나를 보호하려 함", "I forgot it.", "기억이 희미해짐", "단순 망각", "I erased it from my mind.", "지우개로 지워버림", "의도적으로 생각을 지우려 함"], "url": "https://www.youtube.com/shorts/cUcouxHspHM"}, {"id": "3ce76387-2455-817d-8438-cf226514a1ff", "front": "We are diving in to maybe some spicy unfiltered what we call in English hot takes.", "context": null, "hint": "We are diving in to maybe some spicy unfiltered what we call in English hot takes. 우리는 영어로 흔히 '핫 테이크(hot takes)'라고 부르는, 어쩌면 자극적이고 여과되지 않은 이야기들 속으로 깊이 들어가 보려고 합니다.", "detail": ["의미와 이미지 > 관통하는 하나의 이미지: 뜨겁게 갓 튀겨낸 요리처럼, 숙성이나 냉각 과정 없이 '즉흥적이고 강렬하며 논쟁적인 의견'", "구분", "설명", "품사", "명사구 (Hot take)", "핵심 의미", "깊은 고민이나 객관적 사실보다는, 즉흥적인 감정에 기반하여 강하게 주장하는 도발적인 의견", "주요 맥락", "팟캐스트, 소셜 미디어, 토론 프로그램 등에서 대중의 이목을 끌기 위해 던지는 파격적인 발언", "어원 (Idiom Origin) 언론계(특히 스포츠 저널리즘)에서 유래했습니다. 마감 직전이나 생방송 중에 깊은 분석 없이 '뜨겁고(hot)' 자극적으로 내뱉는 즉흥적인 논평을 뜻하는 'hot copy'나 'hot column'에서 발전했습니다. 차갑게 식은(냉철하고 객관적인) 분석과 대비되는 개념입니다."], "url": "https://www.youtube.com/shorts/cAqLAYXnjkI"}, {"id": "3ce76387-2455-818b-aac5-f49ca130997a", "front": "The weather forecast said it's supposed to rain later, so this might come in handy.", "context": null, "hint": "The weather forecast said it's supposed to rain later, so this might come in handy. 일기예보에서 이따가 비가 올 거라고 했으니까, 이게 유용하게 쓰일지도 몰라.", "detail": ["구분", "내용", "품사", "동사구 (Idiomatic verb phrase)", "의미", "유용하다, 도움이 되다, 쓸모가 있다", "주요 활용", "come in handy for [명사] (~에 유용하다)<br>come in handy to [동사] (~하는 데 도움이 되다)", "관통하는 이미지 '손(Hand)에 들어온다(Come in)'는 물리적인 이미지에서 출발합니다. 내가 어떤 도구나 물건을 집어 들기 가장 편한 위치, 즉 '손이 닿는 가까운 곳에 유용한 상태로 들어와 있는 모습'을 뜻합니다. 상황이 닥쳤을 때 바로 집어 들어 쓸 수 있는 최적의 상태를 의미합니다."], "url": "https://www.youtube.com/shorts/ia8JZKlmMdo"}, {"id": "3cd76387-2455-81b3-a8a5-fed2da298d55", "front": "There's nothing quite like exploring a new city with your best friend.", "context": "you have to be supportive of that. It's also exciting. It means that your friend's going to go and explore a new place and you get to go and visit them and there's nothing quite like being", "hint": "There's nothing quite like exploring a new city with your best friend. 새로운 도시를 가장 친한 친구와 탐험하는 것만큼 좋은 것은 없다.", "detail": ["there's nothing quite like는 \"어떤 것과도 비교할 수 없는 특별한 최고(또는 최악)의 대상/경험이 있다\"는 의미를 전달합니다.", "1. 관통하는 하나의 이미지 (Core Image)", "> \"저울의 한쪽을 완전히 압도하는 절대적인 존재\"", "이 표현의 핵심 이미지는 '비교 대상의 부재(Absence of comparison)'입니다. 세상에 수많은 것들이 존재하지만, 지금 말하는 이 대상과 견줄 만한(quite like) 것은 세상에 단 하나도 없다는 뜻입니다.", "2. 어원 및 구조 분석", "There is nothing: 없다, 아무것도.", "quite like: ~와 꽤 비슷한, 견줄 만한.", "어원적 의미: 원래 quite는 '완전히, 완전히 다르게'라는 뜻에서 발전하여 비교급을 강조하는 역할을 합니다. 즉, \"완전히 비슷하다고 할 만한 것이 전혀 없다\"라는 직역에서 유래하여, \"독보적이고 대체 불가능한 가치나 경험\"을 나타낼 때 쓰이게 되었습니다.", "3. 유연한 해석 가이드", "문맥에 따라 다음과 같이 자연스럽게 의역할 수 있습니다.", "상황", "해석 예시", "긍정적 경험 (가장 흔함)", "\"~만한 것이 없다\", \"~가 최고다\", \"~와 비교할 수 없다\"", "부정적 상황 (불쾌한 경험)", "\"~같은 지옥은 없다\", \"~만큼 끔찍한 것은 없다\"", "독특한 대상", "\"~와는 완전히 다른 독특한 매력이 있다\"", "자막 속 문장에서는 친구를 방문하고 새로운 곳을 경험하는 것만큼 '비교할 수 없을 정도로 멋진 일은 없다'는 긍정적 감탄으로 사용되었습니다."], "url": "https://www.youtube.com/watch?v=20dpB3N4kwU&list=LL&index=53"}, {"id": "3cd76387-2455-81a1-85eb-e3096eba40d9", "front": "So you have to learn to just roll with the punches.", "context": "But I think for the most part there's some things that you just can't control. So you have to learn to just roll with the punches. You just found out that your best friend and your", "hint": "You just have to learn to just roll with the punches when unexpected things happen. 예상치 못한 일이 일어날 때 너는 그저 역경에 유연하게 대처하는 법을 배워야 한다.", "detail": ["관통하는 하나의 이미지", "'복싱 경기에서 날아오는 주먹(펀치)을 몸을 빼며 흘려내는 모습' 공격(시련)을 정면으로 맞아 부딪히는 대신, 그 충격을 최소화하며 유연하게 흘려보내는 상황을 뜻합니다. 따라서 \"어려움이나 예상치 못한 상황에 순응하며 유연하게 대처하다\"라는 의미로 확장됩니다.", "어원 설명", "19세기 말 전통 복싱(boxing)에서 유래했습니다. 링 위에서 상대방이 날리는 강한 펀치를 꼿꼿이 서서 다 맞거나 맞서 싸우기보다, 주먹이 날아오는 방향으로 머리와 상체를 뒤로 빼거나 살짝 돌려 충격을 완화하는 기술(ride the punch)에서 비롯되었습니다. 삶의 시련을 복서가 맞는 펀치에 비유한 표현입니다.", "유의어 및 뉘앙스 비교표", "표현", "중심 이미지", "뉘앙스", "Roll with the punches", "날아오는 주먹을 몸으로 흘려내기", "예기치 못한 연속된 어려움에 유연하고 임기응변으로 대처하다", "Weather the storm", "거센 폭풍우 속에서 견뎌내기", "힘든 시기나 위기를 끝까지 버텨내고 살아남다", "Go with the flow", "흐르는 물결에 몸을 맡기기", "상황을 거스르지 않고 자연스럽게 흘러가는 대로 따르다", "Adapt to change", "새로운 환경에 맞게 형태 바꾸기", "변화된 조건에 맞춰 행동이나 방식을 수정하다"], "url": "https://www.youtube.com/watch?v=20dpB3N4kwU&list=LL&index=53"}, {"id": "3cd76387-2455-8184-b957-eb66367bacc4", "front": "But something that I always like to say is if it's not meant to be, it's not meant to be.", "context": "But something that I always like to say is if it's not meant to be, it's not meant to be. And what's meant for you will be. You're known to be such a good planner.", "hint": "핵심 표현 분석: be meant to be", "detail": ["의미: ~할 운명이다, 그렇게 되도록 정해져 있다", "구조: be동사 + meant (mean의 과거분사) + to 부정사", "뉘앙스: 인간의 노력이나 의지만으로는 바꿀 수 없는 '섭리'나 '운명'을 나타낼 때 사용합니다. 긍정(\"우리 맺어질 운명이야\")과 부정(\"될 인연이 아니었어\") 모두에 쓰입니다.", "어원 설명", "동사 mean은 원래 '의도하다, 뜻하다'라는 뜻입니다.", "여기에 수동태(be meant)가 되면 '(...하도록) 의도되어 있다, 계획되어 있다'가 됩니다.", "시간이 흘러 인간의 의도가 아니라 \"하늘(우주, 운명)이 그렇게 계획해 두었다\"는 의미로 확장되어 '운명이다'라는 뜻으로 정착되었습니다.", "유사 표현 비교", "표현", "뉘앙스 및 차이점", "예시", "It's meant to be.", "하늘이 정해준 운명일 때", "We met again. It must be meant to be. (우리가 다시 만났어. 이건 운명이야.)", "It's not meant to be.", "노력해도 안 되는 일, 인연이 아닐 때", "We broke up, but it just wasn't meant to be. (우린 헤어졌지만, 될 인연이 아니었던 거지.)", "It is what it is.", "운명이라기보다는 \"이미 벌어진 일은 바꿀 수 없으니 받아들인다\"는 체념/수용", "I lost my wallet, but it is what it is. (지갑을 잃어버렸지만, 어쩔 수 없지 뭐.)"], "url": "https://www.youtube.com/watch?v=20dpB3N4kwU&list=LL&index=53"}, {"id": "3cd76387-2455-81dd-811c-d6c0d0ec2207", "front": "go off", "context": null, "hint": "go off는 불이나 전기가 '꺼지다'라는 뜻도 되지만, '갑자기 작동하다(발동 걸리다)'라는 뜻도 가지고 있습니다.", "detail": ["구분", "의미", "예시", "장치/소리", "울리다, 터지다, 작동하다", "알람이 울리다(An alarm goes off)", "생각/아이디어", "번뜩이다, 불이 켜지듯 확 떠오르다", "아이디어가 떠오르다(An idea goes off)", "즉, 머릿속에서 경보나 전구 스위치가 '갑자기 켜지는(작동하는)' 순간을 뜻합니다."], "url": "https://www.youtube.com/watch?v=Z-dBGWwLExE&list=LL&index=52"}, {"id": "3cd76387-2455-819c-a8be-f6874ea2f2ea", "front": "You know who gives zero Old people.", "context": "You know who gives zero Old people. So, I go swimming like once or twice a week. The other day, I get out of the pool and this woman comes up to me. She's around like 70, 80 years old", "hint": "You know who gives zero? Old people. 당신도 알다시피 전혀 신경 쓰지 않는 사람이 누군지 아나요? 바로 노인들이에요.", "detail": ["관용어 give zero (또는 give zero fucks, give zero shits)는 \"전혀 신경 쓰지 않는다\", \"관심이 없다\"는 의미의 속된 표현입니다.", "단어/표현", "직역", "실제 의미", "Give", "주다", "(관심이나 신경을) 쓰다", "Zero", "영(0)", "전혀 없음, 1도 없음", "Give zero", "0을 주다", "상대방의 시선이나 사회적 체면 따위에 전혀 에너지를 쏟지 않다", "어원 설명 이 표현은 'A give a damn(신경 쓰다)'이나 'I give a fuck(신경 써)'이라는 표현에서 유래했습니다. 무언가에 가치나 의미를 부여해 '내 신경을 할당해 준다'는 개념입니다. 여기에 숫자 'zero(0)'를 붙여, 내가 할당해 줄 신경의 총량이 '0'이라는 뜻으로 진화했습니다. 즉, 남이 나를 어떻게 보든 전혀 개의치 않는 상태를 뜻합니다.", "핵심 이미지 텅 빈 전광판 (Zero) 머릿속이나 마음속에 타인의 시선, 평가, 체면을 담아두는 공간이 완전히 비어(0) 있는 상태를 상상하면 됩니다. 이 이미지를 바탕으로 \"눈치 보지 않는다\", \"신경 쓴다의 수치가 바닥이다\" 등으로 유연하게 해석할 수 있습니다."], "url": "https://www.youtube.com/watch?v=Z-dBGWwLExE&list=LL&index=52"}, {"id": "3cd76387-2455-81e3-916c-c1c9ba0d34ea", "front": "They're picking these low low-life deadbeat dads.", "context": "around. They're picking these low low-life deadbeat dads. Nobody around to help them. Just having to do all this herself. She's just going to get bigger.", "hint": "He is such a deadbeat dad who never pays child support. 그는 양육비도 전혀 주지 않는 무책임한 아빠야.", "detail": ["관용어 어원", "deadbeat는 19세기 중반 미국에서 유래했습니다. 당시 무거운 짐을 나르는 노동자들이 징을 'dead beat(소리가 울리지 않고 둔탁하게 쿵 하고 치는 것)'치며 일할 가치가 없음을 표현한 데서 비롯되었다는 설이 있습니다. 이후 빚을 갚지 않고 도망 다니는 사람이나 일하기 싫어하는 게으른 사람을 뜻하게 되었습니다.", "핵심 이미지와 의미", "구분", "내용", "관통하는 이미지", "\"축 늘어져서(dead) 제자리걸음만 치는(beat) 사람\"", "핵심 의미", "사회적·가정적 책임을 다하지 않고 기생하거나 도망치는 사람", "확장 의미", "1. 양육비를 주지 않는 무책임한 부모 (본문 속 의미)<br>2. 빚을 갚지 않는 사람<br>3. 게으르고 빈둥거리는 사람"], "url": "https://www.youtube.com/watch?v=nI2wCaifXvk&list=LL&index=51"}, {"id": "3cd76387-2455-8132-bf69-c640e01fef26", "front": "No, I don't mean to get you get strays here.", "context": ">> [laughter] >> Sorry, Greg. No, I don't mean to get you get strays here.", "hint": "Sorry, Greg. No, I don't mean to get you strays here. 미안해, 그레그. 아니, 여기서 너한테 유탄이 튀게 하려는 의도는 아니었어.", "detail": ["어원: 'stray'는 원래 '길을 잃다, 헤매다'라는 동사/형용사에서 유래했습니다. 군사 용어인 'stray bullet(유탄, 빗나간 총알)'에서 온 표현으로, 의도하지 않은 방향으로 날아와 엉뚱한 사람에게 피해를 주는 상황을 비유합니다.", "중심 이미지: '주인이나 울타리를 벗어나 이리저리 떠돌아다니는 존재'를 뜻합니다. 여기서는 화자의 의도와 상관없이 엉뚱한 곳으로 튀어 오르는 불똥이나 유탄( stray bullet)을 의미합니다.", "구분", "설명", "품사", "명사 (복수형 strays)", "기본 의미", "길잃은 동물(유기견/고양이), 낙오자, 빗나간 것", "관용적 의미", "의도치 않게 주변 사람에게 튀는 피해, 애매한 비난이나 유탄", "문맥적 해석", "\"너를 (애매한 상황이나 엉뚱한 비난의) 유탄에 맞게 하려는 게 아니었어\""], "url": "https://www.youtube.com/watch?v=CuN335DR_RA&list=LL&index=49"}, {"id": "3cd76387-2455-81eb-9370-f149a1a0c967", "front": "His hands were grimy after working on the car engine all day.", "context": null, "hint": "His hands were grimy after working on the car engine all day. 그의 손은 하루 종일 자동차 엔진을 수리한 후 때가 묻어 지저분했다.", "detail": ["관통하는 이미지: 눈에 보일 정도로 찌든 때나 먼지가 표면을 덮어 불쾌하고 지저분한 상태.", "구분", "내용", "품사", "형용사 (Adjective)", "의미", "때 묻은, 더러운, 끈질긴 때가 낀", "유의어", "dirty, filthy,grubby, soiled", "반의어", "clean, spotless, immaculate"], "url": "https://www.youtube.com/watch?v=CuN335DR_RA&list=LL&index=49"}, {"id": "3cd76387-2455-8119-98c3-dd4d451bc97f", "front": ">> I will say I thought his neck was going to explode.", "context": ">> I will say I thought his neck was going to explode. He was like, I mean, but but eating a burger is not supposed to be like, \"Ooh, ooh, ooh.\"", "hint": "I will say that his neck was going to explode. 솔직히 말해서 그의 목이 터져버릴 것 같았어.", "detail": ["'I will say'의 의미와 이미지", "I will say는 직역하면 \"내가 말할 것이다\"이지만, 실제 회화에서는 \"(내 생각을 솔직히 말하자면) 과연 그렇네\", \"인정할 건 해야겠어\", \"솔직히 말해서\"라는 의미로 사용됩니다.", "관통하는 하나의 이미지: 마음속에 있던 생각이나 상대방의 말에 대한 동의를 \"마지못해, 혹은 솔직히 한 걸음 물러서서 인정하는 모습\"입니다. 상대방의 의견에 100% 전적으로 동의한다기보다는, \"그건 확실히 인정해 줄 만하네\"라며 내 판단이나 평가를 덧붙일 때 씁니다.", "유사 표현 비교", "표현", "뉘앙스", "예시", "I will say", "솔직히 인정하는데, ~야", "I will say it was a good movie. (솔직히 좋은 영화였다고 인정은 할게.)", "I must say", "내 주장을 좀 더 강하게 강조할 때 (정말이지)", "I must say, I am impressed. (정말이지, 감동받았어.)", "I would say", "확신은 없지만 조심스럽게 추측할 때", "I would say about two hours. (대략 두 시간 정도 걸릴 것 같아요.)"], "url": "https://www.youtube.com/watch?v=CuN335DR_RA&list=LL&index=49"}, {"id": "3cd76387-2455-81d6-b0bc-e8a6251137e7", "front": "This guy This guy knows how to [ __ ] go in on a burger, dude.", "context": "Oh! Oh, pause it. Pause it. This guy's a [ __ ] dude. This guy This guy knows how to [ __ ] go in on a burger, dude.", "hint": "상세 설명: go in on은 주로 음식, 선물, 비용 등을 여러 사람이 돈을 모아서 같이 사거나, 함께 힘을 합쳐 무언가를 해치울 때 쓰는 표현입니다. 여기서는 햄버거를 엄청나게 맛있고 적극적으로 먹어치우는 모습을 비유적으로 표현한 것입니다.", "detail": ["구분", "설명", "품사", "구동사 (Phrasal Verb)", "주요 용도", "1. 비용/음식을 여럿이 함께 나누다<br>2. 어떤 일이나 대상에 적극적으로 몰입하다/덤벼들다", "비슷한 표현", "pitch in, chip in, dive into"], "url": "https://www.youtube.com/watch?v=CuN335DR_RA&list=LL&index=49"}, {"id": "3cd76387-2455-81bb-a696-daa8fa45f78d", "front": "It's very very condescending.", "context": ">> Chill. It's very very condescending.", "hint": "Chill. It's very very condescending. 진정해. 그거 정말 거들먹거리는(잘난 체하는) 태도야.", "detail": ["관통하는 하나의 이미지", "> \"상대방을 아래(down)로 내려다보며(descend) 말하는 모습\"", "'condescending'은 물리적이거나 심리적으로 상대방을 자기보다 아래로 낮춰보고 깔보는 태도를 뜻합니다. 내가 위에서 아래로 내려다본다는 느낌을 기억하면 어떤 상황이든 유연하게 이해할 수 있습니다.", "어원 설명", "con- (완전히/함께) + de- (아래로) + scandere (오르다/내리다)의 결합입니다.", "어원적으로는 \"높은 곳에서 아래로 내려오다\"라는 뜻이었으나, 시간이 지나면서 \"자신의 높은 지위나 우월함을 은근히 드러내며 상대를 깔아뭉개다\"라는 부정적인 의미로 변했습니다.", "유의어 비교", "단어", "핵심 의미", "뉘앙스 차이", "Condescending", "잘난 체하며 깔보는", "상대방을 무시하며 가르치려 들 때", "Arrogant", "오만한, 거만한", "자신이 최고라고 믿어 의심치 않는 태도", "Patronizing", "은근히 무시하는", "겉으로는 도와주는 척하면서 은근히 깔보는 태도"], "url": "https://www.youtube.com/watch?v=jWY8WBOaGc4&list=LL&index=49"}, {"id": "3cd76387-2455-8127-8a89-f168bf5890ac", "front": "SO IT HASN'T SUNK IN YET.", "context": null, "hint": "It hasn't sunk in yet. 아직 실감이 안 나요.", "detail": ["관용구 어원: 'Sink'는 원래 물속으로 '가라앉다'라는 뜻입니다. 배가 물에 가라앉거나 무언가가 진흙 속으로 서서히 스며들어 가라앉는 모습을 연상하면 됩니다. 생각이나 정보가 머릿속 깊이 가라앉아 완전히 이해되거나 마음에 와닿기까지는 시간이 걸린다는 개념에서 유래했습니다.", "핵심 이미지: 물에 무언가가 서서히 가라앉아 스며드는 모습 (정보나 충격적인 소식이 머릿속이나 마음속으로 천천히 스며들어 완전히 이해되는 과정을 뜻합니다.)", "구분", "내용", "직역", "그것은 아직 안으로 가라앉지 않았다.", "의역", "아직 실감이 안 난다, 아직 완전히 이해가 안 된다.", "주요 사용 상황", "큰 상을 받았을 때, 청천벽력 같은 소식을 들었을 때 등", "유연한 해석 적용:", "물리적: 액체가 물품에 아직 스며들지 않았다.", "지식적: 개념이 아직 머릿속에 완전히 쏙 들어오지(이해되지) 않았다.", "감정적: 충격적인 현실이 마음 깊이 내려앉아 체감되지 않았다."], "url": "https://www.youtube.com/watch?v=uyyf25CXM94&list=LL&index=49"}];
+const SESSION = 10;
+const $ = id => document.getElementById(id);
+
+const store = {
+  get(){ try { return JSON.parse(localStorage.getItem('sd_grades') || '{}'); } catch (e) { return {}; } },
+  set(v){ try { localStorage.setItem('sd_grades', JSON.stringify(v)); } catch (e) {} }
+};
+
+let grades = store.get();
+let deck = [], idx = 0, reveal = 0, streak = 0, results = [];
+
+// 예전에 "모름"이던 카드를 앞쪽에 끼워 넣는다 — 금테 보너스 카드의 정체.
+function buildDeck(){
+  const weak = CARDS.filter(c => grades[c.id] === 'dunno');
+  const rest = CARDS.filter(c => grades[c.id] !== 'dunno');
+  return [...weak.slice(0, 4), ...rest].sort(() => Math.random() - 0.5).slice(0, SESSION);
+}
+
+function esc(s){
+  return String(s == null ? '' : s).replace(/[&<>]/g, m => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;' }[m]));
+}
+
+function renderDots(){
+  $('dots').innerHTML = deck.map((_, i) => '<div class="dot ' + (results[i] || '') + '"></div>').join('');
+}
+
+function render(){
+  const c = deck[idx];
+  if (!c) return finish();
+  $('card').classList.toggle('bonus', grades[c.id] === 'dunno');
+  $('front').innerHTML =
+    (grades[c.id] === 'dunno' ? '<div class="chip">다시 만남</div>' : '') +
+    '<p class="en">' + esc(c.front) + '</p>' +
+    (c.context ? '<p class="ctx">' + esc(c.context) + '</p>' : '') +
+    '<div class="tapcue"><i></i>탭하면 뜻</div>';
+  $('back').className = 'back';
+  $('back').innerHTML = '';
+  reveal = 0;
+  renderDots();
+  $('streak').textContent = streak;
+}
+
+function doReveal(){
+  const c = deck[idx];
+  if (reveal === 0){
+    reveal = 1;
+    const cue = $('front').querySelector('.tapcue');
+    if (cue) cue.remove();
+    $('back').className = 'back on';
+    $('back').innerHTML =
+      '<p class="hint">' + esc(c.hint || '(뜻 없음)') + '</p>' +
+      (c.detail && c.detail.length ? '<button class="more" id="more">해설 더 보기</button>' : '') +
+      (c.url ? '<a class="src" href="' + esc(c.url) + '" target="_blank" rel="noopener">원본 쇼츠 &#8599;</a>' : '');
+    const more = $('more');
+    if (more) more.addEventListener('click', e => { e.stopPropagation(); doReveal(); });
+  } else if (reveal === 1){
+    reveal = 2;
+    const more = $('more');
+    if (more) more.remove();
+    const d = document.createElement('div');
+    d.className = 'detail';
+    d.innerHTML = c.detail.map(t => '<p>' + esc(t) + '</p>').join('');
+    $('back').insertBefore(d, $('back').querySelector('.src'));
+  }
+}
+
+function grade(g){
+  const c = deck[idx];
+  grades[c.id] = g;
+  store.set(grades);
+  results[idx] = g;
+  streak = (g === 'know') ? streak + 1 : 0;
+  idx++;
+  if (idx >= deck.length) return finish();
+  render();
+}
+
+function finish(){
+  const n = g => results.filter(x => x === g).length;
+  $('tally').innerHTML = [['know','이해'],['fuzzy','애매'],['dunno','모름']]
+    .map(([k, l]) => '<div><span style="color:var(--' + k + ')">' + n(k) + '</span><em>' + l + '</em></div>')
+    .join('');
+  $('done').classList.add('on');
+}
+
+$('again').addEventListener('click', () => {
+  $('done').classList.remove('on');
+  deck = buildDeck(); idx = 0; results = []; streak = 0;
+  render();
+});
+
+/* ── 제스처 ─────────────────────────────────────────── */
+const card = $('card'), wash = $('wash'), verdict = $('verdict');
+const TH = 88;
+let sx = 0, sy = 0, dx = 0, dy = 0, dragging = false, moved = false, lockH = false;
+
+const upGrade = () => reveal === 0
+  ? ['know', '이해', 'var(--know)']
+  : ['dunno', '모름', 'var(--dunno)'];
+const rightGrade = () => ['fuzzy', '애매', 'var(--fuzzy)'];
+
+function show(color, label, t){
+  wash.style.background = 'radial-gradient(120% 80% at 50% 50%, color-mix(in srgb, ' + color + ' 26%, transparent), transparent 72%)';
+  wash.style.opacity = t;
+  verdict.textContent = label;
+  verdict.style.color = color;
+  verdict.style.opacity = t;
+  verdict.style.transform = 'translate(-50%,-50%) scale(' + (0.85 + t * 0.15) + ')';
+}
+function hide(){ wash.style.opacity = 0; verdict.style.opacity = 0; }
+
+card.addEventListener('pointerdown', e => {
+  if ($('done').classList.contains('on')) return;
+  lockH = !!e.target.closest('.detail');   // 해설을 스크롤 중이면 가로 스와이프만 허용
+  dragging = true; moved = false;
+  sx = e.clientX; sy = e.clientY; dx = 0; dy = 0;
+  card.setPointerCapture(e.pointerId);
+  card.style.transition = 'none';
+});
+
+card.addEventListener('pointermove', e => {
+  if (!dragging) return;
+  dx = e.clientX - sx;
+  dy = lockH ? 0 : e.clientY - sy;
+  if (Math.abs(dx) > 6 || Math.abs(dy) > 6) moved = true;
+  card.style.transform = 'translate(' + dx + 'px,' + dy + 'px) rotate(' + (dx * 0.025) + 'deg)';
+
+  const vert = Math.abs(dy) > Math.abs(dx);
+  const t = Math.min(Math.max(Math.abs(dx), Math.abs(dy)) / TH, 1);
+  if (!lockH && dy < -30 && vert){ const g = upGrade(); show(g[2], g[1], t); }
+  else if (dx > 30 && !vert){ const g = rightGrade(); show(g[2], g[1], t); }
+  else if (dx < -30 && !vert && idx > 0){ show('#8B95A3', '되돌리기', t); }
+  else hide();
+});
+
+card.addEventListener('pointerup', () => {
+  if (!dragging) return;
+  dragging = false; hide();
+  card.style.transition = 'transform .22s cubic-bezier(.2,.7,.3,1)';
+
+  if (!moved){ card.style.transform = ''; doReveal(); return; }
+
+  const vert = Math.abs(dy) > Math.abs(dx);
+  const up = !lockH && dy < -TH && vert;
+  const right = dx > TH && !vert;
+  const left = dx < -TH && !vert;
+
+  if (up || right){
+    const g = up ? upGrade() : rightGrade();
+    card.style.transform = up ? 'translateY(-120%)' : 'translateX(120%)';
+    setTimeout(() => { card.style.transition = 'none'; card.style.transform = ''; grade(g[0]); }, 180);
+  } else if (left && idx > 0){
+    card.style.transform = 'translateX(120%)';
+    setTimeout(() => {
+      card.style.transition = 'none'; card.style.transform = '';
+      idx--; results[idx] = undefined; streak = 0; render();
+    }, 180);
+  } else {
+    card.style.transform = '';
+  }
+});
+
+card.addEventListener('pointercancel', () => {
+  dragging = false; hide(); card.style.transform = '';
+});
+
+deck = buildDeck();
+render();
+</script>

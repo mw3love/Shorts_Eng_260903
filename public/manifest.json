@@ -1,0 +1,9 @@
+{
+  "name": "Shorts Deck",
+  "short_name": "Shorts Deck",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0B0D10",
+  "theme_color": "#0B0D10",
+  "orientation": "portrait"
+}
