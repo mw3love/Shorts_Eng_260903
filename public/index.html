@@ -12,7 +12,7 @@
 <style>
   :root{
     --ink:#0B0D10; --ink3:#1E252D;
-    --paper:#EFF2F6; --muted:#8B95A3; --faint:#5A6472;
+    --paper:#EFF2F6; --body-text:#C9D1DC; --muted:#8B95A3; --faint:#5A6472;
     --know:#3DD68C; --fuzzy:#F0B342; --dunno:#FF6B5B; --gold:#E4C271;
     --serif:"Newsreader",Georgia,"Times New Roman",serif;
     --sans:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo",sans-serif;
@@ -26,52 +26,65 @@
     -webkit-user-select:none;user-select:none;
   }
   #app{
-    position:fixed;inset:0;display:grid;grid-template-rows:auto minmax(0,1fr) auto;
+    position:fixed;inset:0;display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;
     max-width:520px;margin:0 auto;
     padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
   }
-  .rail{display:flex;align-items:center;gap:12px;padding:14px 20px 10px}
-  .dots{display:flex;gap:5px;flex:1}
-  .dot{height:3px;flex:1;border-radius:2px;background:var(--ink3);transition:background .25s}
-  .dot.know{background:var(--know)}
-  .dot.fuzzy{background:var(--fuzzy)}
-  .dot.dunno{background:var(--dunno)}
-  .streak{font-family:var(--mono);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
-  .streak b{color:var(--know);font-weight:500}
+  .rail{display:flex;align-items:center;gap:10px;padding:12px 20px 8px}
+  .iconbtn{background:none;border:0;color:var(--muted);font-size:18px;line-height:1;padding:4px;cursor:pointer}
+  .gauge{flex:1;height:3px;border-radius:2px;background:var(--ink3);overflow:hidden}
+  .gaugebar{height:100%;width:0;background:var(--gold);transition:width .3s ease}
+  .counter{font-family:var(--mono);font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
 
-  .stage{position:relative;overflow:hidden;display:flex}
-  .card{position:absolute;inset:0;display:grid;grid-template-rows:1fr auto;padding:8px 22px 0;touch-action:none;will-change:transform}
-  .card.bonus::before{content:"";position:absolute;inset:10px 14px;border:1px solid var(--gold);border-radius:20px;opacity:.45;pointer-events:none}
-  .front{display:flex;flex-direction:column;justify-content:center;gap:18px;min-height:0}
+  .titlebar{padding:2px 22px 2px}
+  .titlebar .en{font-family:var(--serif);font-weight:300;line-height:1.14;letter-spacing:-.015em;font-size:clamp(26px,6.6vw,40px);text-wrap:balance;margin:0}
+
+  .stage{position:relative;overflow:hidden}
+  .card{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;gap:16px;padding:0 22px;touch-action:none;will-change:transform;-webkit-touch-callout:none}
+  .card.bonus::before{content:"";position:absolute;inset:10px 4px;border:1px solid var(--gold);border-radius:20px;opacity:.45;pointer-events:none}
   .chip{
     align-self:flex-start;font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;
     color:var(--gold);border:1px solid color-mix(in srgb,var(--gold) 45%,transparent);padding:3px 8px;border-radius:99px;
   }
-  .en{font-family:var(--serif);font-weight:300;line-height:1.16;letter-spacing:-.015em;font-size:clamp(30px,7.4vw,46px);text-wrap:balance;margin:0}
   .ctx{font-family:var(--serif);font-style:italic;font-size:14.5px;line-height:1.5;color:var(--faint);border-left:2px solid var(--ink3);padding-left:12px;margin:0}
   .tapcue{font-size:12.5px;color:var(--faint);display:flex;align-items:center;gap:7px;animation:breathe 3.4s ease-in-out infinite}
   .tapcue i{display:block;width:5px;height:5px;border-radius:50%;background:var(--faint)}
   @keyframes breathe{0%,100%{opacity:.45}50%{opacity:1}}
 
-  .back{display:none;flex-direction:column;gap:14px;min-height:0;padding-bottom:14px}
-  .back.on{display:flex}
-  .hint{font-size:19px;line-height:1.45;font-weight:500;margin:0;border-top:1px solid var(--ink3);padding-top:16px;-webkit-user-select:text;user-select:text}
-  .detail{
-    overflow-y:auto;touch-action:pan-y;display:flex;flex-direction:column;gap:9px;
-    font-size:14px;line-height:1.62;color:var(--muted);-webkit-user-select:text;user-select:text;
-    -webkit-mask-image:linear-gradient(180deg,#000 88%,transparent);mask-image:linear-gradient(180deg,#000 88%,transparent);
+  .reader{position:absolute;inset:0;display:none;flex-direction:column;padding:0 22px 16px;touch-action:pan-y}
+  .stage.reading .card{visibility:hidden}
+  .stage.reading .reader{display:flex}
+  #app.reading .legend{visibility:hidden}
+  .readerbody{
+    overflow-y:auto;touch-action:pan-y;padding-top:12px;border-top:1px solid var(--ink3);
+    -webkit-user-select:text;user-select:text;display:flex;flex-direction:column;gap:9px;
+    font-size:14.5px;line-height:1.62;color:var(--body-text);
   }
-  .detail p{margin:0}
-  .more{align-self:flex-start;background:none;border:1px solid var(--ink3);color:var(--muted);font-family:var(--sans);font-size:12.5px;padding:7px 13px;border-radius:99px;cursor:pointer}
-  .src{align-self:flex-start;font-family:var(--mono);font-size:11px;color:var(--faint);text-decoration:none;border-bottom:1px solid var(--ink3);padding-bottom:2px}
+  .readerbody .lhint,.readerbody p.lhint{font-size:16px;font-weight:600;color:var(--paper);margin:0 0 2px}
+  .readerbody p{margin:0}
+  .readerbody h3{font-family:var(--serif);font-weight:400;font-size:20px;margin:14px 0 4px;color:var(--paper)}
+  .readerbody h4{font-family:var(--serif);font-weight:400;font-size:17px;margin:12px 0 4px;color:var(--paper)}
+  .readerbody h5{font-size:14px;margin:10px 0 3px;color:var(--paper);font-weight:600}
+  .readerbody ul,.readerbody ol{margin:2px 0;padding-left:20px}
+  .readerbody li{margin:3px 0}
+  .readerbody blockquote{border-left:2px solid var(--gold);padding-left:12px;margin:6px 0;color:var(--faint);font-style:italic}
+  .readerbody .callout{background:var(--ink3);border-radius:10px;padding:10px 12px;margin:4px 0}
+  .readerbody hr{border:0;border-top:1px solid var(--ink3);margin:10px 0}
+  .readerbody pre{background:var(--ink3);border-radius:8px;padding:10px 12px;overflow-x:auto;margin:4px 0}
+  .readerbody pre code{background:none;color:var(--paper);padding:0}
+  .readerbody code{background:color-mix(in srgb,var(--gold) 22%,transparent);color:var(--gold);padding:1px 5px;border-radius:4px;font-family:var(--mono);font-size:.9em}
+  .readerbody table{width:100%;border-collapse:collapse;margin:6px 0;font-size:13px}
+  .readerbody th,.readerbody td{border:1px solid var(--ink3);padding:6px 8px;text-align:left;vertical-align:top}
+  .readerbody th{color:var(--gold);font-weight:500;background:color-mix(in srgb,var(--gold) 8%,transparent)}
+  .src{align-self:flex-start;font-family:var(--mono);font-size:11px;color:var(--faint);text-decoration:none;border-bottom:1px solid var(--ink3);padding-bottom:2px;margin-top:4px}
   a:focus-visible,button:focus-visible{outline:2px solid var(--know);outline-offset:3px}
 
-  .wash{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .1s}
+  .wash{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .1s;z-index:1}
   .verdict{
     position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(.85);
     font-family:var(--mono);font-size:15px;letter-spacing:.22em;text-transform:uppercase;
     padding:10px 20px;border:1.5px solid currentColor;border-radius:6px;
-    opacity:0;pointer-events:none;transition:opacity .1s,transform .1s;white-space:nowrap;
+    opacity:0;pointer-events:none;transition:opacity .1s,transform .1s;white-space:nowrap;z-index:2;
   }
 
   .legend{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--ink3);border-top:1px solid var(--ink3);font-family:var(--mono)}
@@ -82,269 +95,494 @@
   .legend .f b{color:var(--fuzzy)}
   .legend .d b{color:var(--dunno)}
 
-  .sheet{position:absolute;inset:0;display:none;flex-direction:column;justify-content:center;gap:26px;padding:0 26px;background:var(--ink)}
+  .sheet{position:absolute;inset:0;display:none;flex-direction:column;justify-content:center;gap:26px;padding:0 26px;background:var(--ink);z-index:3}
   .sheet.on{display:flex}
-  .sheet h2{font-family:var(--serif);font-weight:300;font-size:38px;margin:0;line-height:1.1}
+  .sheet h2{font-family:var(--serif);font-weight:300;font-size:32px;margin:0;line-height:1.1}
   .sheet p{margin:0;color:var(--muted);font-size:14px;line-height:1.6}
-  .tally{display:flex;gap:26px;font-family:var(--mono);font-variant-numeric:tabular-nums}
-  .tally div{display:flex;flex-direction:column;gap:5px}
-  .tally span{font-size:34px;line-height:1}
-  .tally em{font-size:11px;letter-spacing:.12em;color:var(--faint);font-style:normal}
-  .again{align-self:flex-start;background:var(--paper);color:var(--ink);border:0;border-radius:99px;font-family:var(--sans);font-size:15px;font-weight:600;padding:14px 30px;cursor:pointer}
-  .sync{position:absolute;top:14px;right:20px;font-family:var(--mono);font-size:10px;color:var(--faint)}
+
+  /* ── 모아보기 ── */
+  .listview{position:fixed;inset:0;max-width:520px;margin:0 auto;background:var(--ink);display:none;flex-direction:column;z-index:10;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+  .listview.on{display:flex}
+  .listhead{display:flex;align-items:center;gap:10px;padding:14px 18px 8px}
+  .listhead button{background:none;border:0;color:var(--paper);font-size:14px;font-family:var(--sans);cursor:pointer;padding:4px 2px}
+  .listhead input{flex:1;background:var(--ink3);border:0;border-radius:8px;color:var(--paper);font-family:var(--sans);font-size:14px;padding:9px 12px}
+  .listhead input::placeholder{color:var(--faint)}
+  .tabs{display:flex;gap:6px;padding:6px 18px 10px;overflow-x:auto}
+  .tab{flex:none;background:var(--ink3);border:0;border-radius:99px;color:var(--muted);font-family:var(--mono);font-size:11.5px;padding:7px 12px;cursor:pointer;white-space:nowrap}
+  .tab.on{background:var(--gold);color:var(--ink)}
+  .recent{padding:0 18px}
+  .rechead{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin:6px 0 8px}
+  .recrow{display:flex;gap:8px;overflow-x:auto;padding-bottom:10px}
+  .recchip{flex:none;background:var(--ink3);border:0;border-radius:99px;color:var(--paper);font-size:12.5px;padding:8px 13px;cursor:pointer;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .listbody{flex:1;overflow-y:auto;padding:4px 18px 24px;-webkit-user-select:text;user-select:text}
+  .lrow{border-bottom:1px solid var(--ink3);padding:12px 0;cursor:pointer}
+  .lhead{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .lfront{font-family:var(--serif);font-size:16px;color:var(--paper)}
+  .lstep{font-family:var(--mono);font-size:10px;padding:3px 8px;border-radius:99px;background:var(--ink3);color:var(--muted)}
+  .lstep.s1{background:color-mix(in srgb,var(--fuzzy) 30%,transparent);color:var(--fuzzy)}
+  .lstep.s2,.lstep.s3{background:color-mix(in srgb,var(--know) 30%,transparent);color:var(--know)}
+  .lbody{margin-top:10px;font-size:13.5px;line-height:1.6;color:var(--body-text)}
+  .lbody code{background:color-mix(in srgb,var(--gold) 22%,transparent);color:var(--gold);padding:1px 5px;border-radius:4px;font-family:var(--mono);font-size:.9em}
+  .lbody table{width:100%;border-collapse:collapse;margin:6px 0;font-size:12.5px}
+  .lbody th,.lbody td{border:1px solid var(--ink3);padding:5px 7px;text-align:left}
+  .lempty{color:var(--faint);font-size:13px;padding:30px 0;text-align:center}
+
   @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
 <div id="app">
   <div class="rail">
-    <div class="dots" id="dots"></div>
-    <div class="streak">연속 <b id="streak">0</b></div>
+    <button class="iconbtn" id="listBtn" aria-label="모아보기">&#9776;</button>
+    <div class="gauge"><div class="gaugebar" id="gaugebar"></div></div>
+    <div class="counter" id="counter">&middot;</div>
   </div>
+
+  <div class="titlebar"><p class="en" id="cardTitle"></p></div>
 
   <div class="stage" id="stage">
     <div class="wash" id="wash"></div>
     <div class="card" id="card">
       <div class="front" id="front"></div>
-      <div class="back" id="back"></div>
     </div>
+    <div class="reader" id="reader"><div class="readerbody" id="readerBody"></div></div>
     <div class="verdict" id="verdict"></div>
-
     <div class="sheet on" id="loading"><h2>불러오는 중</h2><p id="loadmsg">Notion에서 카드를 가져옴</p></div>
-    <div class="sheet" id="done">
-      <h2>한 판 끝.</h2>
-      <div class="tally" id="tally"></div>
-      <button class="again" id="again">한 판 더</button>
-      <div class="sync" id="sync"></div>
-    </div>
   </div>
 
   <div class="legend">
-    <div class="k"><b>&uarr;</b>이해<em>안 보고 넘김</em></div>
-    <div class="f"><b>&rarr;</b>애매<em>헷갈림</em></div>
-    <div class="d"><b>탭 &rarr; &uarr;</b>모름<em>뜻 보고 넘김</em></div>
+    <div class="d"><b>&larr;</b>모름<em>왼쪽으로 밀기</em></div>
+    <div class="f"><b>누르기</b>애매<em>롱프레스</em></div>
+    <div class="k"><b>&rarr;</b>이해<em>오른쪽으로 밀기</em></div>
   </div>
 </div>
 
-<script>
-const SESSION = 10;
-const $ = (id) => document.getElementById(id);
+<div class="listview" id="listview">
+  <div class="listhead">
+    <button id="closeListBtn">&larr; 닫기</button>
+    <input id="searchBox" placeholder="검색">
+  </div>
+  <div class="tabs" id="tabs"></div>
+  <div class="recent" id="recentSec"></div>
+  <div class="listbody" id="listBody"></div>
+</div>
 
-let deck = [], idx = 0, reveal = 0, streak = 0, results = [], pending = 0, stats = null;
+<script>
+const $ = (id) => document.getElementById(id);
 
 const local = {
   get(k, d){ try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } },
   set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
 };
 
-const keyOf = (c) => c.key || String(c.front || '').toLowerCase().replace(/[^a-z0-9가-힣]+/g, ' ').trim();
-const isWeak = (c) => c.prevGrade === 'dunno';
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>]/g, (m) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;' }[m]));
+const escBr = (s) => String(s == null ? '' : s).split(/<br\s*\/?>/i).map(esc).join('<br>');
 
-/* ── 한 판 불러오기 ───────────────────────────────────────
-   ⚠ 카드가 1300장이 넘어 전량을 받지 않는다 — 서버가 한 판(10장)을 골라 준다.
-   실패하면 마지막 판 캐시 → 씨앗 데이터 순으로 퇴화한다. 폰이 오프라인이거나
-   Notion이 느려도 앱이 빈 화면이 되지 않게. */
-async function loadSession(){
-  try {
-    const res = await fetch('/api/cards?session=' + SESSION);
-    const d = await res.json();
-    if (d.error) throw new Error(d.error);
-    if (d.cards?.length){
-      stats = { total: d.total, graded: d.graded, syncing: d.syncing, progress: d.progress };
-      local.set('sd_last', { cards: d.cards, at: Date.now() });
-      return { deck: d.cards, src: 'notion' };
-    }
-    if (d.syncing) stats = { syncing: true, progress: d.progress };
-    throw new Error('아직 카드 없음');
-  } catch (e) {
+const cardKeyOf = (front) => String(front || '').toLowerCase().replace(/[^a-z0-9가-힣]+/g, ' ').trim();
+
+/* ── 원본 블록 렌더링 ────────────────────────────────────────
+   서버는 Notion 원본 블록을 그대로 보내고, 렌더는 여기(표시 시점)에서 한다.
+   그래야 렌더 로직을 바꿔도 재동기화가 필요 없다. 옛 캐시/씨앗(cards.seed.json)의
+   평문 문자열 형식도 함께 지원한다(둘 다 typeof로 구분). */
+
+function richHtml(rich){
+  return (rich || []).map((t) => {
+    let s = esc(t.t);
+    if (t.code) s = '<code>' + s + '</code>';
+    if (t.bold) s = '<b>' + s + '</b>';
+    if (t.italic) s = '<i>' + s + '</i>';
+    if (t.strike) s = '<s>' + s + '</s>';
+    if (t.underline) s = '<u>' + s + '</u>';
+    if (t.href) s = '<a href="' + esc(t.href) + '" target="_blank" rel="noopener">' + s + '</a>';
+    return s;
+  }).join('');
+}
+function tableHtml(b){
+  const rows = b.rows || [];
+  return '<table>' + rows.map((row, ri) => {
+    const tag = b.headerRow && ri === 0 ? 'th' : 'td';
+    return '<tr>' + row.map((cell) => '<' + tag + '>' + richHtml(cell) + '</' + tag + '>').join('') + '</tr>';
+  }).join('') + '</table>';
+}
+function blockHtml(b){
+  if (!b) return '';
+  switch (b.type){
+    case 'heading_1': return '<h3>' + richHtml(b.rich) + '</h3>';
+    case 'heading_2': return '<h4>' + richHtml(b.rich) + '</h4>';
+    case 'heading_3': return '<h5>' + richHtml(b.rich) + '</h5>';
+    case 'bulleted_list_item': return '<li>' + richHtml(b.rich) + '</li>';
+    case 'numbered_list_item': return '<li>' + richHtml(b.rich) + '</li>';
+    case 'quote': return '<blockquote>' + richHtml(b.rich) + '</blockquote>';
+    case 'callout': return '<div class="callout">' + richHtml(b.rich) + '</div>';
+    case 'to_do': return '<div>' + (b.checked ? '&#9745; ' : '&#9744; ') + richHtml(b.rich) + '</div>';
+    case 'code': return '<pre><code>' + richHtml(b.rich) + '</code></pre>';
+    case 'divider': return '<hr>';
+    case 'table': return tableHtml(b);
+    default: return b.rich ? '<p>' + richHtml(b.rich) + '</p>' : '';
+  }
+}
+function blocksHtml(blocks){
+  let html = '', open = null;
+  for (const b of blocks || []){
+    const isLi = b.type === 'bulleted_list_item' || b.type === 'numbered_list_item';
+    const tag = b.type === 'numbered_list_item' ? 'ol' : 'ul';
+    if (isLi){
+      if (open !== tag){ if (open) html += '</' + open + '>'; html += '<' + tag + '>'; open = tag; }
+    } else if (open){ html += '</' + open + '>'; open = null; }
+    html += blockHtml(b);
+  }
+  if (open) html += '</' + open + '>';
+  return html;
+}
+
+// hint/context/detail은 새 형식(블록 객체)과 옛 형식(문자열/문자열 배열) 둘 다 온다.
+function hintHtml(c){
+  if (c.hint == null) return null;
+  if (typeof c.hint === 'string') return escBr(c.hint);
+  return richHtml(c.hint.rich || []);
+}
+function ctxHtml(c){
+  if (c.context == null) return null;
+  if (typeof c.context === 'string') return esc(c.context);
+  return richHtml(c.context.rich || []);
+}
+function detailHtml(c){
+  if (!c.detail || !c.detail.length) return '';
+  if (typeof c.detail[0] === 'string') return c.detail.map((t) => '<p>' + escBr(t) + '</p>').join('');
+  return blocksHtml(c.detail);
+}
+
+/* ── 상태 ───────────────────────────────────────────────── */
+let deck = [], idx = 0, remaining = 0, total = 0, sessionPromotions = 0, reading = false;
+
+/* ── 카드 공급 ──────────────────────────────────────────── */
+async function fetchBatch(n){
+  const res = await fetch('/api/cards?n=' + n);
+  const d = await res.json();
+  if (d.error) throw new Error(d.error);
+  if (typeof d.total === 'number') total = d.total;
+  if (typeof d.remaining === 'number') remaining = d.remaining;
+  updateGauge();
+  if (d.cards?.length){ local.set('sd_last', { cards: d.cards, at: Date.now() }); return d.cards; }
+  throw new Error(d.syncing ? '동기화 중' : '카드 없음'); // 빈 결과는 폴백(캐시→씨앗)으로 넘겨야 한다
+}
+
+async function fetchWithFallback(n){
+  try { return await fetchBatch(n); }
+  catch (e) {
     const c = local.get('sd_last', null);
-    if (c?.cards?.length) return { deck: c.cards, src: 'cache' };
+    if (c?.cards?.length) return c.cards;
     const res = await fetch('/cards.seed.json').catch(() => null);
     if (res?.ok){
       const all = await res.json();
       const g = local.get('sd_grades', {});
-      const marked = all.map((x) => ({ ...x, prevGrade: g[keyOf(x)]?.grade || null }));
-      return { deck: marked.sort(() => Math.random() - 0.5).slice(0, SESSION), src: 'seed' };
+      total = all.length; remaining = all.length;
+      updateGauge();
+      return all.map((x) => ({ ...x, prevGrade: g[cardKeyOf(x.front)]?.grade || null, step: 0 }))
+        .sort(() => Math.random() - 0.5);
     }
     throw e;
   }
 }
 
-const esc = (s) => String(s == null ? '' : s).replace(/[&<>]/g, (m) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;' }[m]));
-
-// AI 해설 원문에 리터럴 "<br>"이 섞여 들어오는 카드가 있다. 이스케이프하면 글자로
-// 보이고 그대로 두면 주입 통로가 된다 — 줄바꿈으로만 되살린다.
-const escBr = (s) => String(s == null ? '' : s).split(/<br\s*\/?>/i).map(esc).join('<br>');
-
-function renderDots(){
-  $('dots').innerHTML = deck.map((_, i) => '<div class="dot ' + (results[i] || '') + '"></div>').join('');
+let fetching = false;
+async function ensureQueue(){
+  if (fetching || deck.length - idx > 3) return;
+  fetching = true;
+  try {
+    const more = await fetchWithFallback(8);
+    const have = new Set(deck.map((c) => c.id));
+    const fresh = more.filter((c) => !have.has(c.id));
+    if (fresh.length) deck.push(...fresh);
+  } catch (e) { /* 네트워크 실패 — 남은 큐로 계속 스와이프 가능하게 조용히 무시 */ }
+  fetching = false;
+  if (idx < deck.length && $('loading').classList.contains('on')) showCurrent();
 }
 
-function render(){
+function pushRecent(c){
+  const rs = local.get('sd_recent', []).filter((r) => r.id !== c.id);
+  rs.unshift({ id: c.id, front: c.front });
+  local.set('sd_recent', rs.slice(0, 30));
+}
+
+/* ── 렌더 ───────────────────────────────────────────────── */
+function updateGauge(){
+  $('gaugebar').style.width = total ? (100 * (1 - remaining / Math.max(total, 1))) + '%' : '0%';
+  $('counter').textContent = remaining + ' / ' + total + (sessionPromotions ? ' · 승급 ' + sessionPromotions : '');
+}
+
+function isWeak(c){ return c.prevGrade === 'dunno'; }
+
+function showCurrent(){
   const c = deck[idx];
-  if (!c) return finish();
+  if (!c){ $('loadmsg').textContent = '더 가져오는 중…'; $('loading').classList.add('on'); return; }
+  $('loading').classList.remove('on');
+  $('cardTitle').textContent = c.front;
   const weak = isWeak(c);
   $('card').classList.toggle('bonus', weak);
+  const ctx = ctxHtml(c);
   $('front').innerHTML =
     (weak ? '<div class="chip">다시 만남</div>' : '') +
-    '<p class="en">' + esc(c.front) + '</p>' +
-    (c.context ? '<p class="ctx">' + esc(c.context) + '</p>' : '') +
-    '<div class="tapcue"><i></i>탭하면 뜻</div>';
-  $('back').className = 'back';
-  $('back').innerHTML = '';
-  reveal = 0;
-  renderDots();
-  $('streak').textContent = streak;
+    (ctx ? '<p class="ctx">' + ctx + '</p>' : '') +
+    '<div class="tapcue"><i></i>탭하면 전문</div>';
+  updateGauge();
+  pushRecent(c);
+  ensureQueue();
 }
 
-function doReveal(){
+function renderReader(){
   const c = deck[idx];
-  if (reveal === 0){
-    reveal = 1;
-    $('front').querySelector('.tapcue')?.remove();
-    $('back').className = 'back on';
-    $('back').innerHTML =
-      '<p class="hint">' + escBr(c.hint || '(뜻 없음)') + '</p>' +
-      (c.detail?.length ? '<button class="more" id="more">해설 더 보기</button>' : '') +
-      (c.url ? '<a class="src" href="' + esc(c.url) + '" target="_blank" rel="noopener">원본 쇼츠 &#8599;</a>' : '');
-    $('more')?.addEventListener('click', (e) => { e.stopPropagation(); doReveal(); });
-  } else if (reveal === 1){
-    reveal = 2;
-    $('more')?.remove();
-    const d = document.createElement('div');
-    d.className = 'detail';
-    d.innerHTML = c.detail.map((t) => '<p>' + escBr(t) + '</p>').join('');
-    $('back').insertBefore(d, $('back').querySelector('.src'));
-  }
+  const h = hintHtml(c);
+  $('readerBody').innerHTML =
+    (h ? '<p class="lhint">' + h + '</p>' : '') +
+    detailHtml(c) +
+    (c.url ? '<a class="src" href="' + esc(c.url) + '" target="_blank" rel="noopener">원본 쇼츠 &#8599;</a>' : '');
+  $('readerBody').scrollTop = 0;
 }
 
-// 채점은 화면을 막지 않는다 — 먼저 넘기고, 서버 기록은 뒤에서 따라간다.
-function grade(g){
-  const c = deck[idx], k = keyOf(c);
-  c.prevGrade = g;
-  // 씨앗 폴백으로 돌 때만 쓰이는 로컬 사본 — 서버가 살아 있으면 KV가 진실의 원본이다.
+/* ── 채점 ───────────────────────────────────────────────── */
+function doGrade(g){
+  const c = deck[idx];
+  const key = c.key || cardKeyOf(c.front);
+  const prevStep = c.step || 0;
+  let step = prevStep;
+  if (g === 'know') step = Math.min(prevStep + 1, 3);
+  else if (g === 'dunno') step = Math.max(prevStep - 1, 0);
+  if (prevStep === 0 && step > 0) { remaining = Math.max(0, remaining - 1); sessionPromotions++; }
+  else if (prevStep > 0 && step === 0) { remaining = Math.min(total, remaining + 1); }
+  c.prevGrade = g; c.step = step;
+
   const lg = local.get('sd_grades', {});
-  lg[k] = { grade: g, n: (lg[k]?.n || 0) + 1, at: Date.now() };
+  lg[key] = { grade: g, n: (lg[key]?.n || 0) + 1, step, at: Date.now() };
   local.set('sd_grades', lg);
-  results[idx] = g;
-  streak = (g === 'know') ? streak + 1 : 0;
 
-  pending++;
   fetch('/api/grade', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ pageId: c.id, key: k, grade: g })
-  }).catch(() => {}).finally(() => { pending--; });
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pageId: c.id, key, grade: g }),
+  }).then((r) => r.json()).then((d) => { if (typeof d.step === 'number') c.step = d.step; }).catch(() => {});
 
+  updateGauge();
   idx++;
-  if (idx >= deck.length) return finish();
-  render();
+  showCurrent();
 }
 
-function finish(){
-  const n = (g) => results.filter((x) => x === g).length;
-  $('tally').innerHTML = [['know','이해'],['fuzzy','애매'],['dunno','모름']]
-    .map(([k, l]) => '<div><span style="color:var(--' + k + ')">' + n(k) + '</span><em>' + l + '</em></div>').join('');
-  const scope = stats?.total ? `전체 ${stats.total}장 중 ${stats.graded}장 채점함` : '';
-  const prog = stats?.syncing && stats.progress
-    ? ` · 동기화 ${stats.progress.processed}/${stats.progress.total}` : '';
-  $('sync').textContent = (pending ? '기록 저장 중…' : scope) + prog;
-  $('done').classList.add('on');
+function step(dir){
+  if (dir > 0){ idx++; }
+  else if (dir < 0 && idx > 0){ idx--; }
+  showCurrent();
 }
 
-$('again').addEventListener('click', async () => {
-  $('again').disabled = true;
-  const { deck: d } = await loadSession().catch(() => ({ deck: [] }));
-  $('again').disabled = false;
-  if (!d.length) return;
-  $('done').classList.remove('on');
-  deck = d; idx = 0; results = []; streak = 0;
-  render();
-});
-
-/* ── 제스처 ─────────────────────────────────────────────── */
-const card = $('card'), wash = $('wash'), verdict = $('verdict');
-const TH = 88;
-let sx = 0, sy = 0, dx = 0, dy = 0, dragging = false, moved = false, lockH = false;
-
-const upGrade = () => reveal === 0 ? ['know','이해','var(--know)'] : ['dunno','모름','var(--dunno)'];
-const rightGrade = () => ['fuzzy','애매','var(--fuzzy)'];
+/* ── 1단(카드) 제스처: 좌/우=이해·모름, 상/하=다음·이전(채점 없음), 롱프레스=애매, 탭=전문 ── */
+const card = $('card'), wash = $('wash'), verdict = $('verdict'), stage = $('stage'), app = $('app');
+const TH = 90, LP_MS = 420;
+let sx = 0, sy = 0, dx = 0, dy = 0, dragging = false, moved = false, lpTimer = null, lpFired = false;
 
 function show(color, label, t){
   wash.style.background = 'radial-gradient(120% 80% at 50% 50%, color-mix(in srgb, ' + color + ' 26%, transparent), transparent 72%)';
   wash.style.opacity = t;
-  verdict.textContent = label;
-  verdict.style.color = color;
+  verdict.textContent = label; verdict.style.color = color;
   verdict.style.opacity = t;
   verdict.style.transform = 'translate(-50%,-50%) scale(' + (0.85 + t * 0.15) + ')';
 }
 const hide = () => { wash.style.opacity = 0; verdict.style.opacity = 0; };
 
+function exitAndGrade(g){
+  const dir = g === 'know' ? 1 : -1;
+  card.style.transition = 'transform .2s cubic-bezier(.2,.7,.3,1)';
+  card.style.transform = 'translateX(' + (dir * 120) + '%) rotate(' + (dir * 8) + 'deg)';
+  setTimeout(() => { card.style.transition = 'none'; card.style.transform = ''; doGrade(g); }, 190);
+}
+function exitAndStep(dir){
+  card.style.transition = 'transform .2s cubic-bezier(.2,.7,.3,1)';
+  card.style.transform = 'translateY(' + (dir * 120) + '%)';
+  setTimeout(() => { card.style.transition = 'none'; card.style.transform = ''; step(dir); }, 190);
+}
+function fireLongpress(){
+  lpFired = true; hide();
+  show('var(--fuzzy)', '애매', 1);
+  card.style.transition = 'transform .16s ease, opacity .16s ease';
+  card.style.transform = 'scale(.95)'; card.style.opacity = '0.35';
+  setTimeout(() => {
+    card.style.transition = 'none'; card.style.transform = ''; card.style.opacity = '';
+    hide(); doGrade('fuzzy');
+  }, 170);
+}
+
 card.addEventListener('pointerdown', (e) => {
-  if ($('done').classList.contains('on') || $('loading').classList.contains('on')) return;
-  lockH = !!e.target.closest('.detail');
-  dragging = true; moved = false;
+  if (reading || $('loading').classList.contains('on')) return;
+  dragging = true; moved = false; lpFired = false;
   sx = e.clientX; sy = e.clientY; dx = 0; dy = 0;
   card.setPointerCapture(e.pointerId);
   card.style.transition = 'none';
+  lpTimer = setTimeout(() => { if (dragging && !moved) fireLongpress(); }, LP_MS);
 });
-
 card.addEventListener('pointermove', (e) => {
-  if (!dragging) return;
-  dx = e.clientX - sx;
-  dy = lockH ? 0 : e.clientY - sy;
-  if (Math.abs(dx) > 6 || Math.abs(dy) > 6) moved = true;
-  card.style.transform = 'translate(' + dx + 'px,' + dy + 'px) rotate(' + (dx * 0.025) + 'deg)';
-
+  if (!dragging || lpFired) return;
+  dx = e.clientX - sx; dy = e.clientY - sy;
+  if (Math.abs(dx) > 6 || Math.abs(dy) > 6){ moved = true; clearTimeout(lpTimer); }
+  card.style.transform = 'translate(' + dx + 'px,' + dy + 'px) rotate(' + (dx * 0.02) + 'deg)';
   const vert = Math.abs(dy) > Math.abs(dx);
   const t = Math.min(Math.max(Math.abs(dx), Math.abs(dy)) / TH, 1);
-  if (!lockH && dy < -30 && vert){ const g = upGrade(); show(g[2], g[1], t); }
-  else if (dx > 30 && !vert){ const g = rightGrade(); show(g[2], g[1], t); }
-  else if (dx < -30 && !vert && idx > 0){ show('#8B95A3', '되돌리기', t); }
+  if (vert && Math.abs(dy) > 24) show('#8B95A3', dy < 0 ? '다음' : '이전', t);
+  else if (!vert && dx > 24) show('var(--know)', '이해', t);
+  else if (!vert && dx < -24) show('var(--dunno)', '모름', t);
   else hide();
 });
-
 card.addEventListener('pointerup', () => {
+  clearTimeout(lpTimer);
   if (!dragging) return;
-  dragging = false; hide();
-  card.style.transition = 'transform .22s cubic-bezier(.2,.7,.3,1)';
-  if (!moved){ card.style.transform = ''; doReveal(); return; }
-
+  dragging = false;
+  if (lpFired) return;
+  hide();
+  card.style.transition = 'transform .2s cubic-bezier(.2,.7,.3,1)';
+  if (!moved){ card.style.transform = ''; openReader(); return; }
   const vert = Math.abs(dy) > Math.abs(dx);
-  const up = !lockH && dy < -TH && vert;
-  const right = dx > TH && !vert;
-  const left = dx < -TH && !vert;
+  if (vert && Math.abs(dy) > TH) exitAndStep(dy < 0 ? 1 : -1);
+  else if (!vert && dx > TH) exitAndGrade('know');
+  else if (!vert && dx < -TH) exitAndGrade('dunno');
+  else card.style.transform = '';
+});
+card.addEventListener('pointercancel', () => { clearTimeout(lpTimer); dragging = false; hide(); card.style.transform = ''; });
 
-  if (up || right){
-    const g = up ? upGrade() : rightGrade();
-    card.style.transform = up ? 'translateY(-120%)' : 'translateX(120%)';
-    setTimeout(() => { card.style.transition = 'none'; card.style.transform = ''; grade(g[0]); }, 180);
-  } else if (left && idx > 0){
-    card.style.transform = 'translateX(120%)';
-    setTimeout(() => {
-      card.style.transition = 'none'; card.style.transform = '';
-      idx--; results[idx] = undefined; streak = 0; render();
-    }, 180);
-  } else {
-    card.style.transform = '';
+/* ── 2단(읽기) 열기/닫기 ─────────────────────────────────── */
+function openReader(){ reading = true; app.classList.add('reading'); stage.classList.add('reading'); renderReader(); }
+function closeReader(){ reading = false; app.classList.remove('reading'); stage.classList.remove('reading'); }
+
+const readerBody = $('readerBody'), reader = $('reader');
+let rsx = 0, rsy = 0, rdx = 0, rdy = 0, rDragging = false, rAtTop = false, rAtBottom = false, rMode = null;
+
+readerBody.addEventListener('pointerdown', (e) => {
+  rDragging = true; rsx = e.clientX; rsy = e.clientY; rdx = 0; rdy = 0; rMode = null;
+  rAtTop = readerBody.scrollTop <= 0;
+  rAtBottom = readerBody.scrollTop + readerBody.clientHeight >= readerBody.scrollHeight - 1;
+  try { readerBody.setPointerCapture(e.pointerId); } catch (err) {} // 드래그 중 포인터가 요소 밖으로 나가도 이벤트를 계속 받는다
+});
+readerBody.addEventListener('pointermove', (e) => {
+  if (!rDragging) return;
+  rdx = e.clientX - rsx; rdy = e.clientY - rsy;
+  if (rMode === null && (Math.abs(rdx) > 10 || Math.abs(rdy) > 10)){
+    rMode = Math.abs(rdx) > Math.abs(rdy) ? 'h' : 'v';
+  }
+  if (rMode === 'h') reader.style.transform = 'translateX(' + rdx + 'px)';
+  else if (rMode === 'v'){
+    if (rdy > 0 && rAtTop) reader.style.transform = 'translateY(' + Math.min(rdy, 140) * 0.5 + 'px)';
+    else if (rdy < 0 && rAtBottom) reader.style.transform = 'translateY(' + Math.max(rdy, -140) * 0.5 + 'px)';
   }
 });
+readerBody.addEventListener('pointerup', () => {
+  if (!rDragging) return; rDragging = false;
+  reader.style.transition = 'transform .18s ease';
+  const closeH = rMode === 'h' && Math.abs(rdx) > TH;
+  const closeV = rMode === 'v' && Math.abs(rdy) > TH && ((rdy > 0 && rAtTop) || (rdy < 0 && rAtBottom));
+  reader.style.transform = '';
+  if (closeH || closeV) closeReader();
+  setTimeout(() => { reader.style.transition = ''; }, 200);
+  rMode = null;
+});
+readerBody.addEventListener('pointercancel', () => { rDragging = false; reader.style.transform = ''; rMode = null; });
 
-card.addEventListener('pointercancel', () => { dragging = false; hide(); card.style.transform = ''; });
+/* ── 모아보기 ───────────────────────────────────────────── */
+let indexItems = null, listFilter = 'all', listQuery = '', expandedId = null, expandedCache = {};
+const listview = $('listview'), tabs = $('tabs'), recentSec = $('recentSec'), listBody = $('listBody');
+
+async function openList(){
+  listview.classList.add('on');
+  if (!indexItems){
+    try {
+      const res = await fetch('/api/index');
+      const d = await res.json();
+      indexItems = d.items || [];
+    } catch (e) { indexItems = []; }
+  }
+  renderTabs(); renderRecent(); renderList();
+}
+function closeList(){ listview.classList.remove('on'); }
+
+function renderTabs(){
+  const counts = [0, 0, 0, 0];
+  indexItems.forEach((it) => counts[Math.min(it.step, 3)]++);
+  const labels = ['0', '1차', '2차', '3차'];
+  tabs.innerHTML = ['<button class="tab' + (listFilter === 'all' ? ' on' : '') + '" data-f="all">전체 ' + indexItems.length + '</button>']
+    .concat(labels.map((l, i) => '<button class="tab' + (listFilter === String(i) ? ' on' : '') + '" data-f="' + i + '">' + l + ' ' + counts[i] + '</button>'))
+    .join('');
+}
+tabs.addEventListener('click', (e) => {
+  const b = e.target.closest('.tab'); if (!b) return;
+  listFilter = b.dataset.f; renderTabs(); renderList();
+});
+$('searchBox').addEventListener('input', (e) => { listQuery = e.target.value.trim().toLowerCase(); renderList(); });
+
+function renderRecent(){
+  const rs = local.get('sd_recent', []);
+  recentSec.innerHTML = rs.length
+    ? '<div class="rechead">최근 본 것</div><div class="recrow">' +
+      rs.slice(0, 15).map((r) => '<button class="recchip" data-id="' + esc(r.id) + '">' + esc(r.front) + '</button>').join('') + '</div>'
+    : '';
+}
+recentSec.addEventListener('click', (e) => {
+  const b = e.target.closest('.recchip'); if (!b) return;
+  listFilter = 'all'; listQuery = ''; $('searchBox').value = ''; renderTabs();
+  toggleExpand(b.dataset.id);
+});
+
+function rowHtml(it){
+  const badge = ['0', '1차', '2차', '3차'][Math.min(it.step, 3)];
+  const open = expandedId === it.id;
+  return '<div class="lrow' + (open ? ' open' : '') + '" data-id="' + esc(it.id) + '">' +
+    '<div class="lhead"><span class="lfront">' + esc(it.front) + '</span><span class="lstep s' + Math.min(it.step, 3) + '">' + badge + '</span></div>' +
+    (open ? '<div class="lbody">' + (expandedCache[it.id] ? expandDetail(expandedCache[it.id]) : '불러오는 중…') + '</div>' : '') +
+    '</div>';
+}
+function expandDetail(c){
+  const h = hintHtml(c);
+  return (h ? '<p style="color:var(--paper);font-weight:600;margin:0 0 6px">' + h + '</p>' : '') + detailHtml(c) +
+    (c.url ? '<a class="src" href="' + esc(c.url) + '" target="_blank" rel="noopener">원본 쇼츠 &#8599;</a>' : '');
+}
+function renderList(){
+  let items = indexItems || [];
+  if (listFilter !== 'all') items = items.filter((it) => Math.min(it.step, 3) === Number(listFilter));
+  if (listQuery) items = items.filter((it) => it.front.toLowerCase().includes(listQuery));
+  listBody.innerHTML = items.length
+    ? items.slice(0, 300).map(rowHtml).join('')
+    : '<div class="lempty">해당하는 카드 없음</div>';
+}
+listBody.addEventListener('click', (e) => {
+  const row = e.target.closest('.lrow'); if (!row) return;
+  toggleExpand(row.dataset.id);
+});
+async function toggleExpand(id){
+  expandedId = expandedId === id ? null : id;
+  renderList();
+  if (!expandedId) return;
+  const it = (indexItems || []).find((x) => x.id === expandedId);
+  if (it) pushRecent(it);
+  if (!expandedCache[expandedId]){
+    try {
+      const res = await fetch('/api/card?id=' + encodeURIComponent(expandedId));
+      const d = await res.json();
+      expandedCache[expandedId] = d.error ? { hint: null, detail: [] } : d;
+    } catch (e) { expandedCache[expandedId] = { hint: null, detail: [] }; }
+    renderList();
+  }
+}
+
+$('listBtn').addEventListener('click', openList);
+$('closeListBtn').addEventListener('click', closeList);
 
 /* ── 시작 ───────────────────────────────────────────────── */
-loadSession().then(({ deck: d, src }) => {
-  if (!d.length){ $('loadmsg').textContent = '카드가 없음 — Notion DB를 확인'; return; }
-  deck = d;
-  $('loading').classList.remove('on');
-  render();
-  if (src !== 'notion') console.warn('[ShortsDeck] 대체 데이터 사용:', src);
-}).catch((e) => {
-  const p = stats?.progress;
-  $('loadmsg').textContent = p
-    ? `Notion에서 카드를 가져오는 중 ${p.processed}/${p.total} — 잠시 후 새로고침`
-    : '불러오기 실패 — ' + e.message;
-});
+(async () => {
+  try {
+    const cards = await fetchWithFallback(8);
+    if (!cards.length){
+      $('loadmsg').textContent = '카드가 없음 — Notion DB를 확인';
+      return;
+    }
+    deck = cards; idx = 0;
+    showCurrent();
+  } catch (e) {
+    $('loadmsg').textContent = '불러오기 실패 — ' + e.message;
+  }
+})();
 </script>
 </body>
 </html>
