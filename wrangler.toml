@@ -10,7 +10,7 @@ binding = "ASSETS"
 # 카드 캐시 + 학습 이력(grades). `wrangler kv namespace create KV`로 만든 id를 넣을 것.
 [[kv_namespaces]]
 binding = "KV"
-id = "PUT_KV_NAMESPACE_ID_HERE"
+id = "929a2e986f2447689d4bb936327e6120"
 
 [vars]
 NOTION_DB_ID = "277763872455804ebc00cb991e8e3247"
@@ -18,3 +18,7 @@ NOTION_DB_ID = "277763872455804ebc00cb991e8e3247"
 # NOTION_TOKEN은 vars가 아니라 secret이다:
 #   npx wrangler secret put NOTION_TOKEN
 # 로컬 개발은 .dev.vars 파일에 NOTION_TOKEN=... (gitignore됨)
+
+# 동기화는 한 번에 못 끝난다(무료 요금제 서브요청 50회 상한). cron이 이어 돌린다.
+[triggers]
+crons = ["*/5 * * * *"]

@@ -130,42 +130,44 @@
 const SESSION = 10;
 const $ = (id) => document.getElementById(id);
 
-let CARDS = [], grades = {}, deck = [], idx = 0, reveal = 0, streak = 0, results = [], pending = 0;
+let deck = [], idx = 0, reveal = 0, streak = 0, results = [], pending = 0, stats = null;
 
 const local = {
   get(k, d){ try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } },
   set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
 };
 
-/* ── 데이터 로드 ─────────────────────────────────────────
-   Worker가 진실의 원본. 실패하면 마지막으로 성공한 캐시 → 씨앗 데이터 순으로 퇴화한다.
-   폰에서 오프라인이거나 Notion이 느릴 때도 앱이 빈 화면이 되지 않게. */
-async function load(){
+const keyOf = (c) => c.key || String(c.front || '').toLowerCase().replace(/[^a-z0-9가-힣]+/g, ' ').trim();
+const isWeak = (c) => c.prevGrade === 'dunno';
+
+/* ── 한 판 불러오기 ───────────────────────────────────────
+   ⚠ 카드가 1300장이 넘어 전량을 받지 않는다 — 서버가 한 판(10장)을 골라 준다.
+   실패하면 마지막 판 캐시 → 씨앗 데이터 순으로 퇴화한다. 폰이 오프라인이거나
+   Notion이 느려도 앱이 빈 화면이 되지 않게. */
+async function loadSession(){
   try {
-    const res = await fetch('/api/cards');
-    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const res = await fetch('/api/cards?session=' + SESSION);
     const d = await res.json();
     if (d.error) throw new Error(d.error);
-    CARDS = d.cards || [];
-    grades = d.grades || {};
-    local.set('sd_cache', { cards: CARDS, grades, at: Date.now() });
-    return 'notion';
+    if (d.cards?.length){
+      stats = { total: d.total, graded: d.graded, syncing: d.syncing, progress: d.progress };
+      local.set('sd_last', { cards: d.cards, at: Date.now() });
+      return { deck: d.cards, src: 'notion' };
+    }
+    if (d.syncing) stats = { syncing: true, progress: d.progress };
+    throw new Error('아직 카드 없음');
   } catch (e) {
-    const c = local.get('sd_cache', null);
-    if (c?.cards?.length){ CARDS = c.cards; grades = c.grades || {}; return 'cache'; }
+    const c = local.get('sd_last', null);
+    if (c?.cards?.length) return { deck: c.cards, src: 'cache' };
     const res = await fetch('/cards.seed.json').catch(() => null);
-    if (res?.ok){ CARDS = await res.json(); grades = local.get('sd_grades', {}); return 'seed'; }
+    if (res?.ok){
+      const all = await res.json();
+      const g = local.get('sd_grades', {});
+      const marked = all.map((x) => ({ ...x, prevGrade: g[keyOf(x)]?.grade || null }));
+      return { deck: marked.sort(() => Math.random() - 0.5).slice(0, SESSION), src: 'seed' };
+    }
     throw e;
   }
-}
-
-const keyOf = (c) => c.key || String(c.front || '').toLowerCase().replace(/[^a-z0-9가-힣]+/g, ' ').trim();
-const gradeOf = (c) => grades[keyOf(c)]?.grade;
-
-function buildDeck(){
-  const weak = CARDS.filter((c) => gradeOf(c) === 'dunno');
-  const rest = CARDS.filter((c) => gradeOf(c) !== 'dunno');
-  return [...weak.slice(0, 4), ...rest].sort(() => Math.random() - 0.5).slice(0, SESSION);
 }
 
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>]/g, (m) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;' }[m]));
@@ -181,7 +183,7 @@ function renderDots(){
 function render(){
   const c = deck[idx];
   if (!c) return finish();
-  const weak = gradeOf(c) === 'dunno';
+  const weak = isWeak(c);
   $('card').classList.toggle('bonus', weak);
   $('front').innerHTML =
     (weak ? '<div class="chip">다시 만남</div>' : '') +
@@ -219,8 +221,11 @@ function doReveal(){
 // 채점은 화면을 막지 않는다 — 먼저 넘기고, 서버 기록은 뒤에서 따라간다.
 function grade(g){
   const c = deck[idx], k = keyOf(c);
-  grades[k] = { grade: g, n: (grades[k]?.n || 0) + 1, at: Date.now() };
-  local.set('sd_cache', { cards: CARDS, grades, at: Date.now() });
+  c.prevGrade = g;
+  // 씨앗 폴백으로 돌 때만 쓰이는 로컬 사본 — 서버가 살아 있으면 KV가 진실의 원본이다.
+  const lg = local.get('sd_grades', {});
+  lg[k] = { grade: g, n: (lg[k]?.n || 0) + 1, at: Date.now() };
+  local.set('sd_grades', lg);
   results[idx] = g;
   streak = (g === 'know') ? streak + 1 : 0;
 
@@ -240,13 +245,20 @@ function finish(){
   const n = (g) => results.filter((x) => x === g).length;
   $('tally').innerHTML = [['know','이해'],['fuzzy','애매'],['dunno','모름']]
     .map(([k, l]) => '<div><span style="color:var(--' + k + ')">' + n(k) + '</span><em>' + l + '</em></div>').join('');
-  $('sync').textContent = pending ? '기록 저장 중…' : 'Notion에 기록됨';
+  const scope = stats?.total ? `전체 ${stats.total}장 중 ${stats.graded}장 채점함` : '';
+  const prog = stats?.syncing && stats.progress
+    ? ` · 동기화 ${stats.progress.processed}/${stats.progress.total}` : '';
+  $('sync').textContent = (pending ? '기록 저장 중…' : scope) + prog;
   $('done').classList.add('on');
 }
 
-$('again').addEventListener('click', () => {
+$('again').addEventListener('click', async () => {
+  $('again').disabled = true;
+  const { deck: d } = await loadSession().catch(() => ({ deck: [] }));
+  $('again').disabled = false;
+  if (!d.length) return;
   $('done').classList.remove('on');
-  deck = buildDeck(); idx = 0; results = []; streak = 0;
+  deck = d; idx = 0; results = []; streak = 0;
   render();
 });
 
@@ -321,14 +333,17 @@ card.addEventListener('pointerup', () => {
 card.addEventListener('pointercancel', () => { dragging = false; hide(); card.style.transform = ''; });
 
 /* ── 시작 ───────────────────────────────────────────────── */
-load().then((src) => {
-  if (!CARDS.length){ $('loadmsg').textContent = '카드가 없음 — Notion DB를 확인'; return; }
+loadSession().then(({ deck: d, src }) => {
+  if (!d.length){ $('loadmsg').textContent = '카드가 없음 — Notion DB를 확인'; return; }
+  deck = d;
   $('loading').classList.remove('on');
-  deck = buildDeck();
   render();
   if (src !== 'notion') console.warn('[ShortsDeck] 대체 데이터 사용:', src);
 }).catch((e) => {
-  $('loadmsg').textContent = '불러오기 실패 — ' + e.message;
+  const p = stats?.progress;
+  $('loadmsg').textContent = p
+    ? `Notion에서 카드를 가져오는 중 ${p.processed}/${p.total} — 잠시 후 새로고침`
+    : '불러오기 실패 — ' + e.message;
 });
 </script>
 </body>
