@@ -41,7 +41,6 @@ const BUCKET_SIZE = 50;             // ⚠ 카드별 개별 KV 저장은 불가 
 const PARSER_VERSION = 2;           // 포맷을 바꾸면 올릴 것 — 증분 로직이 옛 포맷을 재사용하지 않게
 const SUB_BUDGET = 40;              // 50 상한에서 여유 10회를 남긴다
 const STALE_MS = 6 * 60 * 60 * 1000; // 캐시가 이보다 오래되면 cron이 새 동기화를 시작
-const DUE_DAYS = { 1: 3, 2: 7, 3: 21 }; // "때가 됨" 경과일 — 강제 아님, 뽑기 가중치일 뿐
 
 /* ── Notion 호출 (서브요청 예산 관리) ─────────────────────── */
 
@@ -341,7 +340,7 @@ async function syncStep(env, token, dbId) {
       }
 
       st.bucket.cards.push(card);
-      st.items.push({ id: row.id, key: card.key, front: row.front, url: row.url, edited: row.edited, bucket: st.bucket.num });
+      st.items.push({ id: row.id, key: card.key, front: row.front, url: row.url, edited: row.edited, created: row.created, bucket: st.bucket.num });
       st.i++;
 
       if (st.bucket.cards.length >= BUCKET_SIZE) {
@@ -499,40 +498,29 @@ async function undoGrade(env, token, dbId, { pageId, key, prev }) {
 const json = (o, status = 200) =>
   new Response(JSON.stringify(o), { status, headers: { 'Content-Type': 'application/json; charset=utf-8' } });
 
-const shuffle = (a) => a.map((v) => [Math.random(), v]).sort((x, y) => x[0] - y[0]).map((p) => p[1]);
-
 /**
- * 뽑기: 완료도 0(빈 값 포함) 70% + 복습 때가 된 상위 차수 30%.
- * "때가 됨" = 마지막 채점 이후 경과일이 차수별 기준(1차 3일·2차 7일·3차 21일)을 넘김.
- * ⚠ 정통 간격반복(SM-2/FSRS)이 아니다 — 경과일은 강제가 아니라 뽑기 가중치일 뿐이라
- *   "오늘 밀린 47장" 같은 부채감이 생기지 않는다.
+ * 뽑기: 생성일자 오름차순(오래된 것부터) 그대로 — 사용자가 Notion에서 쓰던 방식과
+ * 동일(2026-09-04 결정, 완료도 0/복습 구분·가중치 전부 폐기). `after`(마지막으로 받은
+ * 카드의 created)를 기준으로 그다음 지점부터 이어서 n개를 뽑고, 끝에 닿으면 처음으로
+ * 되감는다(고리형 — 기존 덱 순환 방식과 동일한 정신).
  */
-function pickCandidates(items, grades, n) {
-  const now = Date.now();
-  const zero = [], due = [];
-  for (const it of items) {
-    const g = grades[it.key];
-    const step = g?.step || 0;
-    if (step === 0) { zero.push(it); continue; }
-    const days = DUE_DAYS[Math.min(step, 3)] || 999;
-    if (!g?.at || now - g.at >= days * 86400000) due.push(it);
+function pickByDate(items, n, after) {
+  const sorted = [...items].sort((a, b) => new Date(a.created) - new Date(b.created));
+  if (!sorted.length) return [];
+  let start = 0;
+  if (after) {
+    const afterMs = new Date(after).getTime();
+    start = sorted.findIndex((it) => new Date(it.created).getTime() > afterMs);
+    if (start === -1) start = 0; // 끝까지 다 왔으면 처음으로
   }
-  const nZero = Math.max(1, Math.round(n * 0.7));
-  const picked = [...shuffle(zero).slice(0, nZero), ...shuffle(due).slice(0, n - nZero)];
-  if (picked.length < n) {
-    const have = new Set(picked.map((c) => c.id));
-    const rest = items.filter((it) => !have.has(it.id));
-    picked.push(...shuffle(rest).slice(0, n - picked.length));
-  }
-  return shuffle(picked).slice(0, n);
-}
-
-function remainingCount(items, grades) {
-  return items.filter((it) => !(grades[it.key]?.step > 0)).length;
+  const out = [];
+  for (let i = 0; i < n && i < sorted.length; i++) out.push(sorted[(start + i) % sorted.length]);
+  return out;
 }
 
 async function handleCards(env, url) {
   const n = Math.min(Math.max(parseInt(url.searchParams.get('n') || '8', 10) || 8, 1), 30);
+  const after = url.searchParams.get('after') || null;
   const idxRaw = await env.KV.get(K_INDEX);
   const grades = JSON.parse((await env.KV.get(K_GRADES)) || '{}');
   const st = JSON.parse((await env.KV.get(K_STATE)) || 'null');
@@ -540,34 +528,32 @@ async function handleCards(env, url) {
 
   if (!idxRaw) {
     return json({
-      cards: [], total: 0, remaining: 0, graded: Object.keys(grades).length, syncing: true,
+      cards: [], total: 0, syncing: true,
       progress: st ? { processed: st.i, total: st.rows.length } : null,
     }, 202);
   }
 
   const idx = JSON.parse(idxRaw);
-  const candidates = pickCandidates(idx.items, grades, n);
+  const candidates = pickByDate(idx.items, n, after);
   const byBucket = new Map();
   for (const it of candidates) {
     if (!byBucket.has(it.bucket)) byBucket.set(it.bucket, []);
     byBucket.get(it.bucket).push(it.id);
   }
-  const cards = [];
+  const byId = new Map();
   for (const [num, ids] of byBucket) {
     const raw = await env.KV.get(K_BUCKET + num);
     if (!raw) continue;
-    const byId = Object.fromEntries(JSON.parse(raw).cards.map((c) => [c.id, c]));
-    for (const id of ids) {
-      const c = byId[id];
-      if (c) cards.push({ ...c, step: grades[c.key]?.step || 0, n: grades[c.key]?.n || 0 });
+    for (const c of JSON.parse(raw).cards) {
+      if (ids.includes(c.id)) byId.set(c.id, { ...c, step: grades[c.key]?.step || 0, n: grades[c.key]?.n || 0 });
     }
   }
+  // 버킷별로 묶어 읽었으니 candidates(날짜순)를 기준으로 다시 순서를 맞춘다.
+  const cards = candidates.map((it) => byId.get(it.id)).filter(Boolean);
 
   return json({
-    cards: shuffle(cards),
+    cards,
     total: idx.items.length,
-    remaining: remainingCount(idx.items, grades),
-    graded: Object.keys(grades).length,
     builtAt: idx.builtAt,
     syncing,
     progress: st ? { processed: st.i, total: st.rows.length } : null,
