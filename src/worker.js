@@ -374,13 +374,34 @@ const rt = (arr) => (arr || []).map((t) => t.plain_text || '').join('');
 
 /* ── 채점 기록 ───────────────────────────────────────────── */
 
-// ⚠ know에 /완료/를 넣지 말 것 — 난이도 컬럼에도 "완료" 옵션이 있어 "쉬움" 대신 그게 잡힌다.
-const GRADE_HINT = { know: /쉬움|easy/i, fuzzy: /적당|보통|medium/i, dunno: /어려|hard|모름/i };
-
 // 진도(완료도) 옵션 — 실측: 첫 옵션은 "0차"가 아니라 그냥 "0". step 0은 그 옵션으로.
 function progressOptionFor(options, step) {
   if (step <= 0) return options.find((o) => o === '0') || options.find((o) => /^0/.test(o)) || null;
   return options.find((o) => new RegExp('^' + Math.min(step, 3) + '차').test(o)) || null;
+}
+
+/* ── 하루 활동 로그(캘린더용, 2026-09-04 UX 재설계 반영) ───────
+   "채점(완료 버튼)한 카드 키" 집합을 날짜별로 KV에 쌓는다 — 뷰(스와이프로 지나간 것)까지
+   전부 기록하면 KV 쓰기가 매 스와이프마다 발생해 무료 쓰기 1,000회/일에 쉽게 걸린다.
+   그래서 "그날 본 개수"는 정확히는 "그날 채점한 개수"의 근사다(1일 실사용 채점량은
+   수십 건 수준이라 예산에 전혀 안 걸림). 되돌리기는 이 기록을 지우지 않는다 —
+   "봤다"는 사실 자체는 안 되돌린다는 결정(CLAUDE.md UX 규약)과 일치. */
+const K_DAILY = 'daily:v1:'; // + YYYY-MM-DD(KST)
+
+function dayKeyKST(ms) {
+  const d = new Date(ms + 9 * 3600000); // UTC+9로 밀어서 그 날짜의 UTC 자정 기준 문자열을 뽑는다
+  return d.toISOString().slice(0, 10);
+}
+
+async function markSeenToday(env, key, atMs) {
+  const dk = K_DAILY + dayKeyKST(atMs);
+  const raw = await env.KV.get(dk);
+  const keys = raw ? JSON.parse(raw) : [];
+  if (!keys.includes(key)) {
+    keys.push(key);
+    await env.KV.put(dk, JSON.stringify(keys));
+  }
+  return keys.length;
 }
 
 // name === null이면 속성을 비운다(되돌리기가 "한 번도 채점 안 한 상태"로 복구할 때 씀).
@@ -390,20 +411,25 @@ const optionPayload = (type, name) =>
     : (type === 'select' ? { select: { name } } : { status: { name } });
 
 /**
- * 채점 한 번 = 완료도(진도) 한 칸 승급/제자리/강등 + 상태(난이도) 갱신 + 복습 횟수 +1.
- * ⚠ 횟수(n)와 차수(step)는 별개 축 — 같이 올리면 세 번 봐도 계속 모르는 카드가 3차로
- *   올라간다(첫 구현의 실제 결함). 강등은 한 칸만 — 0으로 리셋하면 소거의 재미가 죽는다.
+ * 채점 한 번 = 완료도(진도)를 클라이언트가 정한 목표 차수(step)로 직접 설정 + 복습 횟수 +1.
+ * ⚠ 2026-09-04 UX 재설계로 "이해/애매/모름" 3단 채점이 폐지됐다 — 완료 버튼 탭은 항상
+ *   n+1(step=min(현재+1,3)), 롱프레스는 임의 차수로 텔레포트. 어느 쪽이든 클라이언트가
+ *   최종 목표 step을 계산해 보내고, 서버는 그 값을 그대로 반영한다(증감 로직 없음).
+ *   "몰랐다/틀렸다" 신호가 없어졌으므로 상태(난이도) 컬럼은 더 이상 채점에서 건드리지 않는다.
+ * ⚠ 횟수(n)와 차수(step)는 별개 축 — 텔레포트로 차수만 바꿔도 n은 그대로 +1 된다(그
+ *   순간도 "봤다"로 치는 것).
  */
-async function writeGrade(env, token, dbId, { pageId, key, grade }) {
+async function writeGrade(env, token, dbId, { pageId, key, step }) {
+  const at = Date.now();
   // 1) KV — 진실의 원본. pageId가 churn해도 제목 키로 살아남는다.
   const all = JSON.parse((await env.KV.get(K_GRADES)) || '{}');
   const prev = all[key] || { n: 0, step: 0 };
   const n = prev.n + 1;
-  const step = grade === 'know' ? Math.min((prev.step || 0) + 1, 3)
-    : grade === 'dunno' ? Math.max((prev.step || 0) - 1, 0)
-    : (prev.step || 0);
-  all[key] = { grade, n, step, at: Date.now() };
+  all[key] = { n, step, at };
   await env.KV.put(K_GRADES, JSON.stringify(all));
+
+  // 1-b) 오늘 활동 로그 — 캘린더가 읽는 원본(위 markSeenToday 참조).
+  await markSeenToday(env, key, at);
 
   // 2) Notion — best effort. 실패해도 채점은 이미 KV에 남았으므로 안전 퇴화.
   let notionOk = false;
@@ -415,10 +441,6 @@ async function writeGrade(env, token, dbId, { pageId, key, grade }) {
     }
     const props = {};
     if (schema.count) props[schema.count] = { number: n };
-    if (schema.difficulty) {
-      const opt = schema.difficultyOptions.find((o) => GRADE_HINT[grade]?.test(o));
-      if (opt) props[schema.difficulty] = optionPayload(schema.difficultyType, opt);
-    }
     if (schema.progress) {
       const opt = progressOptionFor(schema.progressOptions, step);
       if (opt) props[schema.progress] = optionPayload(schema.progressType, opt);
@@ -433,17 +455,20 @@ async function writeGrade(env, token, dbId, { pageId, key, grade }) {
 }
 
 /**
- * 되돌리기 — 직전 채점 한 건만 취소(단발성, 히스토리 없음). "잘못 매긴 채점 복구"가
- * 목적이라 복습 횟수(n)까지 되돌린다 — writeGrade의 "횟수는 단조증가" 원칙의 유일한
- * 예외(2026-09-03 사용자 결정). prev가 null이면 "한 번도 채점 안 한 상태"로 복구하는
- * 것이라 Notion 속성도 실제로 비운다(옵션 미설정).
+ * 되돌리기 — 이동+채점 통합 히스토리에서 스택 팝 한 건씩(다단계, 클라이언트가 스택을 들고
+ * 연속 호출). "잘못 매긴 채점 복구"가 목적이라 복습 횟수(n)까지 되돌린다 — writeGrade의
+ * "횟수는 단조증가" 원칙의 유일한 예외. prev가 null이면 "한 번도 채점 안 한 상태"로 복구.
+ * ⚠ 오늘 활동 로그(daily:v1:*)는 되돌리지 않는다 — "봤다"는 사실 자체는 안 되돌린다는
+ *   결정(CLAUDE.md UX 규약, 2026-09-04)과 일치.
  */
 async function undoGrade(env, token, dbId, { pageId, key, prev }) {
   const all = JSON.parse((await env.KV.get(K_GRADES)) || '{}');
-  if (prev) all[key] = { grade: prev.grade, n: prev.n, step: prev.step, at: Date.now() };
+  if (prev) all[key] = { n: prev.n, step: prev.step, at: Date.now() };
   else delete all[key];
   await env.KV.put(K_GRADES, JSON.stringify(all));
 
+  const n = prev ? prev.n : 0;
+  const step = prev ? prev.step : 0;
   let notionOk = false;
   try {
     let schema = JSON.parse((await env.KV.get(K_SCHEMA)) || 'null');
@@ -451,20 +476,8 @@ async function undoGrade(env, token, dbId, { pageId, key, prev }) {
       schema = await discoverSchema(token, dbId);
       await env.KV.put(K_SCHEMA, JSON.stringify(schema));
     }
-    const n = prev ? prev.n : 0;
-    const step = prev ? prev.step : 0;
     const props = {};
     if (schema.count) props[schema.count] = { number: n };
-    if (schema.difficulty) {
-      if (prev) {
-        // 옵션을 못 찾으면(스키마 드리프트) writeGrade처럼 건드리지 않고 넘어간다 —
-        // "한 번도 채점 안 한 상태"가 아닌 한 함부로 비우지 않는다.
-        const opt = schema.difficultyOptions.find((o) => GRADE_HINT[prev.grade]?.test(o));
-        if (opt) props[schema.difficulty] = optionPayload(schema.difficultyType, opt);
-      } else {
-        props[schema.difficulty] = optionPayload(schema.difficultyType, null);
-      }
-    }
     if (schema.progress) {
       const opt = progressOptionFor(schema.progressOptions, step);
       if (opt) props[schema.progress] = optionPayload(schema.progressType, opt);
@@ -543,7 +556,7 @@ async function handleCards(env, url) {
     const byId = Object.fromEntries(JSON.parse(raw).cards.map((c) => [c.id, c]));
     for (const id of ids) {
       const c = byId[id];
-      if (c) cards.push({ ...c, prevGrade: grades[c.key]?.grade || null, step: grades[c.key]?.step || 0, n: grades[c.key]?.n || 0 });
+      if (c) cards.push({ ...c, step: grades[c.key]?.step || 0, n: grades[c.key]?.n || 0 });
     }
   }
 
@@ -589,7 +602,38 @@ async function handleCard(env, id) {
   if (!card) return json({ error: 'not found' }, 404);
   const grades = JSON.parse((await env.KV.get(K_GRADES)) || '{}');
   const g = grades[card.key];
-  return json({ ...card, prevGrade: g?.grade || null, step: g?.step || 0 });
+  return json({ ...card, step: g?.step || 0, n: g?.n || 0 });
+}
+
+// 하단 시트 캘린더 — 최근 N일(기본 28)의 날짜별 활동 개수. 하루 1건씩 KV 읽기라
+// N=28이면 28회, 요청당 50회 상한 안쪽이라 여유 있다.
+async function handleCalendar(env, url) {
+  const days = Math.min(Math.max(parseInt(url.searchParams.get('days') || '28', 10) || 28, 1), 42);
+  const now = Date.now();
+  const out = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const date = dayKeyKST(now - i * 86400000);
+    const raw = await env.KV.get(K_DAILY + date);
+    out.push({ date, count: raw ? JSON.parse(raw).length : 0 });
+  }
+  return json({ days: out });
+}
+
+// 캘린더에서 특정 날짜를 눌렀을 때 — 그날 채점된 카드 목록(제목·차수만, 모아보기와 동일 모양).
+async function handleDay(env, date) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '')) return json({ error: 'date 형식 오류(YYYY-MM-DD)' }, 400);
+  const raw = await env.KV.get(K_DAILY + date);
+  const keys = raw ? JSON.parse(raw) : [];
+  if (!keys.length) return json({ items: [] });
+  const idxRaw = await env.KV.get(K_INDEX);
+  if (!idxRaw) return json({ items: [] });
+  const idx = JSON.parse(idxRaw);
+  const byKey = new Map(idx.items.map((it) => [it.key, it]));
+  const grades = JSON.parse((await env.KV.get(K_GRADES)) || '{}');
+  const items = keys.map((k) => byKey.get(k)).filter(Boolean).map((it) => ({
+    id: it.id, key: it.key, front: it.front, step: grades[it.key]?.step || 0,
+  }));
+  return json({ items });
 }
 
 export default {
@@ -600,6 +644,8 @@ export default {
     if (url.pathname === '/api/cards') return handleCards(env, url);
     if (url.pathname === '/api/index') return handleIndex(env);
     if (url.pathname === '/api/card') return handleCard(env, url.searchParams.get('id') || '');
+    if (url.pathname === '/api/calendar') return handleCalendar(env, url);
+    if (url.pathname === '/api/day') return handleDay(env, url.searchParams.get('date') || '');
 
     if (url.pathname === '/api/sync') {
       if (!token || !dbId) return json({ error: 'NOTION_TOKEN / NOTION_DB_ID 미설정' }, 500);
@@ -614,7 +660,7 @@ export default {
         const body = await request.json();
         if (!body.key) return json({ error: 'key 필요' }, 400);
         if (body.undo) return json(await undoGrade(env, token, dbId, body));
-        if (!body.grade) return json({ error: 'grade 필요' }, 400);
+        if (typeof body.step !== 'number') return json({ error: 'step 필요(목표 차수 0~3)' }, 400);
         return json(await writeGrade(env, token, dbId, body));
       } catch (e) { return json({ error: String(e.message || e) }, 500); }
     }
