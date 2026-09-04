@@ -62,16 +62,20 @@
   }
   .peek-prev{transform:translateX(-100%)}
   .peek-next{transform:translateX(100%)}
-  .peek .title{padding:14px 22px 6px;color:var(--muted)}
+  /* padding-top은 .topbar의 10px과 반드시 같아야 한다 — 어긋나면 프리뷰→실제 스왑 순간
+     제목이 그 차이만큼 위/아래로 튄다(2026-09-04 15라운드, 4px 어긋나 있던 걸 발견해 맞춤). */
+  .peek .title{padding:10px 22px 6px;color:var(--paper)}
   .content p{margin:0 0 12px}
   .content h3{font-family:var(--serif);font-weight:400;font-size:1.3em;color:var(--paper);margin:20px 0 8px}
   .content .hl{background:var(--coral);color:var(--ink);padding:.04em .4em;border-radius:4px;font-family:var(--mono);font-size:.88em;font-weight:600;white-space:nowrap}
   .content table{width:100%;border-collapse:collapse;margin:10px 0;font-size:.87em}
   .content th,.content td{border:1px solid var(--ink4);padding:6px 8px;text-align:left;vertical-align:top}
   .content th{color:var(--coral);font-weight:500;background:color-mix(in srgb,var(--coral) 7%,transparent)}
-  /* 프리뷰 본문 — .content 스타일을 그대로 물려받되(같은 클래스 병기), 옅게 죽이고 하단은 페이드 */
+  /* 프리뷰 본문 — .content 스타일을 그대로 물려받되(같은 클래스 병기), 하단만 페이드.
+     예전엔 opacity:.5로 옅게 죽였는데, 실제로 스왑될 때 밝기까지 같이 튀어 보여서
+     뺐다(2026-09-04 15라운드) — 화면 옆으로 잘려 나온 위치 자체가 이미 "프리뷰" 신호. */
   .peekbody{
-    flex:1;min-height:0;opacity:.5;
+    flex:1;min-height:0;
     -webkit-mask-image:linear-gradient(to bottom, black 55%, transparent 90%);
     mask-image:linear-gradient(to bottom, black 55%, transparent 90%);
   }
@@ -306,7 +310,10 @@ let history = []; // 이동+채점 통합 스택 — 되돌리기 연타로 오�
 // 오늘 본 카드 id — 채점 여부와 무관하게 "표시된 적 있음"이면 들어간다(2026-09-04 7라운드 결정).
 // Set이라 같은 카드를 스와이프로 몇 번을 오가도 중복으로 안 늘어난다 — "채점만 카운트" 방식이
 // 겪던 문제(스와이프는 셀 수 없음)와 "다 카운트" 방식이 겪을 문제(왔다갔다로 숫자 부풀림)를 동시에 해결한다.
-let todaySet = new Set(MAIN_DECK_IDS); // 목업 기준값 — 데모 시작 시 "오늘 6개 이미 봄" 상태로 시작
+// 6장 전부를 시드하면 메인 덱을 스와이프로 돌아도 항상 이미 "본" 카드뿐이라 숫자가
+// 절대 안 늘어난다(2026-09-04 14라운드, 사용자가 실측으로 발견) — 절반만 시드해서
+// 나머지 절반을 처음 스와이프로 만날 때 실제로 늘어나는 걸 보여준다.
+let todaySet = new Set(MAIN_DECK_IDS.slice(0, 3));
 let session = null; // { total, i } — 날짜별 복습 세션 중일 때만
 
 /* ── 캘린더 목업(최근 28일, 실제 날짜에 매핑) ── */
@@ -457,8 +464,14 @@ function goPrev(){
 /* ── 좌우=이전/다음(채점 없음, 드래그 중 옆 카드 제목이 살짝 보임), 상하=스크롤(네이티브) ── */
 const content = $('content'), scroller = $('scroller'), topbar = $('topbar');
 const peekPrev = $('peekPrev'), peekNext = $('peekNext');
-const TH = 70;
-let sx = 0, sy = 0, dx = 0, dy = 0, mode = null, dragging = false;
+// 커밋 판정 = 실측 폭 비율 + 속도(플릭) 하이브리드(2026-09-04 14라운드, Swiper.js
+// longSwipesRatio/longSwipesMs·Material Design 3 duration 토큰 참고). 고정 px(TH)는
+// 화면폭이 크면 살짝만 끌어도 넘어가버리는 문제가 있어 폐기.
+const COMMIT_RATIO = 0.5;   // 천천히 끌 때: 폭의 50% 이상 끌어야 커밋(다음 카드 절반 보이는 지점 근처)
+const FLICK_MS = 300;       // 이 시간 안에 손을 떼면 "플릭"으로 간주
+const FLICK_RATIO = 0.18;   // 플릭일 때: 폭의 18%만 끌어도 커밋(빠르게 튕기면 짧은 거리로도 넘어감)
+const TRANSITION_MS = 280;  // 전환 지속시간(Swiper speed·MD3 medium2 기준 ~300ms에 맞춤)
+let sx = 0, sy = 0, dx = 0, dy = 0, mode = null, dragging = false, dragW = 1, startT = 0;
 
 function prevCard(){ return deck[(idx - 1 + deck.length) % deck.length]; }
 function nextCard(){ return deck[(idx + 1) % deck.length]; }
@@ -476,17 +489,18 @@ function setDragTransition(t){
   content.style.transition = t; topbar.style.transition = t;
   peekPrev.style.transition = t; peekNext.style.transition = t;
 }
-// 손가락 이동보다 화면 이동을 조금 키우고(민감도), 임계값을 넘으면 저항을 줘서
-// "여기서부터 커밋된다"는 게 손끝에 느껴지게 한다(2026-09-04 9라운드).
-const DRAG_SENS = 1.35;
-function dragCurve(rawDx){
+// 손끝보다 화면이 아주 살짝 더 따라오는 정도만 증폭(커밋 판정이 이제 폭 비율 기준이라
+// 과증폭할 이유가 없다 — 2026-09-04 14라운드, 시각 이동과 커밋 기준을 같은 축으로 통일).
+const DRAG_SENS = 1.15;
+function dragCurve(rawDx, w){
   const amp = rawDx * DRAG_SENS;
   const sign = amp < 0 ? -1 : 1, abs = Math.abs(amp);
-  return abs <= TH ? amp : sign * (TH + (abs - TH) * 0.4);
+  return abs <= w ? amp : sign * (w + (abs - w) * 0.3); // 카드 폭을 넘어가면 저항
 }
 
 scroller.addEventListener('pointerdown', (e) => {
   dragging = true; mode = null; sx = e.clientX; sy = e.clientY; dx = 0; dy = 0;
+  dragW = scroller.offsetWidth || 1; startT = e.timeStamp;
   try { scroller.setPointerCapture(e.pointerId); } catch (err) {}
   setDragTransition('none');
   const pc = prevCard(), nc = nextCard();
@@ -501,19 +515,29 @@ scroller.addEventListener('pointermove', (e) => {
   if (mode === null && (Math.abs(dx) > 10 || Math.abs(dy) > 10)){
     mode = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v';
   }
-  if (mode === 'h') setDragX(dragCurve(dx));
+  if (mode === 'h') setDragX(dragCurve(dx, dragW));
 });
-scroller.addEventListener('pointerup', () => {
+scroller.addEventListener('pointerup', (e) => {
   if (!dragging) return;
   dragging = false;
   if (mode === 'h'){
-    setDragTransition('transform .18s cubic-bezier(.2,.7,.3,1)');
-    if (dx < -TH){
-      setDragX(-40);
-      setTimeout(() => { setDragTransition('none'); resetDragX(); goNext(); }, 160);
-    } else if (dx > TH){
-      setDragX(40);
-      setTimeout(() => { setDragTransition('none'); resetDragX(); goPrev(); }, 160);
+    const elapsed = e.timeStamp - startT;
+    const ratio = Math.abs(dx) / dragW;
+    const isFlick = elapsed <= FLICK_MS && ratio >= FLICK_RATIO;
+    const commit = isFlick || ratio >= COMMIT_RATIO;
+    setDragTransition('transform ' + TRANSITION_MS + 'ms cubic-bezier(.2,.7,.3,1)');
+    if (commit && dx < 0){
+      setDragX(-dragW);
+      content.addEventListener('transitionend', function onEnd(){
+        content.removeEventListener('transitionend', onEnd);
+        setDragTransition('none'); resetDragX(); goNext();
+      }, { once: true });
+    } else if (commit && dx > 0){
+      setDragX(dragW);
+      content.addEventListener('transitionend', function onEnd(){
+        content.removeEventListener('transitionend', onEnd);
+        setDragTransition('none'); resetDragX(); goPrev();
+      }, { once: true });
     } else {
       resetDragX();
     }
