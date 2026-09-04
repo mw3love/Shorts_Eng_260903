@@ -176,7 +176,14 @@
   .sheetsettings{padding:10px 18px 4px;display:flex;flex-direction:column;gap:8px;border-bottom:1px solid var(--ink3);margin-bottom:6px}
   .sliderow{display:flex;align-items:center;gap:10px}
   .sliderow label{flex:none;width:38px;font-family:var(--mono);font-size:11px;color:var(--muted)}
-  .sliderow input[type="range"]{flex:1;accent-color:var(--coral)}
+  /* pill 트랙 + 코랄 채움(design-bakeoff 라운드2 확정, 2026-09-04) — --fill은 JS가 값%로 갱신 */
+  .sliderow input[type="range"]{
+    flex:1;-webkit-appearance:none;appearance:none;height:6px;border-radius:999px;outline:none;background:linear-gradient(to right,var(--coral) 0%,var(--coral) var(--fill,50%),var(--ink4) var(--fill,50%),var(--ink4) 100%);
+  }
+  .sliderow input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:16px;border-radius:50%;background:var(--coral);cursor:pointer;border:2px solid var(--ink)}
+  .sliderow input[type="range"]::-moz-range-track{height:6px;border-radius:999px;background:var(--ink4)}
+  .sliderow input[type="range"]::-moz-range-progress{height:6px;border-radius:999px;background:var(--coral)}
+  .sliderow input[type="range"]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--coral);border:2px solid var(--ink);cursor:pointer}
   .sliderow .val{flex:none;width:38px;text-align:right;font-family:var(--mono);font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
   .sheetsearch{padding:10px 18px 6px}
   .sheetsearch input{
@@ -196,13 +203,15 @@
   .calweekday{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;padding:0 18px 4px;font-family:var(--mono);font-size:9.5px;color:var(--muted);text-align:center}
   .calgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;padding:0 18px 6px}
   /* 날짜 숫자=코너 작게, 개수=중앙 크게로 분리(2026-09-04 10라운드) — 둘이 붙어 보이던 문제 보완.
-     배경 농도로 개수를 또 표현하지 않는다(숫자 하나로 충분) — 코랄은 개수 숫자에만 쓴다. */
-  .calcell{aspect-ratio:1;border-radius:6px;border:0;cursor:pointer;position:relative;background:var(--ink3)}
+     캘린더는 베이크오프 3라운드 확정(2026-09-04): 칸 모양=C2(플랫, 그림자·그러데이션 없음),
+     오늘 칸 테두리=C1(코랄 링+글로우), 개수 숫자=C3(크고 밝은 흰색 — "뚜렷하게") 조합. */
+  .calcell{aspect-ratio:1;border-radius:5px;border:0;cursor:pointer;position:relative;background:var(--ink3)}
   .calcell.blank{background:transparent;pointer-events:none}
   .calcell .dnum{position:absolute;top:3px;left:5px;font-family:var(--mono);font-size:9px;color:var(--muted)}
-  .calcell .dcnt{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:13px;font-weight:600;color:var(--coral)}
-  .calcell.today{box-shadow:inset 0 0 0 1.5px var(--paper)}
-  .calcell:disabled{cursor:default;opacity:.5}
+  .calcell .dcnt{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:14px;font-weight:300;color:var(--paper)}
+  .calcell.today{box-shadow:0 0 0 1.5px var(--coral),0 2px 6px rgba(255,143,107,.3)}
+  .calcell.today .dcnt{color:var(--coral)}
+  .calcell:disabled{cursor:default;opacity:.4}
   .sheetlist{padding:6px 18px 22px}
   .srow{
     display:flex;align-items:center;justify-content:space-between;gap:10px;
@@ -664,6 +673,10 @@ function fmtCalHeadDate(i){
 function readPx(el){ return Math.round(parseFloat(getComputedStyle(el).fontSize)) + 'px'; }
 function lsGet(k){ try { return localStorage.getItem(k); } catch (err) { return null; } }
 function lsSet(k, v){ try { localStorage.setItem(k, v); } catch (err) {} }
+function setSliderFill(el){
+  const pct = (el.value - el.min) / (el.max - el.min) * 100;
+  el.style.setProperty('--fill', pct + '%');
+}
 const titleScale = $('titleScale'), bodyScale = $('bodyScale');
 const savedTScale = lsGet('sd_tscale'), savedBScale = lsGet('sd_bscale');
 if (savedTScale) titleScale.value = savedTScale;
@@ -672,11 +685,13 @@ function applyTitleScale(){
   document.documentElement.style.setProperty('--tscale', titleScale.value);
   $('titleScaleVal').textContent = readPx($('cardTitle'));
   lsSet('sd_tscale', titleScale.value);
+  setSliderFill(titleScale);
 }
 function applyBodyScale(){
   document.documentElement.style.setProperty('--bscale', bodyScale.value);
   $('bodyScaleVal').textContent = readPx(content);
   lsSet('sd_bscale', bodyScale.value);
+  setSliderFill(bodyScale);
 }
 titleScale.addEventListener('input', applyTitleScale);
 bodyScale.addEventListener('input', applyBodyScale);
