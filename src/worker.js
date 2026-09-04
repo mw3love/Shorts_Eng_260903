@@ -380,12 +380,15 @@ function progressOptionFor(options, step) {
   return options.find((o) => new RegExp('^' + Math.min(step, 3) + '차').test(o)) || null;
 }
 
-/* ── 하루 활동 로그(캘린더용, 2026-09-04 UX 재설계 반영) ───────
-   "채점(완료 버튼)한 카드 키" 집합을 날짜별로 KV에 쌓는다 — 뷰(스와이프로 지나간 것)까지
-   전부 기록하면 KV 쓰기가 매 스와이프마다 발생해 무료 쓰기 1,000회/일에 쉽게 걸린다.
-   그래서 "그날 본 개수"는 정확히는 "그날 채점한 개수"의 근사다(1일 실사용 채점량은
-   수십 건 수준이라 예산에 전혀 안 걸림). 되돌리기는 이 기록을 지우지 않는다 —
-   "봤다"는 사실 자체는 안 되돌린다는 결정(CLAUDE.md UX 규약)과 일치. */
+/* ── 하루 활동 로그(캘린더+오늘 스크러버용) ───────
+   "그날 표시된(본) 카드 키" 집합을 날짜순으로 KV에 쌓는다(순서 보존 — 스크러버가 방문
+   순서대로 점을 그려야 해서 배열이지 Set이 아니다). 트리거는 "채점"이 아니라 "화면에
+   표시"다(2026-09-04 실기기 테스트에서 발견 — 원래 UX 규약도 "본 개수"였는데 포팅 때
+   KV 쓰기 예산을 과하게 걱정해 "채점한 개수"로 잘못 좁혔었다). 걱정이 과했던 이유: 같은
+   카드를 하루에 여러 번 다시 봐도 키 중복 제거로 쓰기가 또 안 나간다 — 실제 쓰기 횟수는
+   "그날 처음 본 새 카드 수"만큼만 발생해서, 하루 200장을 봐도 200회로 무료 한도
+   (1,000회/일)에 전혀 안 걸린다. 되돌리기는 이 기록을 지우지 않는다 — "봤다"는 사실
+   자체는 안 되돌린다는 결정(CLAUDE.md UX 규약)과 일치. */
 const K_DAILY = 'daily:v1:'; // + YYYY-MM-DD(KST)
 
 function dayKeyKST(ms) {
@@ -605,6 +608,30 @@ async function handleCard(env, id) {
   return json({ ...card, step: g?.step || 0, n: g?.n || 0 });
 }
 
+// 카드가 화면에 표시될 때마다 클라이언트가 부른다(채점과 무관) — 오늘 카운터+캘린더+
+// 하단 스크러버의 원본. 같은 카드를 다시 봐도 markSeenToday가 중복 제거하므로 매번 불러도 안전.
+async function handleSeen(env, body) {
+  if (!body.key) return json({ error: 'key 필요' }, 400);
+  const count = await markSeenToday(env, body.key, Date.now());
+  return json({ ok: true, count });
+}
+
+// 되돌리기가 "봤다"는 사실 자체까지 취소할 때 부른다(2026-09-04 실기기 피드백으로 결정
+// 뒤집음 — 예전엔 되돌리기가 오늘 카운트는 안 건드렸는데, 그 방향으로 가면 "5개 보고
+// 마지막 걸 되돌렸는데 오늘 카운트가 그대로 5"인 게 부자연스럽다는 지적). 클라이언트가
+// 이 카드의 오늘 첫 조회가 이번 되돌리기 대상이 맞다고 판단했을 때만 부른다 — 그날 다른
+// 경로로 이미 한 번 더 본 카드까지 지우면 안 되므로, 판단은 클라이언트의 히스토리 스택이
+// 한다(요청 자체는 그냥 이 카드를 오늘 목록에서 뺀다).
+async function handleUnseen(env, body) {
+  if (!body.key) return json({ error: 'key 필요' }, 400);
+  const dk = K_DAILY + dayKeyKST(Date.now());
+  const raw = await env.KV.get(dk);
+  const keys = raw ? JSON.parse(raw) : [];
+  const next = keys.filter((k) => k !== body.key);
+  if (next.length !== keys.length) await env.KV.put(dk, JSON.stringify(next));
+  return json({ ok: true, count: next.length });
+}
+
 // 하단 시트 캘린더 — 최근 N일(기본 28)의 날짜별 활동 개수. 하루 1건씩 KV 읽기라
 // N=28이면 28회, 요청당 50회 상한 안쪽이라 여유 있다.
 async function handleCalendar(env, url) {
@@ -646,6 +673,14 @@ export default {
     if (url.pathname === '/api/card') return handleCard(env, url.searchParams.get('id') || '');
     if (url.pathname === '/api/calendar') return handleCalendar(env, url);
     if (url.pathname === '/api/day') return handleDay(env, url.searchParams.get('date') || '');
+    if (url.pathname === '/api/seen' && request.method === 'POST') {
+      try { return await handleSeen(env, await request.json()); }
+      catch (e) { return json({ error: String(e.message || e) }, 500); }
+    }
+    if (url.pathname === '/api/unseen' && request.method === 'POST') {
+      try { return await handleUnseen(env, await request.json()); }
+      catch (e) { return json({ error: String(e.message || e) }, 500); }
+    }
 
     if (url.pathname === '/api/sync') {
       if (!token || !dbId) return json({ error: 'NOTION_TOKEN / NOTION_DB_ID 미설정' }, 500);
