@@ -120,6 +120,7 @@
   }
   .subpos-chip span#subPos{font-family:var(--mono);font-size:11px;color:var(--paper);font-weight:600}
   .subpos-dots{display:flex;gap:3px}
+  .subpos-dots[hidden]{display:none}
   .subpos-dots i{width:6px;height:6px;border-radius:50%;background:var(--ink4);display:block}
   .subpos-dots i.on{background:var(--coral)}
   .subpos-dots i.half{background:linear-gradient(90deg,var(--coral) 50%,var(--ink4) 50%)}
@@ -128,6 +129,27 @@
      화면을 넣는 대신(무마찰 원칙) 주소 칩만 짧게 튀어 알린다. */
   @keyframes subposflash{0%{transform:scale(1)}35%{transform:scale(1.16)}100%{transform:scale(1)}}
   .subpos-chip.flash{animation:subposflash .42s ease}
+
+  /* ── 검색(2026-09-06) — 상단 주소 칩이 가운데 정렬이라 좌우 코너가 비어 있음(사용자 제안:
+     우상단). 오버레이는 시트와 별개(같은 z 레이어 뒤섞이지 않게 상단만 덮는 형태). ── */
+  .searchbtn{
+    position:absolute;top:env(safe-area-inset-top);right:0;z-index:3;margin:5px 8px 0 0;
+    width:32px;height:32px;border-radius:50%;border:0;cursor:pointer;
+    background:var(--ink3);color:var(--muted);display:flex;align-items:center;justify-content:center;
+    -webkit-touch-callout:none;
+  }
+  .searchov{
+    position:fixed;inset:0;z-index:12;background:var(--ink);display:flex;flex-direction:column;
+    padding-top:env(safe-area-inset-top);
+  }
+  .searchov[hidden]{display:none}
+  .searchbar{flex:none;display:flex;align-items:center;gap:8px;padding:10px 14px}
+  .searchbar input{
+    flex:1;background:var(--ink3);border:0;border-radius:10px;color:var(--paper);
+    font-family:var(--sans);font-size:15px;padding:11px 13px;outline:none;
+  }
+  .searchbar button{flex:none;background:none;border:0;color:var(--muted);font-size:18px;cursor:pointer;padding:4px}
+  .searchresults{flex:1;overflow-y:auto;padding:2px 14px 24px;-webkit-overflow-scrolling:touch}
 
   /* ── 챕터 완주 넛지 배너 ── */
   .chapnudge{
@@ -191,6 +213,10 @@
   .knowbtn svg{width:20px;height:20px;stroke:currentColor}
   .knowbtn:active{transform:scale(.93)}
   .knowbtn.on{background:color-mix(in srgb,var(--know) 24%,var(--ink3));color:var(--know)}
+  /* 완전히 앎/휴지통 카드뷰(reviewMode)에서는 체크 아이콘이 "복구" 역할로 바뀐다 —
+     코랄로 색을 바꿔 평소 안다 버튼(초록)과 구분한다. */
+  .knowbtn.reviewing{color:var(--coral)}
+  .knowbtn.reviewing.on{background:color-mix(in srgb,var(--coral) 24%,var(--ink3));color:var(--coral)}
   .knowpop{
     position:absolute;left:16px;right:16px;bottom:calc(var(--barh) - 4px);z-index:4;
     background:color-mix(in srgb,var(--ink2) 96%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
@@ -279,27 +305,30 @@
   .chaplist{padding:6px 16px 10px;display:flex;flex-direction:column;gap:10px}
   /* 챕터 행 — 라벨 2줄 스택 + 칩 전체가 "이동" 탭 영역, "시험"만 별도 미니 버튼
      (2026-09-05 베이크오프 라운드4 — "이동이 기본 행동이니 칩 전체를 이동으로"). */
-  .chaprow{background:var(--ink3);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;cursor:pointer}
+  /* 2026-09-06 라운드13: 버튼은 22px 큰 숫자(chaprow-score) 줄에 그대로 두고(높이가 이미
+     버튼과 맞음), "최고 N"을 별도 줄→같은 줄 인라인으로 합쳐 그만큼 세로를 줄였다. */
+  .chaprow{background:var(--ink3);border-radius:12px;padding:9px 12px;display:flex;flex-direction:column;gap:5px;cursor:pointer}
   .chaprow:active{background:var(--ink4)}
   .chaprow-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
   .chaprow-label{display:flex;flex-direction:column;gap:1px}
   .chaprow-label b{font-family:var(--serif);font-weight:400;font-size:15px;color:var(--paper)}
   .chaprow-range{font-family:var(--mono);font-size:10.5px;color:var(--muted)}
-  .chaprow-score{font-family:var(--mono);font-size:22px;font-weight:500;color:var(--paper);font-variant-numeric:tabular-nums;flex:none;text-align:right}
-  .chaprow-score .best{display:block;font-size:11px;font-weight:400;color:var(--coral);margin-top:1px}
-  .chaprow-bar{height:5px;border-radius:3px;background:var(--ink4);overflow:hidden}
-  .chaprow-bar i{display:block;height:100%;background:var(--coral);border-radius:3px}
+  .chaprow-score{font-family:var(--mono);font-size:22px;font-weight:500;color:var(--paper);font-variant-numeric:tabular-nums;flex:none;text-align:right;white-space:nowrap}
+  .chaprow-score .best{display:inline;font-size:11px;font-weight:400;color:var(--coral);margin-left:5px}
+  .chaprow-bar{height:4px;border-radius:2px;background:var(--ink4);overflow:hidden}
+  .chaprow-bar i{display:block;height:100%;background:var(--coral);border-radius:2px}
   .chaprow-exam{flex:none;white-space:nowrap;background:var(--ink4);border:0;border-radius:9px;color:var(--coral);font-family:var(--sans);font-size:11px;padding:6px 9px;cursor:pointer}
   .trashsec{padding:4px 16px 18px}
-  .trashtoggle{width:100%;background:none;border:0;color:var(--muted);font-family:var(--sans);font-size:12.5px;padding:10px 2px;cursor:pointer;text-align:left}
   .trashrow{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--ink3);border-radius:10px;padding:10px 12px;margin-top:6px}
   .trashrow .tf{font-family:var(--serif);font-size:14px;color:var(--paper);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .trashrow .ta{display:flex;gap:6px;flex:none}
+  .trashrow .ta{display:flex;gap:6px;flex:none;align-items:center}
   .trashrow .ta button{background:var(--ink4);border:0;border-radius:7px;color:var(--body-text);font-size:11px;padding:6px 8px;cursor:pointer}
   .trashrow .ta button.del{color:var(--coral)}
-  /* 폰트 슬라이더는 스크롤 영역 밖·시트 맨 아래 고정 — 엄지에 가장 가깝고, 챕터 목록을
-     아무리 스크롤해도 자리가 안 변한다(2026-09-05 사용자 선택). */
-  .sheetsettings{flex:none;padding:10px 18px 8px;display:flex;flex-direction:column;gap:20px;border-top:1px solid var(--ink3)}
+  /* 검색 결과 상태 배지(2026-09-06) — .trashrow/.ta를 그대로 재사용, 배지만 추가 */
+  .searchbadge{font-family:var(--sans);font-size:10.5px;color:var(--muted);background:var(--ink4);border-radius:6px;padding:4px 7px;white-space:nowrap}
+  .searchbadge.s-known{color:var(--know)}
+  .searchbadge.s-archive{color:var(--coral)}
+  .searchbadge.s-trash{color:var(--muted)}
   .sliderow{display:flex;align-items:center;gap:10px}
   .sliderow label{flex:none;width:38px;font-family:var(--mono);font-size:11px;color:var(--muted)}
   .sliderow input[type="range"]{flex:1;-webkit-appearance:none;appearance:none;height:6px;border-radius:999px;outline:none;background:linear-gradient(to right,var(--coral) 0%,var(--coral) var(--fill,50%),var(--ink4) var(--fill,50%),var(--ink4) 100%)}
@@ -346,7 +375,8 @@
       </div>
       <div class="peek peek-prev" id="peekPrev"><div class="cardtitle" id="peekPrevTitle"></div><div class="content peekbody" id="peekPrevBody"></div></div>
       <div class="peek peek-next" id="peekNext"><div class="cardtitle" id="peekNextTitle"></div><div class="content peekbody" id="peekNextBody"></div></div>
-      <div class="subpos"><button class="subpos-chip" id="subPosChip" aria-label="이 소챕터 시험보기"><span id="subPos">1-1</span><span class="subpos-dots"><i></i><i></i><i></i><i></i><i></i></span></button></div>
+      <div class="subpos"><button class="subpos-chip" id="subPosChip" aria-label="이 소챕터 시험보기"><span id="subPos">1-1</span><span class="subpos-dots" id="subPosDots"><i></i><i></i><i></i><i></i><i></i></span></button></div>
+      <button class="searchbtn" id="searchOpenBtn" aria-label="검색"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></button>
     </div>
 
     <div class="chapnudge" id="chapNudge">
@@ -357,6 +387,14 @@
     <div class="knowpop" id="knowPop" hidden>
       <button id="knowArchiveBtn">✅ 완전히 안다 — 보관(더 안 보여줌)</button>
       <button class="trash" id="knowTrashBtn">🗑 휴지통으로(나중에 완전삭제 가능)</button>
+      <button class="trash" id="reviewDeleteBtn" hidden>🗑 완전삭제(되돌릴 수 없음)</button>
+    </div>
+
+    <!-- 제목/본문 글자크기 — 2026-09-06부터 챕터 시트에서 분리(무관한 기능이 같이 묶여
+         있다는 지적). 챕터 목록을 열 필요 없이 이 버튼 하나로 바로 조절. -->
+    <div class="knowpop" id="fontPop" hidden>
+      <div class="sliderow"><label for="titleScale">제목</label><input type="range" id="titleScale" min="0.7" max="1.4" step="0.02" value="1"><span class="val" id="titleScaleVal"></span></div>
+      <div class="sliderow"><label for="bodyScale">본문</label><input type="range" id="bodyScale" min="0.8" max="1.5" step="0.02" value="1"><span class="val" id="bodyScaleVal"></span></div>
     </div>
 
     <div class="bottombar" id="bottombar">
@@ -366,6 +404,7 @@
         <div class="barr-icons">
           <button class="knowbtn" id="knowBtn" aria-label="안다(길게 누르면 보관/휴지통)"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></button>
           <button class="barbtn" id="hlBtn" aria-label="형광펜 모드"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg></button>
+          <button class="barbtn" id="fontBtn" aria-label="글자 크기">Aa</button>
           <button class="barbtn" id="sheetBtn" aria-label="챕터 목록">&#9776;</button>
         </div>
       </div>
@@ -399,10 +438,14 @@
     <div class="trashsec" id="archiveSec"></div>
     <div class="trashsec" id="trashSec"></div>
   </div>
-  <div class="sheetsettings">
-    <div class="sliderow"><label for="titleScale">제목</label><input type="range" id="titleScale" min="0.7" max="1.4" step="0.02" value="1"><span class="val" id="titleScaleVal"></span></div>
-    <div class="sliderow"><label for="bodyScale">본문</label><input type="range" id="bodyScale" min="0.8" max="1.5" step="0.02" value="1"><span class="val" id="bodyScaleVal"></span></div>
+</div>
+
+<div class="searchov" id="searchOv" hidden>
+  <div class="searchbar">
+    <input id="searchInput" type="search" placeholder="검색어 입력" autocomplete="off">
+    <button id="searchCloseBtn" aria-label="닫기">&#10005;</button>
   </div>
+  <div class="searchresults" id="searchResults"></div>
 </div>
 
 <script>
@@ -867,6 +910,7 @@ function prefetchNeighbors(){
 // atEnd — 뒤로 스와이프해서 이전 소챕터로 넘어온 경우엔 첫 카드가 아니라 마지막 카드에
 // 도착해야 이동 방향과 화면이 맞는다(2026-09-05 실기기 피드백).
 async function loadSubchapter(atEnd){
+  if (reviewMode) exitReviewModeUi(); // 실제 챕터로 돌아오는 모든 경로(시트 이동·검색 등)의 공통 관문
   const id = subId();
   let cards = subCache.get(id);
   if (!cards){
@@ -888,24 +932,36 @@ async function loadSubchapter(atEnd){
 // 보관·휴지통 카드는 전체보기 로테이션에서 항상 빠진다(점수·총량엔 영향 없음 — 순수 가시성).
 function visibleCards(list){ return list.filter((c) => !c.archived && !c.trashed); }
 function applyFilter(atEnd){
+  // 필터 토글(미완료만 ↔ 전체) 전환 시 지금 보던 카드가 새 목록에도 있으면 그 자리를
+  // 유지한다 — 예전엔 무조건 0번으로 가서 읽던 위치를 잃었다(2026-09-06 사용자 지적).
+  // 소챕터를 새로 불러온 경우(atEnd 호출)는 이전 studyCards가 다른 소챕터 카드라 어차피
+  // key가 안 맞아 이 분기를 안 타고 기존 atEnd 규칙 그대로 적용된다.
+  const prevKey = studyCards[studyIdx] && studyCards[studyIdx].key;
   const visible = visibleCards(subchapterAll);
   studyCards = studyMode === 'unknown' ? visible.filter((c) => !c.known) : visible;
   if (!studyCards.length){ toast('이 소챕터는 모두 알고 있음 — 전체보기로 전환'); studyMode = 'all'; syncFilterButtons(); studyCards = visible; }
-  // studyIdx는 폴백(전체보기 전환)까지 끝난 뒤 한 번만 정한다 — 목록 길이가 확정된 다음이라야 맞다.
-  studyIdx = atEnd ? Math.max(0, studyCards.length - 1) : 0;
+  const keepIdx = prevKey ? studyCards.findIndex((c) => c.key === prevKey) : -1;
+  studyIdx = keepIdx >= 0 ? keepIdx : (atEnd ? Math.max(0, studyCards.length - 1) : 0);
   setRetitleContext(() => studyCards[studyIdx]);
   renderStudyCard();
 }
 function renderStudyCard(){
   const c = studyCards[studyIdx];
   if (!c) return;
+  // 스와이프 없이 곧장 점프하는 경로(챕터 목록 이동·검색 결과 이동·복습 카드뷰 진입 등)가
+  // 여러 곳으로 늘면서, 드래그 도중 상태가 이 경로들과 겹치면 peek 카드의 잔상 transform이
+  // 안 지워진 채 남아 엉뚱한 카드가 화면을 덮는 경우가 있었다(2026-09-06 테스트로 발견) —
+  // 매번 여기서 한 번 더 원위치시켜 어느 경로로 와도 항상 깨끗한 상태로 그린다.
+  setDragTransition('none'); resetDragX();
   $('cardTitle').textContent = c.front;
   $('cardTitle').href = c.url || '#';
   $('content').innerHTML = cardBodyHtml(c);
   $('scroller').scrollTop = 0;
   renderStudyScrubber();
-  $('knowBtn').classList.toggle('on', !!c.known);
+  // reviewMode에선 known on/off가 "복구 여부"와 무관해 오해를 줄 수 있어 끈다(2026-09-06).
+  $('knowBtn').classList.toggle('on', !reviewMode && !!c.known);
   warmImages(studyPrev()); warmImages(studyNext());
+  if (reviewMode) updateReviewBar();
 }
 
 /* ── "안다" 퀵버튼 — 탭=안다, 롱프레스=보관/휴지통 갈림길(2026-09-05 deep-interview) ──
@@ -929,10 +985,19 @@ async function markKnown(){
   apiAnswer(subId(), c.key, true, c.id);
   if (studyMode === 'unknown') removeCurrentCardFromRotation();
 }
-function showKnowPop(){ $('knowPop').hidden = false; }
+function showKnowPop(){
+  // 휴지통 카드뷰(reviewMode)에서 롱프레스는 "완전삭제" 확인 하나뿐 — 평소 보관/휴지통
+  // 갈림길 버튼은 숨긴다(이미 휴지통에 들어와 있는 카드라 그 갈림길 자체가 의미 없음).
+  const isTrashReview = reviewMode === 'trash';
+  $('knowArchiveBtn').hidden = isTrashReview;
+  $('knowTrashBtn').hidden = isTrashReview;
+  $('reviewDeleteBtn').hidden = !isTrashReview;
+  $('knowPop').hidden = false;
+}
 function hideKnowPop(){ $('knowPop').hidden = true; }
 document.addEventListener('pointerdown', (e) => {
   if (!$('knowPop').hidden && !e.target.closest('#knowPop') && e.target !== $('knowBtn')) hideKnowPop();
+  if (!$('fontPop').hidden && !e.target.closest('#fontPop') && e.target !== $('fontBtn')) hideFontPop();
 });
 async function doArchive(){
   const c = studyCards[studyIdx]; if (!c) return;
@@ -958,15 +1023,75 @@ $('knowTrashBtn').addEventListener('click', doTrash);
 let knowPressT = null, knowLongPressed = false;
 const knowBtn = $('knowBtn');
 knowBtn.addEventListener('pointerdown', () => {
+  if (reviewMode === 'archive') return; // 보관함 복습엔 복구 하나뿐 — 롱프레스 없음
   knowLongPressed = false;
   knowPressT = setTimeout(() => { knowLongPressed = true; showKnowPop(); }, 450);
 });
 knowBtn.addEventListener('pointerup', () => {
   clearTimeout(knowPressT);
+  if (reviewMode){ if (!knowLongPressed) doReviewRestore(); return; }
   if (knowLongPressed) return;
   markKnown();
 });
 knowBtn.addEventListener('pointerleave', () => clearTimeout(knowPressT));
+
+/* ── 완전히 앎 / 휴지통 → 챕터처럼 카드뷰로 복습(2026-09-06 라운드13) ──
+   지금까지 시트에서 제목만 보이던 목록을 없애고, 헤더를 챕터 행처럼 눌러 바로 스와이프
+   복습 화면으로 들어간다(studyCards/렌더/스와이프 엔진을 그대로 재사용 — "오답만 다시
+   복습"과 같은 패턴). 하단 바는 필터·전체시험이 의미 없어 숨기고, 안다 버튼은 복구로
+   바뀐다(휴지통은 롱프레스로 완전삭제 추가). */
+let reviewMode = null; // null | 'archive' | 'trash'
+async function enterReviewMode(kind){
+  const path = (kind === 'archive' ? '/api/archive' : '/api/trash') + '?full=1';
+  showLoading('불러오는 중', '카드를 가져옴');
+  let data;
+  try { data = await (await fetch(path)).json(); } catch (e) { data = null; }
+  hideLoading();
+  if (!data || !Array.isArray(data.items) || !data.items.length){ toast('비어 있음'); return; }
+  reviewMode = kind;
+  knowLongPressed = false;
+  studyCards = data.items; studyIdx = 0;
+  $('filterToggle').hidden = true;
+  $('subPosDots').hidden = true;
+  knowBtn.classList.add('reviewing');
+  setRetitleContext(() => studyCards[studyIdx]);
+  renderStudyCard();
+}
+// 실제 챕터로 돌아가는 모든 경로(시트 이동·검색·뒤로가기)가 거치는 UI 원상복구 —
+// loadSubchapter()가 시작할 때 항상 호출해 reviewMode가 새 데이터에 덮여 남지 않게 한다.
+function exitReviewModeUi(){
+  reviewMode = null;
+  $('filterToggle').hidden = false;
+  $('subPosDots').hidden = false;
+  knowBtn.classList.remove('reviewing');
+}
+function exitReviewMode(){ exitReviewModeUi(); loadSubchapter(); }
+function updateReviewBar(){
+  $('subPos').textContent = (reviewMode === 'archive' ? '🎓' : '🗑') + ' ' + (studyIdx + 1) + '/' + studyCards.length;
+}
+function removeCurrentReviewCard(){
+  studyCards.splice(studyIdx, 1);
+  if (studyIdx >= studyCards.length) studyIdx = Math.max(0, studyCards.length - 1);
+  if (!studyCards.length){ toast('모두 정리됨'); exitReviewMode(); return; }
+  setRetitleContext(() => studyCards[studyIdx]);
+  renderStudyCard();
+}
+async function doReviewRestore(){
+  const c = studyCards[studyIdx]; if (!c) return;
+  if (reviewMode === 'archive') await apiArchiveRestore(c.key, c.id); else await apiTrashRestore(c.key, c.id);
+  // 복구 직후 이 소챕터를 다시 열면 캐시(subCache)에 archived/trashed:true가 남아있어
+  // 안 보이던 문제(2026-09-06 라운드12)와 같은 이유로 여기서도 지운다.
+  subCache.clear();
+  toast('복구함');
+  removeCurrentReviewCard();
+}
+$('reviewDeleteBtn').addEventListener('click', async () => {
+  const c = studyCards[studyIdx]; if (!c) return;
+  hideKnowPop();
+  await apiTrashDelete(c.key);
+  toast('완전삭제됨');
+  removeCurrentReviewCard();
+});
 function renderStudyScrubber(){
   const n = studyCards.length;
   const track = $('scrubTrack');
@@ -1073,8 +1198,10 @@ function boundaryCard(dir){
   if (!list.length) return null;
   return dir > 0 ? list[0] : list[list.length - 1];
 }
-function studyPrev(){ return studyIdx > 0 ? studyCards[studyIdx - 1] : boundaryCard(-1); }
-function studyNext(){ return studyIdx + 1 < studyCards.length ? studyCards[studyIdx + 1] : boundaryCard(1); }
+// reviewMode(완전히 앎/휴지통 카드뷰)에서는 경계 밖이 chapIdx/subIdx와 무관한 별도
+// 풀이라 boundaryCard(실제 챕터 기준)를 부르면 안 맞는 카드가 나온다 — 그냥 없음으로 둔다.
+function studyPrev(){ return studyIdx > 0 ? studyCards[studyIdx - 1] : (reviewMode ? null : boundaryCard(-1)); }
+function studyNext(){ return studyIdx + 1 < studyCards.length ? studyCards[studyIdx + 1] : (reviewMode ? null : boundaryCard(1)); }
 function setDragX(px){
   content.style.transform = 'translateX(' + px + 'px)'; cardTitleEl.style.transform = 'translateX(' + px + 'px)';
   peekPrev.style.transform = 'translateX(calc(-100% + ' + px + 'px))'; peekNext.style.transform = 'translateX(calc(100% + ' + px + 'px))';
@@ -1139,14 +1266,16 @@ scroller.addEventListener('pointerup', (e) => {
       setDragX(-dragW);
       content.addEventListener('transitionend', function onEnd(){
         content.removeEventListener('transitionend', onEnd); setDragTransition('none'); resetDragX();
-        if (studyIdx + 1 >= studyCards.length) advanceSubchapter();
+        // reviewMode에선 소챕터 경계가 없다 — 마지막 카드에서 그냥 멈춘다(advanceSubchapter는
+        // chapIdx/subIdx 기준 실제 챕터로 튀어버려 복습 풀을 이탈시킨다).
+        if (studyIdx + 1 >= studyCards.length) { if (reviewMode) toast('마지막 카드'); else advanceSubchapter(); }
         else { studyIdx++; renderStudyCard(); }
       }, { once: true });
     } else if (commit && dx > 0){
       setDragX(dragW);
       content.addEventListener('transitionend', function onEnd(){
         content.removeEventListener('transitionend', onEnd); setDragTransition('none'); resetDragX();
-        if (studyIdx - 1 < 0) retreatSubchapter();
+        if (studyIdx - 1 < 0) { if (reviewMode) toast('첫 카드'); else retreatSubchapter(); }
         else { studyIdx--; renderStudyCard(); }
       }, { once: true });
     } else resetDragX();
@@ -1186,7 +1315,7 @@ function enterExamMode(){ examMode = true; $('readRoot').hidden = true; $('examV
 function exitExamMode(){ examMode = false; $('examView').hidden = true; $('readRoot').hidden = false; clearRetitleContext(); setRetitleContext(() => studyCards[studyIdx]); }
 $('examBack').addEventListener('click', exitExamMode);
 
-$('subPosChip').addEventListener('click', () => enterSubchapterExam());
+$('subPosChip').addEventListener('click', () => { if (reviewMode) exitReviewMode(); else enterSubchapterExam(); });
 async function enterSubchapterExam(){
   // 이미 받아둔 subchapterAll을 그대로 쓴다 — 보관·휴지통 카드는 시험 문제 풀에서도 뺀다.
   const pool = visibleCards(subchapterAll);
@@ -1310,68 +1439,26 @@ $('chapList').addEventListener('click', (e) => {
   }
 });
 
-/* ── 보관함(완전히 앎, 시트 하단) — 휴지통과 같은 모양, "완전삭제" 개념이 없어 복구만. ──
-   보관은 롱프레스 한 번으로 로테이션에서 영구히 빠지는데 되돌릴 길이 없었다(2026-09-06
-   사용자 요청 — 실수로 누르거나 마음이 바뀌었을 때 대비). */
-let archiveOpen = false;
+/* ── 보관함(완전히 앎)·휴지통 — 챕터 행과 같은 모양의 헤더 하나, 누르면 목록이 아니라
+   그 카드들을 스와이프로 훑어보는 복습 화면이 바로 열린다(2026-09-06 라운드13 — 예전엔
+   제목만 나열된 목록+개별 복구 버튼이었는데, "그냥 챕터처럼 묶어서 카드페이지처럼"라는
+   요청으로 교체). 실제 복구/완전삭제는 그 복습 화면(enterReviewMode)의 하단 바에서. */
+function reviewRowHtml(id, icon, label, n){
+  return '<div class="chaprow" id="' + id + '"><div class="chaprow-top">'
+    + '<span class="chaprow-label"><b>' + icon + ' ' + label + '</b><span class="chaprow-range">' + n + '개</span></span>'
+    + '<span class="chaprow-score">' + n + '</span></div></div>';
+}
 async function renderArchiveToggle(){
   const data = await apiArchiveList().catch(() => ({ items: [] }));
   const n = (data.items || []).length;
-  $('archiveSec').innerHTML = '<button class="trashtoggle" id="archiveToggleBtn">🎓 완전히 앎 (' + n + ')' + (archiveOpen ? ' ▲' : ' ▼') + '</button><div id="archiveList"></div>';
-  $('archiveToggleBtn').addEventListener('click', () => { archiveOpen = !archiveOpen; renderArchiveToggle().then(() => { if (archiveOpen) renderArchiveList(data.items); }); });
-  if (archiveOpen) renderArchiveList(data.items);
+  $('archiveSec').innerHTML = reviewRowHtml('archiveRow', '🎓', '완전히 앎', n);
+  if (n) $('archiveRow').addEventListener('click', () => { closeSheet(); enterReviewMode('archive'); });
 }
-function renderArchiveList(items){
-  const el = $('archiveList');
-  if (!items.length){ el.innerHTML = '<div style="padding:10px 2px;color:var(--muted);font-size:12.5px">비어 있음</div>'; return; }
-  el.innerHTML = items.map((it) => '<div class="trashrow" data-key="' + esc(it.key) + '">'
-    + '<span class="tf">' + esc(it.front) + '</span>'
-    + '<div class="ta"><button data-act="restore">복구</button></div>'
-    + '</div>').join('');
-  el.querySelectorAll('[data-act]').forEach((btn) => btn.addEventListener('click', async () => {
-    const key = btn.closest('.trashrow').dataset.key;
-    const item = items.find((it) => it.key === key);
-    await apiArchiveRestore(key, item && item.id);
-    // 트래시 복구(위)와 같은 이유로 캐시를 지운다 — subchapterAll/subCache에 남은
-    // archived:true 때문에 앱에서 안 보이는 걸 막는다.
-    subCache.clear();
-    const entry = currentSubEntry(key);
-    if (entry){ entry.archived = false; applyFilter(); }
-    renderArchiveToggle();
-  }));
-}
-
-/* ── 휴지통(시트 하단) — 접혀 있다가 누르면 목록이 펼쳐짐. 복구/완전삭제 둘 다 여기서. ── */
-let trashOpen = false;
 async function renderTrashToggle(){
   const data = await apiTrashList().catch(() => ({ items: [] }));
   const n = (data.items || []).length;
-  $('trashSec').innerHTML = '<button class="trashtoggle" id="trashToggleBtn">🗑 휴지통 (' + n + ')' + (trashOpen ? ' ▲' : ' ▼') + '</button><div id="trashList"></div>';
-  $('trashToggleBtn').addEventListener('click', () => { trashOpen = !trashOpen; renderTrashToggle().then(() => { if (trashOpen) renderTrashList(data.items); }); });
-  if (trashOpen) renderTrashList(data.items);
-}
-function renderTrashList(items){
-  const el = $('trashList');
-  if (!items.length){ el.innerHTML = '<div style="padding:10px 2px;color:var(--muted);font-size:12.5px">비어 있음</div>'; return; }
-  el.innerHTML = items.map((it) => '<div class="trashrow" data-key="' + esc(it.key) + '">'
-    + '<span class="tf">' + esc(it.front) + '</span>'
-    + '<div class="ta"><button data-act="restore">복구</button><button data-act="del" class="del">완전삭제</button></div>'
-    + '</div>').join('');
-  el.querySelectorAll('[data-act]').forEach((btn) => btn.addEventListener('click', async () => {
-    const key = btn.closest('.trashrow').dataset.key;
-    if (btn.dataset.act === 'restore'){
-      const item = items.find((it) => it.key === key);
-      await apiTrashRestore(key, item && item.id);
-      // 서버 KV는 이걸로 이미 반영됐지만, 클라이언트가 들고 있던 캐시(subchapterAll/subCache)엔
-      // 여전히 trashed:true가 남아있어 앱에서 안 보이는 문제가 있었다(2026-09-06 실기기
-      // 피드백) — 캐시를 지워 다음 로드가 서버에서 새로 받아오게 하고, 지금 보고 있는
-      // 소챕터에 이 카드가 있으면 바로 되살린다.
-      subCache.clear();
-      const entry = currentSubEntry(key);
-      if (entry){ entry.trashed = false; applyFilter(); }
-    } else await apiTrashDelete(key);
-    renderTrashToggle();
-  }));
+  $('trashSec').innerHTML = reviewRowHtml('trashRow', '🗑', '휴지통', n);
+  if (n) $('trashRow').addEventListener('click', () => { closeSheet(); enterReviewMode('trash'); });
 }
 
 /* 시트를 아래로 스와이프하면 닫힌다 */
@@ -1584,6 +1671,61 @@ function applyBodyScale(){
 }
 titleScale.addEventListener('input', applyTitleScale);
 bodyScale.addEventListener('input', applyBodyScale);
+
+/* 글자크기 팝오버 — 2026-09-06부터 챕터 시트에서 분리된 별도 버튼(챕터 이동과 무관한
+   기능이 같이 묶여 있다는 지적). knowPop과 같은 위치·모양을 그대로 재사용. */
+function showFontPop(){ $('fontPop').hidden = false; }
+function hideFontPop(){ $('fontPop').hidden = true; }
+$('fontBtn').addEventListener('click', () => { $('fontPop').hidden ? showFontPop() : hideFontPop(); });
+
+/* ── 검색(2026-09-06) — 제목 부분일치, 상태 배지와 함께. 결과를 고르면 그 카드가 있는
+   소챕터로 이동(보관/휴지통 카드면 그 복습 화면으로) — 로테이션·필터 상태와 무관하게
+   key로 직접 찾아 위치를 맞춘다. ── */
+function parseSubIdClient(id){
+  const m = /^c(\d+)s(\d+)$/.exec(String(id || ''));
+  return m ? { chap: Number(m[1]), sub: Number(m[2]) } : { chap: 0, sub: 0 };
+}
+const SEARCH_BADGE = { unknown: '미확인', known: '확인함', archive: '완전히 앎', trash: '휴지통' };
+function renderSearchResults(items){
+  const el = $('searchResults');
+  if (!items.length){ el.innerHTML = '<div style="padding:16px 4px;color:var(--muted);font-size:12.5px;text-align:center">결과 없음</div>'; return; }
+  el.innerHTML = items.map((it, i) => '<div class="trashrow" data-i="' + i + '">'
+    + '<span class="tf">' + esc(it.front) + '</span>'
+    + '<div class="ta"><span class="searchbadge s-' + it.status + '">' + SEARCH_BADGE[it.status] + '</span></div>'
+    + '</div>').join('');
+  el.querySelectorAll('.trashrow').forEach((row) => row.addEventListener('click', () => goToSearchResult(items[Number(row.dataset.i)])));
+}
+function goToSearchResult(it){
+  closeSearch();
+  if (it.status === 'archive' || it.status === 'trash'){
+    enterReviewMode(it.status).then(() => {
+      const i = studyCards.findIndex((c) => c.key === it.key);
+      if (i >= 0){ studyIdx = i; renderStudyCard(); }
+    });
+    return;
+  }
+  const p = parseSubIdClient(it.subId);
+  chapIdx = p.chap; subIdx = p.sub; savePos();
+  loadSubchapter().then(() => {
+    const i = studyCards.findIndex((c) => c.key === it.key);
+    if (i >= 0){ studyIdx = i; setRetitleContext(() => studyCards[studyIdx]); renderStudyCard(); updateSubPos(); }
+    refreshChapterMeta();
+  });
+}
+let searchT = null;
+function openSearch(){ $('searchOv').hidden = false; $('searchInput').value = ''; $('searchResults').innerHTML = ''; setTimeout(() => $('searchInput').focus(), 60); }
+function closeSearch(){ $('searchOv').hidden = true; clearTimeout(searchT); }
+$('searchOpenBtn').addEventListener('click', openSearch);
+$('searchCloseBtn').addEventListener('click', closeSearch);
+$('searchInput').addEventListener('input', () => {
+  clearTimeout(searchT);
+  const q = $('searchInput').value.trim();
+  if (!q){ $('searchResults').innerHTML = ''; return; }
+  searchT = setTimeout(async () => {
+    const data = await fetch('/api/search?q=' + encodeURIComponent(q)).then((r) => r.json()).catch(() => null);
+    renderSearchResults((data && data.items) || []);
+  }, 220);
+});
 
 /* ── 시작 ── */
 (async () => {
