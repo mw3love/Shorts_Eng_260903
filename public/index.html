@@ -530,16 +530,16 @@ function toast(msg){
 async function apiChapters(){ const r = await fetch('/api/chapters'); return r.json(); }
 async function apiSubchapter(id, mode){ const r = await fetch('/api/subchapter?id=' + encodeURIComponent(id) + '&mode=' + mode); return r.json(); }
 async function apiChapterExam(id){ const r = await fetch('/api/chapterexam?id=' + encodeURIComponent(id)); return r.json(); }
-function apiAnswer(subId, key, know){
-  return fetch('/api/answer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subId, key, know }) })
+function apiAnswer(subId, key, know, pageId){
+  return fetch('/api/answer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subId, key, know, pageId }) })
     .then((r) => r.json()).catch(() => null);
 }
-function apiPostKey(path, key){
-  return fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key }) })
+function apiPostKey(path, key, pageId){
+  return fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key, pageId }) })
     .then((r) => r.json()).catch(() => null);
 }
-const apiArchive = (key) => apiPostKey('/api/archive', key);
-const apiTrash = (key) => apiPostKey('/api/trash', key);
+const apiArchive = (key, pageId) => apiPostKey('/api/archive', key, pageId);
+const apiTrash = (key, pageId) => apiPostKey('/api/trash', key, pageId);
 const apiTrashRestore = (key) => apiPostKey('/api/trash/restore', key);
 const apiTrashDelete = (key) => apiPostKey('/api/trash/delete', key);
 async function apiTrashList(){ const r = await fetch('/api/trash'); return r.json(); }
@@ -923,7 +923,7 @@ async function markKnown(){
   const entry = currentSubEntry(c.key); if (entry) entry.known = true;
   $('knowBtn').classList.add('on');
   updateSubPos();
-  apiAnswer(subId(), c.key, true);
+  apiAnswer(subId(), c.key, true, c.id);
   if (studyMode === 'unknown') removeCurrentCardFromRotation();
 }
 function showKnowPop(){ $('knowPop').hidden = false; }
@@ -936,7 +936,7 @@ async function doArchive(){
   hideKnowPop();
   c.known = true; c.archived = true;
   const entry = currentSubEntry(c.key); if (entry) { entry.known = true; entry.archived = true; }
-  await apiArchive(c.key);
+  await apiArchive(c.key, c.id);
   toast('보관함 — 더 안 보여줌');
   removeCurrentCardFromRotation();
 }
@@ -945,7 +945,7 @@ async function doTrash(){
   hideKnowPop();
   c.trashed = true;
   const entry = currentSubEntry(c.key); if (entry) entry.trashed = true;
-  await apiTrash(c.key);
+  await apiTrash(c.key, c.id);
   toast('휴지통으로 보냄');
   removeCurrentCardFromRotation();
 }
@@ -1229,7 +1229,7 @@ function renderExamCard(){
 async function judgeCard(know){
   const c = examCards[examIdx];
   examResults[c.key] = know;
-  const res = await apiAnswer(c.subId, c.key, know);
+  const res = await apiAnswer(c.subId, c.key, know, c.id);
   if (res && res.ok){ examLastSub = res.sub; examLastChap = res.chap; }
   examIdx++;
   renderExamCard();

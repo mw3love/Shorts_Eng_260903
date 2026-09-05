@@ -51,6 +51,11 @@ const K_ARCHIVED = 'archived:v1'; // { [cardKey]: true } — "완전히 안다, 
                                    // 로테이션에서만 빠진다 — known/총량 점수는 안 건드린다(순수 가시성 플래그).
 const K_TRASHED = 'trashed:v1';   // { [cardKey]: true } — 로컬 소프트 삭제. 휴지통 화면에서 "진짜 삭제"를
                                    // 눌러야 그때 Notion 페이지를 archived로 전환한다(그 전까진 원본 안전).
+const K_REVIEW_SCHEMA = 'reviewSchema:v1'; // { prop: string|null } — '복습 상태' 컬럼 이름 캐시(2026-09-06).
+                                   // 하드코딩 대신 옵션 내용(확인함/완전히 앎/휴지통)으로 찾는다 — 컬럼명이
+                                   // 또 바뀌면 `wrangler kv key delete reviewSchema:v1 --remote`로 지우면
+                                   // 다음 호출이 다시 찾는다(schema:v1의 "낡으면 조용히 실패" 전례와 달리,
+                                   // 실패해도 notionOk:false로 드러날 뿐 로컬 판정은 안 막힌다).
 
 const BUCKET_SIZE = 50;             // ⚠ 카드별 개별 KV 저장은 불가 — 무료 쓰기 1,000회/일에 걸린다
 const PARSER_VERSION = 5;           // 포맷을 바꾸면 올릴 것 — 증분 로직이 옛 포맷을 재사용하지 않게
@@ -228,6 +233,45 @@ async function pageBlocks(token, pageId, budget) {
     blocks.push(cb);
   }
   return blocks;
+}
+
+/* ── '복습 상태' Notion 연동 (2026-09-06) ─────────────────────
+   앱의 안다/보관/휴지통 판정을 Notion select 속성에 그대로 비춘다(미러 아님, 실제
+   속성 수정). 옵션 4개(미확인/확인함/완전히 앎/휴지통)는 스키마 준비 단계에서 이미
+   만들어 뒀다 — 여기서는 그 컬럼을 찾아 값만 쓴다. */
+async function findReviewStatusProp(token, dbId) {
+  const db = await notion(token, `/databases/${dbId}`);
+  const props = db.properties || {};
+  for (const name of Object.keys(props)) {
+    const p = props[name];
+    if (p.type !== 'select') continue;
+    const opts = (p.select?.options || []).map((o) => o.name);
+    if (opts.includes('확인함') && opts.includes('완전히 앎') && opts.includes('휴지통')) return name;
+  }
+  return null;
+}
+async function getReviewStatusProp(env, token, dbId) {
+  const cached = await env.KV.get(K_REVIEW_SCHEMA);
+  if (cached !== null) {
+    try { return JSON.parse(cached).prop; } catch (e) { /* 손상됐으면 다시 찾는다 */ }
+  }
+  const prop = await findReviewStatusProp(token, dbId);
+  await env.KV.put(K_REVIEW_SCHEMA, JSON.stringify({ prop }));
+  return prop;
+}
+// 실패해도 삼키고 false만 반환 — handleRetitle/handleHighlight와 같은 패턴. 로컬 KV가
+// 진실의 원본이므로 Notion 쓰기 실패가 판정 자체를 막지 않는다.
+async function writeReviewStatus(env, token, dbId, pageId, value) {
+  if (!token || !dbId || !pageId) return false;
+  try {
+    const prop = await getReviewStatusProp(env, token, dbId);
+    if (!prop) return false;
+    await notion(token, `/pages/${pageId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ properties: { [prop]: { select: { name: value } } } }),
+    });
+    return true;
+  } catch (e) { return false; }
 }
 
 /* ── 카드 조립 ───────────────────────────────────────────── */
@@ -593,8 +637,8 @@ async function handleChapterExam(env, chapId) {
 
 // 시험 정답 기록 — 소챕터·대챕터의 현재 점수를 다시 계산하고, 최고기록을 필요하면 올린다
 // (단조증가 — 나중에 다시 도전해서 점수가 낮아져도 최고기록은 안 내려간다).
-async function handleAnswer(env, body) {
-  const { subId, key, know } = body || {};
+async function handleAnswer(env, token, dbId, body) {
+  const { subId, key, know, pageId } = body || {};
   if (!subId || !key || typeof know !== 'boolean') return json({ error: 'subId/key/know 필요' }, 400);
   const parsed = parseSubId(subId);
   if (!parsed) return json({ error: 'bad subId' }, 400);
@@ -618,8 +662,11 @@ async function handleAnswer(env, body) {
   best.chap[chapId] = Math.max(best.chap[chapId] || 0, chapScore);
   await env.KV.put(K_BEST, JSON.stringify(best));
 
+  // "몰랐음" 판정엔 쓸 게 없다 — '미확인'은 기본값이라 코드가 명시적으로 되돌릴 일이 없다.
+  const notionOk = know ? await writeReviewStatus(env, token, dbId, pageId, '확인함') : true;
+
   return json({
-    ok: true,
+    ok: true, notionOk,
     sub: { id: subId, current: subScore, best: best.sub[subId], total: subItems.length },
     chap: { id: chapId, current: chapScore, best: best.chap[chapId], total: chapItems.length },
   });
@@ -628,8 +675,8 @@ async function handleAnswer(env, body) {
 // 평소 읽기(전체보기) 중 "안다" 퀵버튼 롱프레스 → 보관/휴지통 갈림길(2026-09-05 deep-interview).
 // 보관 = "완전히 안다, 더 안 봐도 됨" — known도 같이 true로 세팅하고, 전체보기·시험
 // 로테이션에서만 뺀다(점수·총량은 안 바꾼다, 순수 가시성 플래그).
-async function handleArchive(env, body) {
-  const { key } = body || {};
+async function handleArchive(env, token, dbId, body) {
+  const { key, pageId } = body || {};
   if (!key) return json({ error: 'key 필요' }, 400);
   const [known, archived] = await Promise.all([
     env.KV.get(K_KNOWN).then((v) => JSON.parse(v || '{}')),
@@ -637,17 +684,20 @@ async function handleArchive(env, body) {
   ]);
   known[key] = true; archived[key] = true;
   await Promise.all([env.KV.put(K_KNOWN, JSON.stringify(known)), env.KV.put(K_ARCHIVED, JSON.stringify(archived))]);
-  return json({ ok: true });
+  const notionOk = await writeReviewStatus(env, token, dbId, pageId, '완전히 앎');
+  return json({ ok: true, notionOk });
 }
 
-// 휴지통 — 로컬 소프트 삭제. 노션 원본은 "진짜 삭제"를 누르기 전까진 안 건드린다.
-async function handleTrash(env, body) {
-  const { key } = body || {};
+// 휴지통 — 로컬 소프트 삭제. 노션 원본은 "진짜 삭제"를 누르기 전까진 안 건드린다(이 라벨은
+// 그 전 단계의 시각적 표시일 뿐 — handleTrashDelete()의 archived:true 전환과는 다른 층위).
+async function handleTrash(env, token, dbId, body) {
+  const { key, pageId } = body || {};
   if (!key) return json({ error: 'key 필요' }, 400);
   const trashed = JSON.parse((await env.KV.get(K_TRASHED)) || '{}');
   trashed[key] = true;
   await env.KV.put(K_TRASHED, JSON.stringify(trashed));
-  return json({ ok: true });
+  const notionOk = await writeReviewStatus(env, token, dbId, pageId, '휴지통');
+  return json({ ok: true, notionOk });
 }
 
 async function handleTrashList(env) {
@@ -816,16 +866,16 @@ export default {
     if (url.pathname === '/api/subchapter') return handleSubchapter(env, url.searchParams.get('id') || '', url.searchParams.get('mode') || 'all');
     if (url.pathname === '/api/chapterexam') return handleChapterExam(env, url.searchParams.get('id') || '');
     if (url.pathname === '/api/answer' && request.method === 'POST') {
-      try { return await handleAnswer(env, await request.json()); }
+      try { return await handleAnswer(env, token, dbId, await request.json()); }
       catch (e) { return json({ error: String(e.message || e) }, 500); }
     }
     if (url.pathname === '/api/archive' && request.method === 'POST') {
-      try { return await handleArchive(env, await request.json()); }
+      try { return await handleArchive(env, token, dbId, await request.json()); }
       catch (e) { return json({ error: String(e.message || e) }, 500); }
     }
     if (url.pathname === '/api/trash') {
       if (request.method === 'GET') { try { return await handleTrashList(env); } catch (e) { return json({ error: String(e.message || e) }, 500); } }
-      if (request.method === 'POST') { try { return await handleTrash(env, await request.json()); } catch (e) { return json({ error: String(e.message || e) }, 500); } }
+      if (request.method === 'POST') { try { return await handleTrash(env, token, dbId, await request.json()); } catch (e) { return json({ error: String(e.message || e) }, 500); } }
     }
     if (url.pathname === '/api/trash/restore' && request.method === 'POST') {
       try { return await handleTrashRestore(env, await request.json()); }
