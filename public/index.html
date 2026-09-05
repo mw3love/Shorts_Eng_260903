@@ -14,6 +14,11 @@
     --ink:#0B0D10; --ink2:#151A20; --ink3:#1E252D; --ink4:#262E38;
     --paper:#EFF2F6; --body-text:#C9D1DC; --muted:#8B95A3; --faint:#5A6472;
     --know:#3DD68C; --coral:#FF8F6B;
+    /* 글자 크기 배율 — 인라인 스타일이 아니라 변수로 둔다. #content 하나에만 인라인으로
+       걸면 스와이프로 들어오는 peek(.content 클래스만 있고 인라인은 없음)이 기본 크기로
+       그려졌다가 커밋 후 설정 크기로 튄다(2026-09-05 실기기 피드백). 변수면 같은 CSS
+       규칙을 공유하므로 튐이 원리적으로 불가능하다. */
+    --tscale:1; --bscale:1;
     --serif:"Newsreader",Georgia,"Times New Roman",serif;
     --sans:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo",sans-serif;
     --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
@@ -42,13 +47,15 @@
   .scroller{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;touch-action:pan-y;-webkit-user-select:text;user-select:text}
   .cardtitle{
     display:block;font-family:var(--serif);font-weight:400;
-    font-size:clamp(22px,6vw,30px);line-height:1.18;letter-spacing:-.01em;
+    font-size:calc(clamp(22px,6vw,30px) * var(--tscale));line-height:1.18;letter-spacing:-.01em;
     color:var(--paper);text-decoration:none;text-wrap:balance;
     padding:calc(env(safe-area-inset-top) + 62px) 22px 6px;
   }
+  /* 하단 여백은 실제 바 높이(4 + 20 + 46 + 4 = 74px + safe-area)에 여유 18px만 더한 값.
+     예전 112px는 바보다 28px 컸다(2026-09-05 실기기 피드백 — "본문 하단 여백이 꽤 있음"). */
   .content{
-    padding:6px 20px calc(112px + env(safe-area-inset-bottom)) 20px;min-height:100%;
-    font-size:15.5px;line-height:1.7;color:var(--body-text);
+    padding:6px 20px calc(92px + env(safe-area-inset-bottom)) 20px;min-height:100%;
+    font-size:calc(15.5px * var(--bscale));line-height:1.7;color:var(--body-text);
     will-change:transform;
   }
   .peek{position:absolute;inset:0;pointer-events:none;will-change:transform;display:flex;flex-direction:column;overflow:hidden;z-index:1}
@@ -73,7 +80,7 @@
   .content th{color:var(--coral);font-weight:500;background:color-mix(in srgb,var(--coral) 7%,transparent)}
   .content .lhint{font-size:1.08em;font-weight:600;color:var(--paper);margin:0 0 14px}
   .content .src{display:inline-block;font-family:var(--mono);font-size:11px;color:var(--faint);text-decoration:none;border-bottom:1px solid var(--ink3);padding-bottom:2px;margin-top:4px}
-  .content .shot{max-width:100%;border-radius:10px;display:block;margin:6px 0 12px}
+  .content .shot{max-width:100%;border-radius:10px;display:block;margin:6px 0 12px;cursor:zoom-in;-webkit-touch-callout:none}
   .content .shotcap{font-family:var(--mono);font-size:11px;color:var(--muted);margin:-6px 0 12px}
 
   /* ── 상단: 챕터-소챕터 주소("1-1") — 탭하면 이 소챕터 시험. 점 5개(소챕터 10장 기준
@@ -96,7 +103,7 @@
 
   /* ── 챕터 완주 넛지 배너 ── */
   .chapnudge{
-    position:absolute;left:16px;right:16px;bottom:calc(122px + env(safe-area-inset-bottom));z-index:3;
+    position:absolute;left:16px;right:16px;bottom:calc(104px + env(safe-area-inset-bottom));z-index:3;
     background:color-mix(in srgb,var(--ink2) 94%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
     border-radius:14px;padding:12px 14px;box-shadow:0 8px 24px rgba(0,0,0,.4);
     display:flex;flex-direction:column;gap:8px;
@@ -113,11 +120,11 @@
      것만(2026-09-05 실기기 피드백: "하단은 오른손 엄지 영역이 비싼 부동산"). ── */
   .bottombar{
     position:absolute;left:0;right:0;bottom:0;z-index:2;
-    padding:6px 16px calc(6px + env(safe-area-inset-bottom));
+    padding:4px 16px calc(4px + env(safe-area-inset-bottom));
     background:linear-gradient(to top, rgba(11,13,16,.92) 40%, rgba(11,13,16,0));
   }
-  .scrubber{padding:2px 4px 6px;touch-action:none}
-  .scrubtrack{position:relative;height:18px}
+  .scrubber{padding:0 4px 4px;touch-action:none}
+  .scrubtrack{position:relative;height:16px}
   .scrubtrack .track{position:absolute;left:0;right:0;top:50%;height:2px;background:var(--ink4);transform:translateY(-50%);border-radius:2px}
   .scrubtrack .dot{position:absolute;top:50%;width:7px;height:7px;border-radius:50%;background:var(--faint);transform:translate(-50%,-50%);transition:background-color .1s ease}
   .scrubtrack .dot.cur{background:var(--coral);width:10px;height:10px}
@@ -139,18 +146,22 @@
   .barbtn:active{transform:scale(.93)}
   .barbtn.active{background:color-mix(in srgb,var(--coral) 30%,var(--ink3));color:var(--coral)}
   .barbtn svg{width:18px;height:18px;stroke:currentColor}
+  /* 아이콘 선 색은 "무슨 버튼인가"를 알려주는 정체성이라 꺼져 있어도 유지한다(형광펜=코랄,
+     안다=초록). 켜짐/꺼짐 구분은 채도와 배경 틴트가 진다 — 색을 상태에만 쓰는 원칙과
+     충돌하지 않는다(2026-09-05 실기기 피드백: "체크버튼에 색이 없다"). */
+  #hlBtn{color:color-mix(in srgb,var(--coral) 60%,var(--muted))}
   /* "안다" 퀵버튼 — 원형 아이콘 전용으로 교체(2026-09-05 베이크오프 라운드4 — "초록 체크에
      글씨 없이 깔끔해서 좋음"). 탭=안다, 롱프레스=보관/휴지통 팝업은 그대로. */
   .knowbtn{
     flex:none;width:46px;height:46px;border-radius:50%;border:0;cursor:pointer;
     display:flex;align-items:center;justify-content:center;
-    background:var(--ink3);color:var(--muted);-webkit-touch-callout:none;
+    background:var(--ink3);color:color-mix(in srgb,var(--know) 60%,var(--muted));-webkit-touch-callout:none;
   }
   .knowbtn svg{width:20px;height:20px;stroke:currentColor}
   .knowbtn:active{transform:scale(.93)}
   .knowbtn.on{background:color-mix(in srgb,var(--know) 24%,var(--ink3));color:var(--know)}
   .knowpop{
-    position:absolute;left:16px;right:16px;bottom:calc(72px + env(safe-area-inset-bottom));z-index:4;
+    position:absolute;left:16px;right:16px;bottom:calc(62px + env(safe-area-inset-bottom));z-index:4;
     background:color-mix(in srgb,var(--ink2) 96%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
     border-radius:14px;padding:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);
     display:flex;flex-direction:column;gap:6px;
@@ -163,7 +174,7 @@
   .retitlePop{position:fixed;z-index:9;background:var(--coral);color:var(--ink);font-family:var(--sans);font-size:12.5px;font-weight:600;padding:9px 14px;border-radius:99px;box-shadow:0 4px 16px rgba(0,0,0,.4);cursor:pointer;-webkit-user-select:none;user-select:none}
   .retitlePop[hidden]{display:none}
 
-  .toast{position:fixed;left:50%;bottom:130px;transform:translate(-50%,8px);z-index:8;font-family:var(--mono);font-size:12.5px;color:var(--paper);background:var(--ink3);padding:8px 14px;border-radius:8px;opacity:0;pointer-events:none;transition:opacity .18s ease,transform .18s ease;white-space:nowrap}
+  .toast{position:fixed;left:50%;bottom:112px;transform:translate(-50%,8px);z-index:8;font-family:var(--mono);font-size:12.5px;color:var(--paper);background:var(--ink3);padding:8px 14px;border-radius:8px;opacity:0;pointer-events:none;transition:opacity .18s ease,transform .18s ease;white-space:nowrap}
   .toast.on{opacity:1;transform:translate(-50%,0)}
 
   .loadbox{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:var(--ink)}
@@ -202,19 +213,28 @@
   .sheetback.on{opacity:1;pointer-events:auto}
   .sheet{
     position:fixed;left:0;right:0;bottom:0;max-width:520px;margin:0 auto;z-index:11;
-    background:var(--ink2);border-radius:18px 18px 0 0;max-height:82dvh;display:flex;flex-direction:column;
+    background:var(--ink2);border-radius:18px 18px 0 0;max-height:42dvh;display:flex;flex-direction:column;
     transform:translateY(100%);transition:transform .26s cubic-bezier(.2,.7,.3,1);
     padding-bottom:env(safe-area-inset-bottom);box-shadow:0 -8px 30px rgba(0,0,0,.4);
   }
   .sheet.on{transform:translateY(0)}
-  /* 시각적으로는 얇은 막대지만, 실제 드래그 히트박스는 훨씬 넓다(2026-09-05 실기기
-     피드백 — 정확히 막대 위를 눌러야만 드래그로 닫혔던 것을 완화). */
-  /* touch-action:none 필수 — 없으면 iOS가 이 터치를 네이티브 스크롤/바운스로 먼저 채가서
-     JS 드래그 로직에 이벤트가 안 넘어온다(2026-09-05 실기기 피드백으로 발견 — 데스크톱
-     합성 이벤트 테스트로는 이 경합 자체가 재현이 안 됐다). */
-  .sheethandle{width:72px;height:26px;margin:0 auto;flex:none;position:relative;cursor:grab;touch-action:none}
+  /* 시각적으로는 얇은 막대지만 히트박스는 시트 폭 전체 × 46px다 — 예전엔 72×26px여서
+     주석만 "넓다"고 적혀 있고 실제로는 좁았다(2026-09-05 실기기 피드백: 드래그로 닫기가
+     계속 안 됨). touch-action:none은 이 영역 전체에 걸려야 iOS가 터치를 네이티브
+     스크롤/바운스로 먼저 채가지 않는다.
+     ⚠ 제스처 하나에만 닫기를 걸지 않는다 — 데스크톱 합성 이벤트로는 이 경합이 재현되지
+     않아 검증이 불가능하므로, 항상 통하는 탈출구로 ✕ 버튼을 함께 둔다. */
+  .sheethandle{width:100%;height:46px;flex:none;position:relative;cursor:grab;touch-action:none}
   .sheethandle::after{content:'';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:36px;height:4px;background:var(--ink4);border-radius:3px}
-  .sheetscroll{flex:1;min-height:0;overflow-y:auto;-webkit-user-select:text;user-select:text}
+  .sheetclose{
+    position:absolute;right:10px;top:50%;transform:translateY(-50%);
+    width:32px;height:32px;border-radius:50%;border:0;cursor:pointer;
+    background:var(--ink3);color:var(--muted);font-size:14px;line-height:1;
+    display:flex;align-items:center;justify-content:center;-webkit-touch-callout:none;
+  }
+  .sheetclose:active{background:var(--ink4)}
+  /* overscroll-behavior:contain — 목록 끝에서 바운스가 터치를 삼켜 드래그가 죽는 것을 막는다. */
+  .sheetscroll{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-user-select:text;user-select:text}
   .chaplist{padding:6px 16px 10px;display:flex;flex-direction:column;gap:10px}
   /* 챕터 행 — 라벨 2줄 스택 + 칩 전체가 "이동" 탭 영역, "시험"만 별도 미니 버튼
      (2026-09-05 베이크오프 라운드4 — "이동이 기본 행동이니 칩 전체를 이동으로"). */
@@ -236,7 +256,9 @@
   .trashrow .ta{display:flex;gap:6px;flex:none}
   .trashrow .ta button{background:var(--ink4);border:0;border-radius:7px;color:var(--body-text);font-size:11px;padding:6px 8px;cursor:pointer}
   .trashrow .ta button.del{color:var(--coral)}
-  .sheetsettings{padding:8px 18px 4px;display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--ink3);margin-top:2px}
+  /* 폰트 슬라이더는 스크롤 영역 밖·시트 맨 아래 고정 — 엄지에 가장 가깝고, 챕터 목록을
+     아무리 스크롤해도 자리가 안 변한다(2026-09-05 사용자 선택). */
+  .sheetsettings{flex:none;padding:8px 18px 6px;display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--ink3)}
   .sliderow{display:flex;align-items:center;gap:10px}
   .sliderow label{flex:none;width:38px;font-family:var(--mono);font-size:11px;color:var(--muted)}
   .sliderow input[type="range"]{flex:1;-webkit-appearance:none;appearance:none;height:6px;border-radius:999px;outline:none;background:linear-gradient(to right,var(--coral) 0%,var(--coral) var(--fill,50%),var(--ink4) var(--fill,50%),var(--ink4) 100%)}
@@ -245,6 +267,29 @@
   .sliderow input[type="range"]::-moz-range-progress{height:6px;border-radius:999px;background:var(--coral)}
   .sliderow input[type="range"]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--coral);border:2px solid var(--ink);cursor:pointer}
   .sliderow .val{flex:none;width:38px;text-align:right;font-family:var(--mono);font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+  /* ── 이미지 확대(라이트박스) ── 본문 스크린샷을 탭하면 전체화면으로 띄우고 핀치·더블탭으로
+     확대한다. 페이지 자체는 maximum-scale=1이라 브라우저 핀치줌이 막혀 있어, 여기서만
+     transform으로 직접 구현한다. #app 밖(body 직속)에 두는 이유는 #app의 position:fixed·
+     user-select:none 제약을 물려받지 않기 위해서다(시트와 같은 이유).
+     ⚠ [hidden]에 display:none을 따로 명시 — author의 display:flex가 UA 기본 규칙을 이긴다. */
+  .lightbox{
+    position:fixed;inset:0;z-index:20;background:#000;
+    display:flex;align-items:center;justify-content:center;overflow:hidden;
+    touch-action:none;-webkit-user-select:none;user-select:none;
+  }
+  .lightbox[hidden]{display:none}
+  .lightbox img{max-width:100%;max-height:100%;transform-origin:center center;will-change:transform}
+  .lbclose{
+    position:fixed;top:calc(env(safe-area-inset-top) + 10px);right:12px;z-index:21;
+    width:38px;height:38px;border-radius:50%;border:0;cursor:pointer;
+    background:rgba(30,37,45,.92);color:var(--paper);font-size:15px;
+    display:flex;align-items:center;justify-content:center;-webkit-touch-callout:none;
+  }
+  .lbhint{
+    position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom) + 14px);z-index:21;
+    font-family:var(--mono);font-size:10.5px;color:var(--faint);pointer-events:none;white-space:nowrap;
+  }
 
   @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
@@ -299,16 +344,22 @@
   <div class="retitlePop" id="retitlePop" hidden>이 문장을 제목으로</div>
 </div>
 
+<div class="lightbox" id="lightbox" hidden>
+  <img id="lbImg" alt="">
+  <button class="lbclose" id="lbClose" aria-label="닫기">&#10005;</button>
+  <div class="lbhint">더블탭·핀치로 확대 · 탭하면 닫힘</div>
+</div>
+
 <div class="sheetback" id="sheetback"></div>
 <div class="sheet" id="sheet">
-  <div class="sheethandle"></div>
+  <div class="sheethandle"><button class="sheetclose" id="sheetClose" aria-label="닫기">&#10005;</button></div>
   <div class="sheetscroll">
-    <div class="sheetsettings">
-      <div class="sliderow"><label for="titleScale">제목</label><input type="range" id="titleScale" min="0.7" max="1.4" step="0.02" value="1"><span class="val" id="titleScaleVal"></span></div>
-      <div class="sliderow"><label for="bodyScale">본문</label><input type="range" id="bodyScale" min="0.8" max="1.5" step="0.02" value="1"><span class="val" id="bodyScaleVal"></span></div>
-    </div>
     <div class="chaplist" id="chapList"></div>
     <div class="trashsec" id="trashSec"></div>
+  </div>
+  <div class="sheetsettings">
+    <div class="sliderow"><label for="titleScale">제목</label><input type="range" id="titleScale" min="0.7" max="1.4" step="0.02" value="1"><span class="val" id="titleScaleVal"></span></div>
+    <div class="sliderow"><label for="bodyScale">본문</label><input type="range" id="bodyScale" min="0.8" max="1.5" step="0.02" value="1"><span class="val" id="bodyScaleVal"></span></div>
   </div>
 </div>
 
@@ -622,7 +673,9 @@ function hideLoading(){ $('loading').hidden = true; }
 // 데이터를 다시 거르기만 하면 되므로 네트워크 왕복이 없다(2026-09-05 실기기 피드백:
 // 토글할 때마다 로딩화면이 떠서 깜빡였던 것 — 그 자체를 없앴다).
 let subchapterAll = [];
-async function loadSubchapter(){
+// atEnd — 뒤로 스와이프해서 이전 소챕터로 넘어온 경우엔 첫 카드가 아니라 마지막 카드에
+// 도착해야 이동 방향과 화면이 맞는다(2026-09-05 실기기 피드백).
+async function loadSubchapter(atEnd){
   showLoading('불러오는 중', '카드를 가져옴');
   let data;
   try { data = await apiSubchapter(subId(), 'all'); }
@@ -632,16 +685,17 @@ async function loadSubchapter(){
   hideLoading();
   if (!subchapterAll.length){ toast('카드 없음'); return; }
   updateSubPos();
-  applyFilter();
+  applyFilter(atEnd);
 }
 // 이미 받아둔 subchapterAll을 거르기만 한다 — 로딩화면·제목 깜빡임 없이 즉시 반영.
 // 보관·휴지통 카드는 전체보기 로테이션에서 항상 빠진다(점수·총량엔 영향 없음 — 순수 가시성).
 function visibleCards(list){ return list.filter((c) => !c.archived && !c.trashed); }
-function applyFilter(){
+function applyFilter(atEnd){
   const visible = visibleCards(subchapterAll);
   studyCards = studyMode === 'unknown' ? visible.filter((c) => !c.known) : visible;
-  studyIdx = 0;
   if (!studyCards.length){ toast('이 소챕터는 모두 알고 있음 — 전체보기로 전환'); studyMode = 'all'; syncFilterButtons(); studyCards = visible; }
+  // studyIdx는 폴백(전체보기 전환)까지 끝난 뒤 한 번만 정한다 — 목록 길이가 확정된 다음이라야 맞다.
+  studyIdx = atEnd ? Math.max(0, studyCards.length - 1) : 0;
   setRetitleContext(() => studyCards[studyIdx]);
   renderStudyCard();
 }
@@ -787,7 +841,7 @@ async function retreatSubchapter(){
     subIdx = chapSubCount - 1;
   }
   savePos();
-  await loadSubchapter();
+  await loadSubchapter(true);
 }
 function showChapNudge(finishedChapIdx){
   $('chapNudgeText').textContent = '챕터 ' + (finishedChapIdx + 1) + ' 다 봤음 — 전체 시험 볼까요?';
@@ -986,6 +1040,7 @@ function renderExamResult(){
 /* ── 챕터 목록(하단 시트) ── */
 $('sheetBtn').addEventListener('click', openSheet);
 $('sheetback').addEventListener('click', closeSheet);
+$('sheetClose').addEventListener('click', closeSheet);
 function openSheet(){
   $('sheet').classList.add('on'); $('sheetback').classList.add('on');
   renderChapList();
@@ -1071,6 +1126,107 @@ sheet.addEventListener('pointerup', () => {
 });
 sheet.addEventListener('pointercancel', () => { sheetDragging = false; sheetMoved = false; sheet.style.transform = ''; });
 
+/* ── 이미지 확대(라이트박스) ──
+   초창기 수동 메모는 스크린샷을 붙여넣은 카드가 있어 본문 폭에 맞추면 글씨가 안 읽힌다.
+   페이지 자체는 maximum-scale=1이라 브라우저 핀치줌이 막혀 있으므로 여기서 transform으로
+   직접 확대한다. Notion 자체 호스팅 이미지는 src가 /api/image?id= 리다이렉트라, 본문에
+   쓰인 src 문자열을 그대로 재사용하면 된다(별도 캐시를 만들지 말 것 — 1시간 만료). */
+const lb = $('lightbox'), lbImg = $('lbImg');
+const LB_MAX = 6, LB_TAP_MS = 300, LB_TAP_TOL = 8;
+let lbScale = 1, lbTx = 0, lbTy = 0, lbBase = null, lbStart = null, lbLastTap = 0;
+const lbPointers = new Map();
+
+function lbApply(){ lbImg.style.transform = 'translate(' + lbTx + 'px,' + lbTy + 'px) scale(' + lbScale + ')'; }
+// 확대된 이미지가 화면 밖으로 빠져나가지 않도록 이동량을 가둔다(화면보다 작으면 중앙 고정).
+function lbClamp(){
+  if (!lbBase) return;
+  const mx = Math.max(0, (lbBase.w * lbScale - window.innerWidth) / 2);
+  const my = Math.max(0, (lbBase.h * lbScale - window.innerHeight) / 2);
+  lbTx = Math.min(mx, Math.max(-mx, lbTx));
+  lbTy = Math.min(my, Math.max(-my, lbTy));
+}
+// 화면 좌표 (px,py)를 제자리에 둔 채 배율만 s로 바꾼다.
+// 화면위치 = 중심 + t + q*scale 이므로, 같은 q를 유지하려면 t' = d - (d - t) * s/scale (d = p - 중심).
+function lbZoomAround(s, px, py, fromScale, fromTx, fromTy){
+  const next = Math.min(LB_MAX, Math.max(1, s));
+  const dx = px - lbBase.cx, dy = py - lbBase.cy;
+  lbTx = dx - (dx - fromTx) * (next / fromScale);
+  lbTy = dy - (dy - fromTy) * (next / fromScale);
+  lbScale = next;
+  lbClamp(); lbApply();
+}
+function lbMeasure(){
+  const r = lbImg.getBoundingClientRect();
+  lbBase = { w: r.width, h: r.height, cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
+}
+function openLightbox(src){
+  lbScale = 1; lbTx = 0; lbTy = 0; lbStart = null; lbLastTap = 0; lbPointers.clear();
+  lbImg.style.transform = '';
+  lbImg.src = src;
+  lb.hidden = false;
+  // 배율 계산의 기준(렌더 크기·중심)은 transform이 없는 상태에서 재야 한다.
+  if (lbImg.complete && lbImg.naturalWidth) lbMeasure();
+  else lbImg.addEventListener('load', lbMeasure, { once: true });
+}
+function closeLightbox(){ lb.hidden = true; lbImg.src = ''; lbPointers.clear(); lbStart = null; }
+$('lbClose').addEventListener('click', closeLightbox);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !lb.hidden) closeLightbox(); });
+window.addEventListener('resize', () => { if (!lb.hidden){ lbScale = 1; lbTx = 0; lbTy = 0; lbApply(); lbMeasure(); } });
+
+lb.addEventListener('pointerdown', (e) => {
+  if (e.target.closest('.lbclose')) return;
+  lbPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  try { lb.setPointerCapture(e.pointerId); } catch (err) {}
+  if (lbPointers.size === 1){
+    lbStart = { x: e.clientX, y: e.clientY, tx: lbTx, ty: lbTy, moved: false };
+  } else if (lbPointers.size === 2){
+    const p = [...lbPointers.values()];
+    lbStart = { pinch: true, scale: lbScale, tx: lbTx, ty: lbTy,
+      dist: Math.max(1, Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y)),
+      cx: (p[0].x + p[1].x) / 2, cy: (p[0].y + p[1].y) / 2 };
+  }
+});
+lb.addEventListener('pointermove', (e) => {
+  if (!lbPointers.has(e.pointerId) || !lbStart || !lbBase) return;
+  lbPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (lbStart.pinch && lbPointers.size >= 2){
+    const p = [...lbPointers.values()];
+    const d = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
+    // 누적 오차를 피하려고 매 프레임 "제스처 시작값"에서 다시 계산한다.
+    lbZoomAround(lbStart.scale * (d / lbStart.dist), lbStart.cx, lbStart.cy, lbStart.scale, lbStart.tx, lbStart.ty);
+  } else if (!lbStart.pinch){
+    const mdx = e.clientX - lbStart.x, mdy = e.clientY - lbStart.y;
+    if (Math.abs(mdx) > LB_TAP_TOL || Math.abs(mdy) > LB_TAP_TOL) lbStart.moved = true;
+    if (lbScale > 1){ lbTx = lbStart.tx + mdx; lbTy = lbStart.ty + mdy; lbClamp(); lbApply(); }
+  }
+});
+function lbEndPointer(e){
+  lbPointers.delete(e.pointerId);
+  if (lbPointers.size > 0){ lbStart = null; return; } // 핀치 중 한 손가락만 뗀 상태
+  const s = lbStart; lbStart = null;
+  if (!s || s.pinch || s.moved) return;
+  const now = e.timeStamp;
+  if (now - lbLastTap < LB_TAP_MS){ // 더블탭 = 2.5배 ↔ 원래 크기 토글
+    lbLastTap = 0;
+    lbZoomAround(lbScale > 1.02 ? 1 : 2.5, e.clientX, e.clientY, lbScale, lbTx, lbTy);
+    return;
+  }
+  lbLastTap = now;
+  // 단일 탭은 확대 상태가 아닐 때만 닫기 — 확대해 놓고 화면을 짚었을 때 꺼지면 곤란하다.
+  setTimeout(() => { if (lbLastTap === now && lbScale <= 1.02 && !lb.hidden) closeLightbox(); }, LB_TAP_MS + 20);
+}
+lb.addEventListener('pointerup', lbEndPointer);
+lb.addEventListener('pointercancel', (e) => { lbPointers.delete(e.pointerId); lbStart = null; });
+
+// 본문·시험 본문의 스크린샷 탭 → 확대. 스와이프가 끝나며 딸려 오는 click은 이동거리로 거른다.
+document.addEventListener('click', (e) => {
+  if (highlightMode || !lb.hidden) return;
+  const img = e.target.closest('img.shot');
+  if (!img || !e.target.closest('#content, #examBody')) return;
+  if (Math.abs(dx) > MOVE_TOL) return;
+  openLightbox(img.src);
+});
+
 /* 글자크기 슬라이더 */
 function setSliderFill(el){ const pct = (el.value - el.min) / (el.max - el.min) * 100; el.style.setProperty('--fill', pct + '%'); }
 function readPx(el){ return Math.round(parseFloat(getComputedStyle(el).fontSize)) + 'px'; }
@@ -1078,13 +1234,16 @@ const titleScale = $('titleScale'), bodyScale = $('bodyScale');
 const savedTScale = lsGet('sd_tscale'), savedBScale = lsGet('sd_bscale');
 if (savedTScale) titleScale.value = savedTScale;
 if (savedBScale) bodyScale.value = savedBScale;
+// 인라인이 아니라 :root 변수를 고친다 — peek(다음/이전 카드)도 같은 CSS 규칙을 쓰므로
+// 스와이프 중 기본 크기로 보였다가 튀는 일이 없다. 시험 본문(.exambody)도 같이 따라온다.
+const rootEl = document.documentElement;
 function applyTitleScale(){
-  cardTitleEl.style.fontSize = 'calc(clamp(22px,6vw,30px) * ' + titleScale.value + ')';
+  rootEl.style.setProperty('--tscale', titleScale.value);
   $('titleScaleVal').textContent = readPx(cardTitleEl);
   lsSet('sd_tscale', titleScale.value); setSliderFill(titleScale);
 }
 function applyBodyScale(){
-  content.style.fontSize = (15.5 * bodyScale.value) + 'px';
+  rootEl.style.setProperty('--bscale', bodyScale.value);
   $('bodyScaleVal').textContent = readPx(content);
   lsSet('sd_bscale', bodyScale.value); setSliderFill(bodyScale);
 }
