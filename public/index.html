@@ -76,24 +76,22 @@
   .content .shot{max-width:100%;border-radius:10px;display:block;margin:6px 0 12px}
   .content .shotcap{font-family:var(--mono);font-size:11px;color:var(--muted);margin:-6px 0 12px}
 
-  /* ── 상단: 챕터-소챕터 주소("1-1") — 탭하면 이 소챕터 시험. 테두리 링이 이 소챕터
-     10장 중 몇 장을 "안다"로 판정했는지 진행률을 보여준다(2026-09-05 실기기 피드백 —
-     시험은 자주 안 쓰니 엄지 영역(하단)이 아니라 여기로, 진행률도 한눈에). ── */
+  /* ── 상단: 챕터-소챕터 주소("1-1") — 탭하면 이 소챕터 시험. 점 5개(소챕터 10장 기준
+     2장당 1점)가 이 소챕터에서 몇 장을 "안다"로 판정했는지 보여준다. 원형 진행률 링에서
+     캡슐형으로 교체(2026-09-05 디자인 베이크오프 라운드4 — "원그래프보다 공간 덜 차지"). ── */
   .subpos{
     position:absolute;top:env(safe-area-inset-top);left:0;right:0;z-index:2;
     display:flex;justify-content:center;padding:8px 0 0;
   }
   .subpos-chip{
-    --pct:0;position:relative;width:46px;height:46px;border-radius:50%;border:0;cursor:pointer;
-    background:var(--ink3);display:flex;align-items:center;justify-content:center;-webkit-touch-callout:none;
+    height:26px;padding:0 12px;border-radius:13px;border:0;cursor:pointer;
+    background:var(--ink3);display:flex;align-items:center;gap:7px;-webkit-touch-callout:none;
   }
-  .subpos-chip::before{
-    content:'';position:absolute;inset:-3px;border-radius:50%;
-    background:conic-gradient(var(--coral) calc(var(--pct)*1%), var(--ink4) 0);
-    -webkit-mask:radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
-    mask:radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
-  }
-  .subpos-chip span{position:relative;font-family:var(--mono);font-size:11px;color:var(--paper)}
+  .subpos-chip span#subPos{font-family:var(--mono);font-size:11px;color:var(--paper);font-weight:600}
+  .subpos-dots{display:flex;gap:3px}
+  .subpos-dots i{width:6px;height:6px;border-radius:50%;background:var(--ink4);display:block}
+  .subpos-dots i.on{background:var(--coral)}
+  .subpos-dots i.half{background:linear-gradient(90deg,var(--coral) 50%,var(--ink4) 50%)}
   .subpos-chip:active{transform:scale(.95)}
 
   /* ── 챕터 완주 넛지 배너 ── */
@@ -123,12 +121,16 @@
   .scrubtrack .track{position:absolute;left:0;right:0;top:50%;height:2px;background:var(--ink4);transform:translateY(-50%);border-radius:2px}
   .scrubtrack .dot{position:absolute;top:50%;width:7px;height:7px;border-radius:50%;background:var(--faint);transform:translate(-50%,-50%);transition:background-color .1s ease}
   .scrubtrack .dot.cur{background:var(--coral);width:10px;height:10px}
-  .barrow{display:flex;align-items:center;gap:8px}
-  .seg{flex:1;display:flex;background:var(--ink3);border-radius:10px;padding:3px}
-  .seg button{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;border:0;background:none;color:var(--muted);font-size:12px;padding:8px 4px;border-radius:8px;cursor:pointer}
-  .seg button.on{background:var(--ink4);color:var(--paper)}
-  .seg.mini{flex:none;padding:3px;gap:1px}
-  .seg.mini button{flex:none;width:30px;padding:9px 0;font-size:13px}
+  .barrow{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  /* 필터 — 예전엔 전체/미완료 2버튼 세그먼트였으나 결국 이진 토글이라 하나로 단순화
+     (2026-09-05 디자인 베이크오프 라운드4, 콘셉트 3안 전부 "애매" 판정 후 대안 채택). */
+  .filtertoggle{
+    flex:none;height:34px;padding:0 14px;border:0;border-radius:17px;cursor:pointer;
+    background:var(--ink3);color:var(--muted);font-family:var(--sans);font-size:12.5px;font-weight:500;
+    -webkit-touch-callout:none;
+  }
+  .filtertoggle.on{background:var(--ink4);color:var(--paper)}
+  .barr-icons{display:flex;align-items:center;gap:8px}
   .barbtn{
     flex:none;width:42px;height:42px;border-radius:50%;border:0;cursor:pointer;
     display:flex;align-items:center;justify-content:center;font-size:17px;
@@ -136,15 +138,17 @@
   }
   .barbtn:active{transform:scale(.93)}
   .barbtn.active{background:color-mix(in srgb,var(--coral) 30%,var(--ink3));color:var(--coral)}
-  /* "안다" 퀵버튼 — 자주 쓰는 액션이라 엄지 영역 한가운데를 크게 차지한다. 탭=안다,
-     롱프레스=보관/휴지통 팝업(2026-09-05 deep-interview로 정리한 스펙). */
+  .barbtn svg{width:18px;height:18px;stroke:currentColor}
+  /* "안다" 퀵버튼 — 원형 아이콘 전용으로 교체(2026-09-05 베이크오프 라운드4 — "초록 체크에
+     글씨 없이 깔끔해서 좋음"). 탭=안다, 롱프레스=보관/휴지통 팝업은 그대로. */
   .knowbtn{
-    flex:1;height:42px;border:0;border-radius:21px;cursor:pointer;
-    background:var(--ink3);color:var(--body-text);font-family:var(--sans);font-size:13.5px;font-weight:500;
-    -webkit-touch-callout:none;
+    flex:none;width:46px;height:46px;border-radius:50%;border:0;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    background:var(--ink3);color:var(--muted);-webkit-touch-callout:none;
   }
-  .knowbtn:active{transform:scale(.97)}
-  .knowbtn.on{background:color-mix(in srgb,var(--know) 22%,var(--ink3));color:var(--know)}
+  .knowbtn svg{width:20px;height:20px;stroke:currentColor}
+  .knowbtn:active{transform:scale(.93)}
+  .knowbtn.on{background:color-mix(in srgb,var(--know) 24%,var(--ink3));color:var(--know)}
   .knowpop{
     position:absolute;left:16px;right:16px;bottom:calc(72px + env(safe-area-inset-bottom));z-index:4;
     background:color-mix(in srgb,var(--ink2) 96%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
@@ -212,17 +216,19 @@
   .sheethandle::after{content:'';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:36px;height:4px;background:var(--ink4);border-radius:3px}
   .sheetscroll{flex:1;min-height:0;overflow-y:auto;-webkit-user-select:text;user-select:text}
   .chaplist{padding:6px 16px 10px;display:flex;flex-direction:column;gap:10px}
-  .chaprow{background:var(--ink3);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+  /* 챕터 행 — 라벨 2줄 스택 + 칩 전체가 "이동" 탭 영역, "시험"만 별도 미니 버튼
+     (2026-09-05 베이크오프 라운드4 — "이동이 기본 행동이니 칩 전체를 이동으로"). */
+  .chaprow{background:var(--ink3);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;cursor:pointer}
+  .chaprow:active{background:var(--ink4)}
   .chaprow-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
-  .chaprow-label{font-family:var(--serif);font-size:15px;color:var(--paper)}
-  .chaprow-range{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-left:6px}
+  .chaprow-label{display:flex;flex-direction:column;gap:1px}
+  .chaprow-label b{font-family:var(--serif);font-weight:400;font-size:15px;color:var(--paper)}
+  .chaprow-range{font-family:var(--mono);font-size:10.5px;color:var(--muted)}
   .chaprow-score{font-family:var(--mono);font-size:22px;font-weight:500;color:var(--paper);font-variant-numeric:tabular-nums;flex:none;text-align:right}
   .chaprow-score .best{display:block;font-size:11px;font-weight:400;color:var(--coral);margin-top:1px}
   .chaprow-bar{height:5px;border-radius:3px;background:var(--ink4);overflow:hidden}
   .chaprow-bar i{display:block;height:100%;background:var(--coral);border-radius:3px}
-  .chaprow-actions{display:flex;gap:6px}
-  .chaprow-actions button{flex:1;background:var(--ink4);border:0;border-radius:9px;color:var(--body-text);font-family:var(--sans);font-size:12px;padding:9px 4px;cursor:pointer}
-  .chaprow-actions button.exam{color:var(--coral)}
+  .chaprow-exam{align-self:flex-start;background:var(--ink4);border:0;border-radius:9px;color:var(--coral);font-family:var(--sans);font-size:11.5px;padding:7px 10px;cursor:pointer}
   .trashsec{padding:4px 16px 18px}
   .trashtoggle{width:100%;background:none;border:0;color:var(--muted);font-family:var(--sans);font-size:12.5px;padding:10px 2px;cursor:pointer;text-align:left}
   .trashrow{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--ink3);border-radius:10px;padding:10px 12px;margin-top:6px}
@@ -253,7 +259,7 @@
       </div>
       <div class="peek peek-prev" id="peekPrev"><div class="cardtitle" id="peekPrevTitle"></div><div class="content peekbody" id="peekPrevBody"></div></div>
       <div class="peek peek-next" id="peekNext"><div class="cardtitle" id="peekNextTitle"></div><div class="content peekbody" id="peekNextBody"></div></div>
-      <div class="subpos"><button class="subpos-chip" id="subPosChip" aria-label="이 소챕터 시험보기"><span id="subPos">1-1</span></button></div>
+      <div class="subpos"><button class="subpos-chip" id="subPosChip" aria-label="이 소챕터 시험보기"><span id="subPos">1-1</span><span class="subpos-dots"><i></i><i></i><i></i><i></i><i></i></span></button></div>
     </div>
 
     <div class="chapnudge" id="chapNudge">
@@ -269,13 +275,12 @@
     <div class="bottombar" id="bottombar">
       <div class="scrubber" id="scrubber"><div class="scrubtrack" id="scrubTrack"><div class="track"></div></div></div>
       <div class="barrow">
-        <div class="seg mini" id="filterSeg">
-          <button data-m="all" class="on" aria-label="전체보기">●</button>
-          <button data-m="unknown" aria-label="모르는 것만">○</button>
+        <button class="filtertoggle" id="filterToggle" aria-pressed="false" aria-label="미완료만 보기">미완료만</button>
+        <div class="barr-icons">
+          <button class="knowbtn" id="knowBtn" aria-label="안다(길게 누르면 보관/휴지통)"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></button>
+          <button class="barbtn" id="hlBtn" aria-label="형광펜 모드"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg></button>
+          <button class="barbtn" id="sheetBtn" aria-label="챕터 목록">&#9776;</button>
         </div>
-        <button class="knowbtn" id="knowBtn" aria-label="안다(길게 누르면 보관/휴지통)">안다</button>
-        <button class="barbtn" id="hlBtn" aria-label="형광펜 모드">&#128397;</button>
-        <button class="barbtn" id="sheetBtn" aria-label="챕터 목록">&#9776;</button>
       </div>
     </div>
 
@@ -581,8 +586,13 @@ function chapId(){ return 'c' + chapIdx; }
 function updateSubPos(){
   $('subPos').textContent = (chapIdx + 1) + '-' + (subIdx + 1);
   const known = subchapterAll.filter((c) => c.known).length;
-  const pct = subchapterAll.length ? Math.round(known / subchapterAll.length * 100) : 0;
-  $('subPosChip').style.setProperty('--pct', pct);
+  const total = subchapterAll.length || 1;
+  const filled = known / total * 5;
+  $('subPosChip').querySelectorAll('.subpos-dots i').forEach((d, i) => {
+    d.classList.remove('on', 'half');
+    if (filled >= i + 1) d.classList.add('on');
+    else if (filled > i) d.classList.add('half');
+  });
 }
 
 async function refreshChapterMeta(){
@@ -735,18 +745,21 @@ $('scrubber').addEventListener('pointermove', (e) => {
 $('scrubber').addEventListener('pointerup', () => { scrubbing = false; });
 $('scrubber').addEventListener('pointercancel', () => { scrubbing = false; });
 
-/* 전체/모르는 것만 필터 — 이미 받아둔 데이터를 다시 거르기만 함(네트워크 없음) */
+/* 미완료만 토글 — 이미 받아둔 데이터를 다시 거르기만 함(네트워크 없음). 2026-09-05
+   베이크오프 라운드4: 전체/미완료 2버튼 세그먼트가 결국 이진 선택이라 토글 하나로 단순화. */
 function syncFilterButtons(){
-  $('filterSeg').querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.m === studyMode));
+  const on = studyMode === 'unknown';
+  $('filterToggle').classList.toggle('on', on);
+  $('filterToggle').setAttribute('aria-pressed', String(on));
+  $('filterToggle').textContent = on ? '✓ 미완료만' : '미완료만';
 }
 function setFilterMode(m){
   studyMode = m;
   syncFilterButtons();
   applyFilter();
 }
-$('filterSeg').addEventListener('click', (e) => {
-  const b = e.target.closest('button'); if (!b) return;
-  setFilterMode(b.dataset.m);
+$('filterToggle').addEventListener('click', () => {
+  setFilterMode(studyMode === 'unknown' ? 'all' : 'unknown');
 });
 
 /* 소챕터/챕터 경계 — 자동으로 다음 소챕터, 챕터가 끝나면 전체시험 넛지 */
@@ -986,11 +999,11 @@ async function renderChapList(){
   allChaptersData = data; totalChapters = data.chapters.length || 1;
   $('chapList').innerHTML = data.chapters.map((c, i) => {
     const pct = c.total ? Math.round(c.current / c.total * 100) : 0;
-    return '<div class="chaprow" data-idx="' + i + '" data-id="' + esc(c.id) + '">'
-      + '<div class="chaprow-top"><span class="chaprow-label">챕터 ' + (i + 1) + '<span class="chaprow-range">' + c.start + '~' + c.end + '</span></span>'
+    return '<div class="chaprow" data-idx="' + i + '" data-id="' + esc(c.id) + '" data-act="go">'
+      + '<div class="chaprow-top"><span class="chaprow-label"><b>챕터 ' + (i + 1) + '</b><span class="chaprow-range">' + c.start + '~' + c.end + '</span></span>'
       + '<span class="chaprow-score">' + c.current + '/' + c.total + '<span class="best">최고 ' + c.best + '</span></span></div>'
       + '<div class="chaprow-bar"><i style="width:' + pct + '%"></i></div>'
-      + '<div class="chaprow-actions"><button data-act="go">여기로 이동</button><button data-act="exam" class="exam">전체시험(' + c.total + '문제)</button></div>'
+      + '<button class="chaprow-exam" data-act="exam">전체시험(' + c.total + '문제)</button>'
       + '</div>';
   }).join('');
 }
