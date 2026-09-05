@@ -205,7 +205,10 @@
   .sheet.on{transform:translateY(0)}
   /* 시각적으로는 얇은 막대지만, 실제 드래그 히트박스는 훨씬 넓다(2026-09-05 실기기
      피드백 — 정확히 막대 위를 눌러야만 드래그로 닫혔던 것을 완화). */
-  .sheethandle{width:72px;height:26px;margin:0 auto;flex:none;position:relative;cursor:grab}
+  /* touch-action:none 필수 — 없으면 iOS가 이 터치를 네이티브 스크롤/바운스로 먼저 채가서
+     JS 드래그 로직에 이벤트가 안 넘어온다(2026-09-05 실기기 피드백으로 발견 — 데스크톱
+     합성 이벤트 테스트로는 이 경합 자체가 재현이 안 됐다). */
+  .sheethandle{width:72px;height:26px;margin:0 auto;flex:none;position:relative;cursor:grab;touch-action:none}
   .sheethandle::after{content:'';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:36px;height:4px;background:var(--ink4);border-radius:3px}
   .sheetscroll{flex:1;min-height:0;overflow-y:auto;-webkit-user-select:text;user-select:text}
   .chaplist{padding:6px 16px 10px;display:flex;flex-direction:column;gap:10px}
