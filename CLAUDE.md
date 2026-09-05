@@ -86,6 +86,41 @@ Playwright로 로컬 `wrangler dev` 페이지에 접속해 `renderTrashList()`�
 보기(1차 확인은 사용자가 API 반영이 아니라 화면으로 직접 봤다고 봄 — 별도 미확인 표시
 없으면 이 항목은 완료로 간주).
 
+### 라운드12 후속 요청 2 — 보관함 복구 + 시트 레이아웃 4건 (2026-09-06)
+
+사용자가 실기기로 위 복구 버그를 확인하는 김에 UI 개선 4건을 같이 요청.
+
+- **"완전히 앎"(보관)도 휴지통처럼 복구 가능하게.** 이전엔 보관은 한 번 누르면
+  되돌릴 길이 없었다(트래시만 시트에 목록+복구가 있었음). `GET/POST /api/archive`
+  (POST는 기존 보관 액션 그대로, GET을 새로 추가해 목록 조회) + `POST
+  /api/archive/restore` 신규. 트래시와 로직 모양이 완전히 같아(플래그 하나 + 목록
+  조회 + 복구 시 리뷰상태 리셋) `listFlagged()`/`unflagAndReset()` 공용 헬퍼로
+  뽑아 `handleTrashList`/`handleArchiveList`, `handleTrashRestore`/
+  `handleArchiveRestore`가 공유한다. 복구 시 `known`은 안 건드린다 — 이 앱엔 known을
+  다시 false로 되돌리는 길이 시험 채점(`handleAnswer`)뿐이라는 기존 원칙 그대로
+  유지(트래시 복구와 동일). 프런트는 시트에 `#archiveSec`(🎓 완전히 앎)을
+  `#trashSec` 위에 새로 추가, 트래시와 같은 CSS 클래스(`trashsec`/`trashrow`)를
+  그대로 재사용(완전삭제 버튼만 없음 — "진짜 삭제" 개념이 보관엔 없어서).
+- **하단 시트 세로 폭 확대** — `.sheet{max-height}` `42dvh → 58dvh`(사용자 체감
+  "화면의 30%"를 "50~60%"로 요청).
+- **제목/본문 폰트 슬라이더 간격 확대** — `.sheetsettings{gap}` `8px → 20px`(두
+  슬라이더가 너무 붙어 있어 손가락으로 어느 쪽을 만지는지 헷갈렸다는 지적).
+- **챕터 행의 "전체시험" 버튼을 별도 줄에서 챕터명↔점수 사이 빈 공간으로 이동.**
+  `.chaprow-top`(flex row, `justify-content:space-between`)에 라벨과 점수 사이
+  세 번째 자식으로 버튼을 끼워 넣어 자연스럽게 가운데 정렬되고, 그만큼 `.chaprow`가
+  차지하던 한 줄(버튼 전용 줄)이 사라져 행 높이가 줄었다 — 한 화면에 더 많은
+  챕터가 보임. 버튼 라벨도 "전체시험(N문제)" → "전체시험"으로 줄임(좁은 가운데
+  공간에 맞춤, 문제 수는 옆 점수에 이미 나옴).
+
+`Version ID e500df54-d7a8-4711-a665-2a2f35f9433c` 배포. **실조건검증**: 로컬
+`wrangler dev` + Playwright로 실제 브라우저에 접속해 시트를 열고 스크린샷으로
+레이아웃(챕터 행 압축·시트 높이·슬라이더 간격) 확인, 보관 복구는 `renderArchiveList()`
+클릭 핸들러와 동일한 코드경로를 실행해 카드가 `studyCards`에 다시 나타나는 것까지
+확인 + **실제 프로덕션 카드 1건으로 archive→restore→Notion `복습 상태=미확인`
+재조회 확인**(콘솔 에러 없음, favicon 404 하나뿐).
+
+**남은 것**: 실기기 확인(시트 높이·챕터 행 레이아웃·슬라이더 조작감·보관 복구 전부).
+
 ## 현재 상태 (2026-09-05 라운드 11 — 링크 없는 제목 탭 버그) — 위 라운드12 다음으로 읽을 것
 
 라운드10 배포 후 사용자가 "영상 링크 없는 카드 제목 탭하면 소챕터 첫 카드로 튄다"고
@@ -892,7 +927,7 @@ pageId를 키로 학습 이력을 저장하면 재저장 한 번에 그 카드�
 | 카드 본문 | Worker KV `bucket:v2:N` | 50장 단위. 블록마다 원본 Notion `block.id` 포함(v3, 형광펜 되쓰기용) |
 | 동기화 커서 | Worker KV `sync:state` | 진행 중일 때만 존재. 끝나면 삭제 |
 | `복습 상태` 컬럼명 캐시 | Worker KV `reviewSchema:v1` | `{ prop: string\|null }`(2026-09-06). 하드코딩 대신 옵션 내용으로 찾은 결과 — 컬럼명이 바뀌면 `wrangler kv key delete`로 지우면 다시 찾는다 |
-| 카드 제목·형광펜·복습 상태 | **Notion 본문/속성 자체** | 미러 아님 — 실제 원본 수정(`/api/retitle`, `/api/highlight`, `/api/answer`\`/archive`\`/trash`가 `복습 상태` PATCH, 2026-09-06). 실패해도 로컬 KV는 먼저 반영(마찰 최소화), `notionOk`로 정직하게 알림 |
+| 카드 제목·형광펜·복습 상태 | **Notion 본문/속성 자체** | 미러 아님 — 실제 원본 수정(`/api/retitle`, `/api/highlight`, `/api/answer`\`/archive`\`/trash`가 `복습 상태` PATCH, 2026-09-06 — `/api/archive/restore`\`/trash/restore`는 `미확인`으로 리셋). 실패해도 로컬 KV는 먼저 반영(마찰 최소화), `notionOk`로 정직하게 알림 |
 | 오프라인 캐시 | localStorage | ⚠ 보조일 뿐 — iOS는 영구성을 보장하지 않는다. 글자 크기(`sd_tscale`·`sd_bscale`)와 마지막 위치(`sd_pos`)만 여기 저장 |
 
 ⚠ (역사) 예전 `grades`(0~3차+횟수)·`daily:v1:*`(캘린더)·`schema:v1`(진도/난이도 판별 캐시)
@@ -1093,6 +1128,11 @@ px(`TH`) 방식은 화면이 크면 살짝만 끌어도 넘어가버리는 문�
   안 보이던 캐시 버그) 배포. `Version ID 50d7a014-9ed6-4cd1-98d6-1d34be2ed1b6`. 실제
   프로덕션 카드로 trash→restore 전 구간 Notion 재조회 확인 + Playwright로 클라이언트
   복구 코드경로 실행 확인(콘솔 에러 없음). 재동기화 불필요.
+- 2026-09-06: 라운드12 후속 요청2(보관함 복구 기능 + 시트 세로 폭·폰트 슬라이더 간격·
+  챕터 행 레이아웃 개선) 배포. `Version ID e500df54-d7a8-4711-a665-2a2f35f9433c`.
+  로컬 `wrangler dev` + Playwright(스크린샷으로 레이아웃 확인, 보관 복구 클릭 핸들러
+  코드경로 실행) + 실제 프로덕션 카드로 archive→restore→Notion `미확인` 재조회 확인
+  (콘솔 에러 없음). 재동기화 불필요.
 
 새 PC/새 계정에서 처음 세울 때:
 
