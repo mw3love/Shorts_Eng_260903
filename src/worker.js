@@ -53,10 +53,12 @@ const K_TRASHED = 'trashed:v1';   // { [cardKey]: true } — 로컬 소프트 �
                                    // 눌러야 그때 Notion 페이지를 archived로 전환한다(그 전까진 원본 안전).
 
 const BUCKET_SIZE = 50;             // ⚠ 카드별 개별 KV 저장은 불가 — 무료 쓰기 1,000회/일에 걸린다
-const PARSER_VERSION = 4;           // 포맷을 바꾸면 올릴 것 — 증분 로직이 옛 포맷을 재사용하지 않게
+const PARSER_VERSION = 5;           // 포맷을 바꾸면 올릴 것 — 증분 로직이 옛 포맷을 재사용하지 않게
                                      // (v3, 2026-09-05: 블록에 원본 block.id 추가 — 형광펜 토글을
                                      //  Notion에 되쓰려면 필요 / v4, 같은 날: image 블록 지원 추가 —
-                                     //  이전엔 이미지만 있는 카드가 조용히 빈 본문으로 캐시됐다)
+                                     //  v5, 같은 날: splitBody()가 image 블록을 "텍스트 없음"으로
+                                     //  오판해 통째로 버리던 버그 수정(v4는 compactBlock만 고치고
+                                     //  이 필터 버그를 놓쳐서 사진 카드가 여전히 비어 있었다)
 const SUB_BUDGET = 40;              // 50 상한에서 여유 10회를 남긴다
 const STALE_MS = 6 * 60 * 60 * 1000; // 캐시가 이보다 오래되면 cron이 새 동기화를 시작
 
@@ -238,7 +240,9 @@ const LATIN = /[A-Za-z]{2,}/;
  * 그 "한 줄"이 1단계 힌트가 된다 — 화면엔 힌트+해설을 한 번에 이어 붙여 보여준다.
  */
 function splitBody(blocks) {
-  let body = blocks.filter((b) => b && plainOf(b).trim());
+  // ⚠ image 블록은 .rich가 없어 plainOf()가 항상 ''를 반환 — 텍스트 유무로만 거르면
+  // 사진만 있는 카드(초창기 수동 메모)가 통째로 사라진다(2026-09-05 실기기 피드백으로 발견).
+  let body = blocks.filter((b) => b && (b.type === 'image' || plainOf(b).trim()));
   let context = null;
 
   const first = body[0] ? plainOf(body[0]) : '';
