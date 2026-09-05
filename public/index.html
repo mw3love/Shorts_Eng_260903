@@ -56,12 +56,21 @@
      클립으로 잃는 실질 가독 영역은 거의 없고(≈750px로 동일), 대신 바를 안전 하한까지
      내려 실제로는 넓어진다(2026-09-05 라운드6 사용자 판단). ── */
   .stage{position:absolute;top:0;left:0;right:0;bottom:var(--barh)}
-  .scroller{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;touch-action:pan-y;-webkit-user-select:text;user-select:text}
+  /* clip-path로 상태바 안전영역 위쪽을 물리적으로 잘라낸다 — apple-mobile-web-app-status-bar-style
+     메타태그는 viewport-fit=cover가 걸린 최신 iOS에서 아이콘 색만 바꿀 뿐 레이아웃 공간을
+     예약하지 않아서(실기기 스샷으로 확인, 2026-09-05), 긴 제목·본문이 스크롤로 상태바
+     뒤까지 올라가는 걸 못 막았다. 스크롤 컨테이너 자체를 잘라내는 쪽이 확실하다. */
+  .scroller{
+    position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;touch-action:pan-y;
+    -webkit-user-select:text;user-select:text;
+    clip-path:inset(env(safe-area-inset-top) 0 0 0);
+  }
   .cardtitle{
     display:block;font-family:var(--serif);font-weight:400;
     font-size:calc(clamp(22px,6vw,30px) * var(--tscale));line-height:1.18;letter-spacing:-.01em;
     color:var(--paper);text-decoration:none;text-wrap:balance;
     padding:calc(env(safe-area-inset-top) + 62px) 22px 6px;
+    -webkit-touch-callout:none;-webkit-user-select:none;user-select:none;
   }
   /* 본문 영역 자체가 바 위에서 끝나므로(.stage) 하단 패딩은 마지막 줄이 경계선에 닿지
      않을 만큼만 있으면 된다 — 예전 92px는 바를 피하려던 값이라 이제 불필요하다. */
@@ -136,7 +145,7 @@
      것만(2026-09-05 실기기 피드백: "하단은 오른손 엄지 영역이 비싼 부동산"). ── */
   .bottombar{
     position:absolute;left:0;right:0;bottom:0;z-index:2;
-    padding:4px 16px max(6px, calc(env(safe-area-inset-bottom) - 14px));
+    padding:4px 16px max(4px, calc(env(safe-area-inset-bottom) - 28px));
     background:var(--ink);
   }
   .scrubber{padding:0 4px 2px;touch-action:none}
@@ -144,7 +153,10 @@
   .scrubtrack .track{position:absolute;left:0;right:0;top:50%;height:2px;background:var(--ink4);transform:translateY(-50%);border-radius:2px}
   .scrubtrack .dot{position:absolute;top:50%;width:7px;height:7px;border-radius:50%;background:var(--faint);transform:translate(-50%,-50%);transition:background-color .1s ease}
   .scrubtrack .dot.cur{background:var(--coral);width:10px;height:10px}
-  .barrow{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  /* 스크러버 위치는 그대로 두고 버튼 행만 더 아래로 밀기 위해, 줄어든 바깥 여백(위)만큼
+     여기 margin-top으로 다시 넣어준다 — 순 이동분은 버튼~화면끝 간격에만 반영되고
+     스크러버~버튼 간격은 오히려 넓어진다(2026-09-05 실기기 피드백: "너무 붙어 보임"). */
+  .barrow{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:14px}
   /* 필터 — 예전엔 전체/미완료 2버튼 세그먼트였으나 결국 이진 토글이라 하나로 단순화
      (2026-09-05 디자인 베이크오프 라운드4, 콘셉트 3안 전부 "애매" 판정 후 대안 채택). */
   .filtertoggle{
@@ -186,9 +198,18 @@
   .knowpop button{border:0;background:var(--ink4);color:var(--paper);border-radius:9px;padding:12px;font-size:13px;cursor:pointer;text-align:left}
   .knowpop button.trash{color:var(--coral)}
 
-  /* ── 본문 드래그 선택 → 제목으로 변경 / 형광펜(문서 하단 JS 참조) ── */
-  .retitlePop{position:fixed;z-index:9;background:var(--coral);color:var(--ink);font-family:var(--sans);font-size:12.5px;font-weight:600;padding:9px 14px;border-radius:99px;box-shadow:0 4px 16px rgba(0,0,0,.4);cursor:pointer;-webkit-user-select:none;user-select:none}
-  .retitlePop[hidden]{display:none}
+  /* ── 제목 롱프레스 메뉴(유튜브 링크 / 제목 수정) — 본문 드래그 선택 기반 방식은
+     폐기했다(2026-09-05 실기기 피드백: 선택 시작은 되는데 네이티브 콜아웃 메뉴와
+     우리 팝업이 겹쳐 지저분했고, 핸들로 정교하게 조정할 때 스와이프에 뺏겼다).
+     .knowpop과 같은 스타일 재사용, 위치만 같은 하단(엄지 반경)에 그대로. ── */
+  .titleEdit input{
+    width:100%;background:var(--ink4);color:var(--paper);border:0;border-radius:9px;
+    padding:12px;font-size:14px;font-family:var(--sans);
+  }
+  .titleEdit .row{display:flex;gap:8px}
+  .titleEdit .row button{flex:1;text-align:center}
+  .titleEdit .row button.primary{color:var(--know)}
+  #titleMenuLink.disabled{color:var(--faint);pointer-events:none}
 
   .toast{position:fixed;left:50%;bottom:calc(var(--barh) + 18px);transform:translate(-50%,8px);z-index:8;font-family:var(--mono);font-size:12.5px;color:var(--paper);background:var(--ink3);padding:8px 14px;border-radius:8px;opacity:0;pointer-events:none;transition:opacity .18s ease,transform .18s ease;white-space:nowrap}
   .toast.on{opacity:1;transform:translate(-50%,0)}
@@ -357,7 +378,14 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <div class="retitlePop" id="retitlePop" hidden>이 문장을 제목으로</div>
+  <div class="knowpop" id="titleMenu" hidden>
+    <button id="titleMenuLink">유튜브 원본 보기</button>
+    <button id="titleMenuEdit">제목 수정</button>
+  </div>
+  <div class="knowpop titleEdit" id="titleEditPop" hidden>
+    <input id="titleEditInput" type="text" placeholder="새 제목" autocomplete="off">
+    <div class="row"><button id="titleEditCancel">취소</button><button class="primary" id="titleEditSave">저장</button></div>
+  </div>
 </div>
 
 <div class="lightbox" id="lightbox" hidden>
@@ -527,37 +555,43 @@ async function apiHighlight(pageId, field, blockIndex, start, end){
   return r.json();
 }
 
-/* ── 본문 드래그 선택 → 제목으로 변경 ──
-   iOS 기본 선택 팝업(복사/찾아보기/번역)이 대개 선택 "위"에 뜨므로, 우리 팝업은 "아래"에
-   띄워 겹침을 줄인다(완전히 없애긴 iOS 특성상 어려움 — 2026-09-05 실기기 피드백). */
+/* ── 제목 롱프레스 메뉴(유튜브 링크 / 제목 수정) ──
+   예전엔 본문에서 예문을 드래그 선택하면 팝업이 떴는데, 선택 시작 자체는 됐지만
+   iOS 기본 콜아웃 메뉴와 겹쳐 지저분했고 핸들로 정교하게 조정할 때 스와이프에
+   뺏겼다(2026-09-05 실기기 피드백, 사진으로 확인). 제목을 길게 눌러 메뉴를 띄우는
+   방식으로 교체 — 드래그 선택 자체가 필요 없어져 그 문제를 원천적으로 피한다. */
 let retitleCtx = null;
 function setRetitleContext(getCard){ retitleCtx = { getCard }; }
-function clearRetitleContext(){ retitleCtx = null; hideRetitlePop(); }
-function hideRetitlePop(){ $('retitlePop').hidden = true; }
-function showRetitlePop(rect, text){
-  const pop = $('retitlePop');
-  pop.hidden = false;
-  pop.dataset.text = text;
-  const w = pop.offsetWidth || 120;
-  pop.style.left = Math.max(8, Math.min(window.innerWidth - 8 - w, rect.left + rect.width / 2 - w / 2)) + 'px';
-  pop.style.top = Math.min(window.innerHeight - 50, rect.bottom + 10) + 'px';
+function clearRetitleContext(){ retitleCtx = null; hideTitleMenu(); hideTitleEdit(); }
+function hideTitleMenu(){ $('titleMenu').hidden = true; }
+function hideTitleEdit(){ $('titleEditPop').hidden = true; }
+function showTitleMenu(){
+  const card = retitleCtx && retitleCtx.getCard(); if (!card) return;
+  $('titleMenuLink').classList.toggle('disabled', !card.url);
+  $('titleMenu').hidden = false;
 }
-document.addEventListener('selectionchange', () => {
-  if (!retitleCtx || highlightMode) return;
-  const sel = document.getSelection();
-  const text = sel && !sel.isCollapsed ? sel.toString().trim() : '';
-  if (!text){ hideRetitlePop(); return; }
-  const range = sel.getRangeAt(0);
-  const rect = range.getBoundingClientRect();
-  if (!rect || (!rect.width && !rect.height)){ hideRetitlePop(); return; }
-  showRetitlePop(rect, text);
+document.addEventListener('pointerdown', (e) => {
+  if (!$('titleMenu').hidden && !e.target.closest('#titleMenu') && e.target.id !== 'cardTitle') hideTitleMenu();
+  if (!$('titleEditPop').hidden && !e.target.closest('#titleEditPop')) hideTitleEdit();
 });
-$('retitlePop').addEventListener('pointerdown', async (e) => {
-  e.preventDefault();
-  const text = $('retitlePop').dataset.text;
+$('titleMenuLink').addEventListener('click', () => {
   const card = retitleCtx && retitleCtx.getCard();
-  hideRetitlePop();
-  if (!text || !card) return;
+  hideTitleMenu();
+  if (card && card.url) window.open(card.url, '_blank', 'noopener');
+});
+$('titleMenuEdit').addEventListener('click', () => {
+  const card = retitleCtx && retitleCtx.getCard(); if (!card) return;
+  hideTitleMenu();
+  $('titleEditInput').value = card.front;
+  $('titleEditPop').hidden = false;
+  $('titleEditInput').focus();
+});
+$('titleEditCancel').addEventListener('click', hideTitleEdit);
+$('titleEditSave').addEventListener('click', async () => {
+  const card = retitleCtx && retitleCtx.getCard(); if (!card) return;
+  const text = $('titleEditInput').value.trim();
+  hideTitleEdit();
+  if (!text || text === card.front) return;
   const res = await apiRetitle(card.id, card.key, text).catch(() => null);
   if (res && res.ok){
     card.front = res.front; card.key = res.key;
@@ -565,6 +599,18 @@ $('retitlePop').addEventListener('pointerdown', async (e) => {
     else { const el = $('examTitle'); if (el) el.textContent = card.front; }
     toast('제목 변경됨');
   } else toast('제목 변경 실패');
+});
+// 롱프레스 판정 뒤엔 그 손을 떼는 click이 링크 이동으로 이어지지 않게 막는다
+// (#cardTitle이 href를 가진 <a>라 평소 탭은 그대로 유튜브로 이동한다).
+let titlePressT = null, titleLongPressed = false;
+$('cardTitle').addEventListener('pointerdown', () => {
+  titleLongPressed = false;
+  titlePressT = setTimeout(() => { titleLongPressed = true; showTitleMenu(); }, 450);
+});
+$('cardTitle').addEventListener('pointerup', () => clearTimeout(titlePressT));
+$('cardTitle').addEventListener('pointerleave', () => clearTimeout(titlePressT));
+$('cardTitle').addEventListener('click', (e) => {
+  if (titleLongPressed){ e.preventDefault(); titleLongPressed = false; }
 });
 
 /* ── 형광펜 모드 ── 켜면 유지되고, 그 뒤 드래그마다 자동으로 그 구간의 code(형광펜)를
@@ -577,7 +623,7 @@ function setHighlightMode(on, btn){
   $('hlBtn').classList.toggle('active', on);
   $('examHlBtn').classList.toggle('active', on);
   if (on){
-    hideRetitlePop();
+    hideTitleMenu(); hideTitleEdit();
     const t = getHighlightTarget();
     if (t){ window.getSelection().removeAllRanges(); doHighlight(t.blk, t.start, t.end); }
   }
@@ -647,7 +693,9 @@ function onHighlightAreaClick(e){
   sel.removeAllRanges(); sel.addRange(range);
   tryAutoHighlight();
 }
-document.addEventListener('mouseup', (e) => {
+// mouseup이 아니라 pointerup — iOS 터치 드래그선택은 합성 mouseup을 안정적으로
+// 안 쏴서 형광펜이 아예 안 먹혔다(2026-09-05 실기기 피드백으로 확인된 버그).
+document.addEventListener('pointerup', (e) => {
   if (!highlightMode) return;
   if (!e.target.closest('#content, #examBody')) return;
   setTimeout(tryAutoHighlight, 0);
@@ -997,7 +1045,7 @@ function beginSwipeTracking(e){
   $('peekNextTitle').textContent = nc ? nc.front : ''; $('peekNextBody').innerHTML = peekBodyHtml(nc);
 }
 scroller.addEventListener('pointerdown', (e) => {
-  if (studyCards.length < 2 || examMode) return;
+  if (studyCards.length < 2 || examMode || highlightMode) return;
   // 이미 선택된 텍스트가 있으면(선택 핸들을 드래그하는 중) 스와이프 트래킹 자체를
   // 시작하지 않는다 — 여기서 캡처를 걸면 핸들 드래그가 그 자리에서 끊긴다.
   if (!window.getSelection().isCollapsed) return;
@@ -1006,8 +1054,11 @@ scroller.addEventListener('pointerdown', (e) => {
   clearTimeout(pressTimer);
   pressTimer = setTimeout(() => { selectPrimed = true; }, SELECT_PRIME_MS);
 });
+// 형광펜 모드에선 스와이프 트래킹을 아예 시작하지 않는다 — 선택 시작뿐 아니라
+// 핸들로 정교하게 조정하는 단계까지 통째로 네이티브에 맡겨야 안전해서, "가로우세
+// 판정"류 휴리스틱보다 이쪽이 확실하다(2026-09-05 실기기 피드백).
 scroller.addEventListener('pointermove', (e) => {
-  if (studyCards.length < 2 || examMode) return;
+  if (studyCards.length < 2 || examMode || highlightMode) return;
   const mdx = e.clientX - sx, mdy = e.clientY - sy;
   if (!dragging && !selectPrimed){
     // 가로 이동이 세로보다 뚜렷할 때만 스와이프로 캡처한다 — 길게 누르는 동안의 세로
