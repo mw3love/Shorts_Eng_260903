@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="theme-color" content="#0B0D10">
 <title>Shorts Deck</title>
 <link rel="manifest" href="/manifest.json">
@@ -27,7 +27,11 @@
     --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
   }
   *{box-sizing:border-box}
-  html,body{height:100%}
+  /* overflow:hidden;position:fixed로 문서 자체를 스크롤 불가능하게 완전히 잠근다 —
+     overscroll-behavior:none만으로는 iOS Safari의 문서 레벨 러버밴드 바운스를 확실히
+     못 막아, 화면 최상단에서 아래로 당기면 #app 하위 요소 중 자체 스크롤 컨텍스트가
+     없는 것들(.bottombar 등)만 딸려 내려가 보이는 증상이 있었다(2026-09-05). */
+  html,body{height:100%;overflow:hidden;position:fixed;inset:0}
   body{
     margin:0;background:var(--ink);color:var(--paper);font-family:var(--sans);
     overscroll-behavior:none;-webkit-tap-highlight-color:transparent;
@@ -132,7 +136,7 @@
      것만(2026-09-05 실기기 피드백: "하단은 오른손 엄지 영역이 비싼 부동산"). ── */
   .bottombar{
     position:absolute;left:0;right:0;bottom:0;z-index:2;
-    padding:4px 16px max(6px, calc(env(safe-area-inset-bottom) - 8px));
+    padding:4px 16px max(6px, calc(env(safe-area-inset-bottom) - 14px));
     background:var(--ink);
   }
   .scrubber{padding:0 4px 2px;touch-action:none}
@@ -406,11 +410,31 @@ function tableHtml(b){
 }
 // 초창기(AI 도입 전) 메모는 스크린샷을 그대로 붙여넣은 카드가 있다 — Notion 자체 호스팅
 // 이미지는 URL이 만료되므로 /api/image로 매번 새로 받는다(external은 고정 URL 그대로).
+function imageSrc(b){ return b.external || ('/api/image?id=' + encodeURIComponent(b.id)); }
 function imageHtml(b){
-  const src = b.external || ('/api/image?id=' + encodeURIComponent(b.id));
+  const src = imageSrc(b);
   const cap = (b.caption || []).map((t) => t.t).join('');
-  return '<img class="shot" src="' + esc(src) + '" alt="' + esc(cap || '메모 스크린샷') + '" loading="lazy">'
+  // loading="lazy" 없음 — 이미 우리가 다음/이전 카드일 때만 렌더하므로 브라우저가 또
+  // 늦출 이유가 없다(2026-09-05: 지연의 진짜 원인은 /api/image가 표시 시점에야 Notion을
+  // 다시 불러 프리사인드 URL을 받는 2홉 구조였다 — warmImages()로 미리 데워둔다).
+  return '<img class="shot" src="' + esc(src) + '" alt="' + esc(cap || '메모 스크린샷') + '">'
     + (cap ? '<p class="shotcap">' + esc(cap) + '</p>' : '');
+}
+// 카드 안 image 블록의 실제 바이트를 미리 받아 브라우저 캐시에 데운다 — 소챕터
+// 텍스트 프리페치(subCache)와 같은 정신, 대상만 이미지로 좁힌 것.
+const warmedImages = new Set();
+function warmImages(c){
+  if (!c) return;
+  const blocks = [];
+  if (c.hint && c.hint.type === 'image') blocks.push(c.hint);
+  if (Array.isArray(c.detail)) c.detail.forEach((b) => { if (b && b.type === 'image') blocks.push(b); });
+  blocks.forEach((b) => {
+    const src = imageSrc(b);
+    if (warmedImages.has(src)) return;
+    warmedImages.add(src);
+    const img = new Image();
+    img.src = src;
+  });
 }
 function blockHtml(b, i){
   if (!b) return '';
@@ -783,6 +807,7 @@ function renderStudyCard(){
   $('scroller').scrollTop = 0;
   renderStudyScrubber();
   $('knowBtn').classList.toggle('on', !!c.known);
+  warmImages(studyPrev()); warmImages(studyNext());
 }
 
 /* ── "안다" 퀵버튼 — 탭=안다, 롱프레스=보관/휴지통 갈림길(2026-09-05 deep-interview) ──
@@ -973,6 +998,9 @@ function beginSwipeTracking(e){
 }
 scroller.addEventListener('pointerdown', (e) => {
   if (studyCards.length < 2 || examMode) return;
+  // 이미 선택된 텍스트가 있으면(선택 핸들을 드래그하는 중) 스와이프 트래킹 자체를
+  // 시작하지 않는다 — 여기서 캡처를 걸면 핸들 드래그가 그 자리에서 끊긴다.
+  if (!window.getSelection().isCollapsed) return;
   dragging = false; selectPrimed = false; mode = null;
   sx = e.clientX; sy = e.clientY; dx = 0; dy = 0; startT = e.timeStamp;
   clearTimeout(pressTimer);
@@ -982,7 +1010,10 @@ scroller.addEventListener('pointermove', (e) => {
   if (studyCards.length < 2 || examMode) return;
   const mdx = e.clientX - sx, mdy = e.clientY - sy;
   if (!dragging && !selectPrimed){
-    if (Math.abs(mdx) > MOVE_TOL || Math.abs(mdy) > MOVE_TOL){
+    // 가로 이동이 세로보다 뚜렷할 때만 스와이프로 캡처한다 — 길게 누르는 동안의 세로
+    // 흔들림까지 캡처를 걸어버려 네이티브 텍스트 선택을 막던 문제(2026-09-05 실기기
+    // 피드백)를 여기서 막는다. 세로 쪽은 그냥 return — 네이티브 스크롤에 맡긴다.
+    if (Math.abs(mdx) > MOVE_TOL && Math.abs(mdx) > Math.abs(mdy)){
       clearTimeout(pressTimer);
       beginSwipeTracking(e);
     } else return;
