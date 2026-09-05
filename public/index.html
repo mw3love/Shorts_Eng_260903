@@ -14,7 +14,6 @@
     --ink:#0B0D10; --ink2:#151A20; --ink3:#1E252D; --ink4:#262E38;
     --paper:#EFF2F6; --body-text:#C9D1DC; --muted:#8B95A3; --faint:#5A6472;
     --know:#3DD68C; --coral:#FF8F6B;
-    --lvl0:var(--muted); --lvl1:#6EA8FE; --lvl2:#F2954D; --lvl3:#FF6B5B;
     --serif:"Newsreader",Georgia,"Times New Roman",serif;
     --sans:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo",sans-serif;
     --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
@@ -24,7 +23,6 @@
   body{
     margin:0;background:var(--ink);color:var(--paper);font-family:var(--sans);
     overscroll-behavior:none;-webkit-tap-highlight-color:transparent;
-    -webkit-user-select:none;user-select:none;
   }
   button{font:inherit;color:inherit}
   a{color:inherit}
@@ -34,32 +32,69 @@
     position:fixed;inset:0;height:100dvh;display:flex;flex-direction:column;overflow:hidden;
     max-width:520px;margin:0 auto;background:var(--ink);
     padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+    -webkit-user-select:none;user-select:none;
   }
 
-  .topstrip{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;padding:8px 22px 0;flex:none;position:relative;z-index:2}
-  #dateSlot{grid-column:3;justify-self:end}
-  .topbar{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:10px 22px 6px;flex:none;position:relative;z-index:2;will-change:transform}
-  .title{
-    display:block;font-family:var(--serif);font-weight:400;
-    font-size:calc(clamp(24px,6.4vw,34px) * var(--tscale,1));line-height:1.16;letter-spacing:-.01em;
-    color:var(--paper);text-decoration:none;text-wrap:balance;
-  }
+  /* ── 상단바: 화면 공용(뒤로가기 / 제목 / 설정) ── */
+  .topbar2{display:flex;align-items:center;gap:10px;padding:10px 16px;flex:none}
+  .topbar2 .navbtn{width:34px;height:34px;border-radius:50%;border:0;background:var(--ink3);color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;flex:none;-webkit-touch-callout:none}
+  .topbar2 .navbtn[hidden]{display:none}
+  .topbar2 .navbtn:active{transform:scale(.94)}
+  .topbar2 .navbtn.active{background:color-mix(in srgb,var(--coral) 30%,var(--ink3));color:var(--coral)}
+  .topbar2-title{flex:1;font-family:var(--serif);font-size:16px;color:var(--paper);text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
-  .stage{position:relative;flex:1;min-height:0;overflow:hidden}
+  .views{flex:1;min-height:0;position:relative;overflow:hidden}
+  .view{position:absolute;inset:0;overflow-y:auto;-webkit-user-select:text;user-select:text}
+  .view[hidden]{display:none}
+  /* 학습/시험 화면은 자체 스크롤 영역(.scroller/.exambody)을 따로 두므로, 바깥 뷰는
+     스크롤이 아니라 세로 flex로 스테이지+스크러버+진행표시를 나눠 담는다. */
+  #viewStudy, #viewExam{overflow:hidden;display:flex;flex-direction:column}
+  #viewStudy[hidden], #viewExam[hidden]{display:none} /* ID 규칙이 .view[hidden]보다 우선하므로 다시 명시 */
+  #viewStudy .stage{flex:1;min-height:0;height:auto}
+
+  /* ── 챕터 개요 / 챕터 상세 공용 ── */
+  .listwrap{padding:6px 16px 24px;display:flex;flex-direction:column;gap:10px;-webkit-user-select:none;user-select:none}
+  .chaphead{padding:4px 16px 10px;display:flex;flex-direction:column;gap:6px}
+  .chaphead .num{font-family:var(--mono);font-size:26px;color:var(--paper);font-variant-numeric:tabular-nums}
+  .chaphead .num b{color:var(--coral);font-weight:500}
+  .chaphead .lbl{font-family:var(--mono);font-size:11px;color:var(--muted)}
+
+  .row{background:var(--ink3);border:0;border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;width:100%;text-align:left;cursor:pointer;-webkit-touch-callout:none}
+  .row:active{background:var(--ink4)}
+  .row-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+  .row-label{font-family:var(--serif);font-size:15px;color:var(--paper)}
+  .row-range{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-left:6px}
+  .row-score{font-family:var(--mono);font-size:13px;color:var(--paper);font-variant-numeric:tabular-nums;flex:none}
+  .row-score .best{color:var(--muted);font-size:10.5px;margin-left:6px}
+  .row-bar{height:4px;border-radius:2px;background:var(--ink4);overflow:hidden}
+  .row-bar i{display:block;height:100%;background:var(--coral);border-radius:2px}
+
+  .subrow{background:var(--ink3);border-radius:12px;padding:11px 12px;display:flex;flex-direction:column;gap:8px}
+  .subrow-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+  .subrow-label{font-family:var(--mono);font-size:12px;color:var(--muted)}
+  .subrow-score{font-family:var(--mono);font-size:13px;color:var(--paper);font-variant-numeric:tabular-nums}
+  .subrow-score .best{color:var(--muted);font-size:10.5px;margin-left:6px}
+  .subrow-actions{display:flex;gap:6px}
+  .subbtn{flex:1;background:var(--ink4);border:0;border-radius:9px;color:var(--body-text);font-family:var(--sans);font-size:12px;padding:9px 4px;cursor:pointer;-webkit-touch-callout:none}
+  .subbtn:active{background:color-mix(in srgb,var(--coral) 25%,var(--ink4))}
+  .subbtn.exam{color:var(--coral)}
+
+  .emptymsg{color:var(--muted);font-size:13px;padding:40px 20px;text-align:center}
+
+  /* ── 학습(스와이프) 화면 — 기존 카드 렌더/제스처 재사용 ── */
+  .stage{position:relative;height:100%;overflow:hidden}
   .scroller{position:absolute;inset:0;z-index:2;overflow-y:auto;overflow-x:hidden;touch-action:pan-y;-webkit-user-select:text;user-select:text}
+  .cardtitle{display:block;font-family:var(--serif);font-weight:400;font-size:calc(clamp(22px,6vw,30px) * var(--tscale,1));line-height:1.18;letter-spacing:-.01em;color:var(--paper);text-decoration:none;text-wrap:balance;padding:8px 22px 6px}
   .content{
-    padding:6px 60px 64px 20px;min-height:100%;
+    padding:6px 60px 40px 20px;min-height:100%;
     font-size:calc(15.5px * var(--bscale,1));line-height:1.66;color:var(--body-text);
     will-change:transform;
   }
-  .peek{
-    position:absolute;inset:0;z-index:1;pointer-events:none;will-change:transform;
-    display:flex;flex-direction:column;overflow:hidden;
-    padding-top:var(--topstrip-h,42px);
-  }
+  .peek{position:absolute;inset:0;z-index:1;pointer-events:none;will-change:transform;display:flex;flex-direction:column;overflow:hidden}
   .peek-prev{transform:translateX(-100%)}
   .peek-next{transform:translateX(100%)}
-  .peek .title{padding:10px 22px 6px;color:var(--paper)}
+  .peek .cardtitle{padding:8px 22px 6px;color:var(--paper)}
+  .peekbody{flex:1;min-height:0;-webkit-mask-image:linear-gradient(to bottom, black 55%, transparent 90%);mask-image:linear-gradient(to bottom, black 55%, transparent 90%)}
   .content p{margin:0 0 12px}
   .content h3{font-family:var(--serif);font-weight:400;font-size:1.3em;color:var(--paper);margin:20px 0 8px}
   .content h4{font-family:var(--serif);font-weight:400;font-size:1.15em;color:var(--paper);margin:16px 0 6px}
@@ -77,235 +112,123 @@
   .content th{color:var(--coral);font-weight:500;background:color-mix(in srgb,var(--coral) 7%,transparent)}
   .content .lhint{font-size:1.08em;font-weight:600;color:var(--paper);margin:0 0 14px}
   .content .src{display:inline-block;font-family:var(--mono);font-size:11px;color:var(--faint);text-decoration:none;border-bottom:1px solid var(--ink3);padding-bottom:2px;margin-top:4px}
-  .peekbody{
-    flex:1;min-height:0;
-    -webkit-mask-image:linear-gradient(to bottom, black 55%, transparent 90%);
-    mask-image:linear-gradient(to bottom, black 55%, transparent 90%);
-  }
 
-  @keyframes donecardIn{0%{opacity:0;transform:scale(.92)}100%{opacity:1;transform:scale(1)}}
-  .donecard{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;height:70vh;animation:donecardIn .22s ease}
-  .donecheck{width:56px;height:56px;border-radius:50%;background:color-mix(in srgb,var(--know) 22%,var(--ink3));color:var(--know);font-size:26px;display:flex;align-items:center;justify-content:center}
-  .donetext{font-family:var(--serif);font-size:20px;color:var(--paper)}
-
-  .loadbox{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:var(--ink)}
-  .loadbox.hide{display:none}
-  .loadbox h2{font-family:var(--serif);font-weight:300;font-size:24px;margin:0;color:var(--paper)}
-  .loadbox p{margin:0;color:var(--muted);font-size:13px}
-
-  .rail{position:absolute;right:12px;bottom:74px;display:flex;flex-direction:column;gap:12px;z-index:4}
-  .railbtn{
-    width:46px;height:46px;border-radius:50%;border:0;cursor:pointer;
-    display:flex;align-items:center;justify-content:center;font-size:19px;
-    backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
-    box-shadow:0 2px 10px rgba(0,0,0,.35);
-    -webkit-touch-callout:none;
-  }
-  .railbtn:active{transform:scale(.92)}
-  .railbtn.sheetbtn{background:color-mix(in srgb,var(--ink3) 82%,transparent);color:var(--muted);font-size:18px}
-  .railbtn.undo{background:color-mix(in srgb,var(--ink3) 82%,transparent);color:var(--muted);font-size:20px}
-  .railbtn.undo:disabled{opacity:.35;pointer-events:none}
-  .railbtn.done{
-    background:color-mix(in srgb,var(--know) 22%,var(--ink3));color:var(--know);font-size:21px;
-    position:relative;
-  }
-  .railbtn.done::after{
-    content:"";position:absolute;top:5px;right:5px;width:5px;height:5px;border-radius:50%;
-    background:color-mix(in srgb,var(--know) 55%,var(--ink3));
-  }
-  .pressring{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg);pointer-events:none}
-  .pressring circle{fill:none;stroke:var(--paper);stroke-width:2.5;stroke-dasharray:126;stroke-dashoffset:126;opacity:0}
-  @keyframes donepulse{0%{transform:scale(1)}40%{transform:scale(1.18)}100%{transform:scale(1)}}
-  .railbtn.done.pulse{animation:donepulse .38s ease}
-
-  .steppop{
-    position:absolute;right:12px;bottom:128px;z-index:5;display:flex;flex-direction:column;gap:6px;
-    background:color-mix(in srgb,var(--ink2) 92%,transparent);backdrop-filter:blur(8px);
-    border-radius:12px;padding:6px;box-shadow:0 6px 24px rgba(0,0,0,.45);
-    opacity:0;transform:translateY(6px) scale(.96);pointer-events:none;transition:opacity .14s ease,transform .14s ease;
-  }
-  .steppop.on{opacity:1;transform:translateY(0) scale(1);pointer-events:auto}
-  .steppop button{
-    width:44px;height:34px;border-radius:8px;border:0;cursor:pointer;background:var(--ink3);color:var(--muted);
-    font-family:var(--mono);font-size:12px;
-  }
-  .steppop button.cur{background:var(--coral);color:var(--ink)}
-
-  .datechip{
-    flex:none;font-family:var(--mono);font-size:11px;font-weight:500;
-    padding:6px 10px;border-radius:99px;display:block;
-    background:color-mix(in srgb,var(--lvl,var(--lvl0)) 18%,var(--ink3));
-    color:var(--lvl,var(--lvl0));
-  }
-  .datechip[data-lvl="0"]{ --lvl:var(--lvl0) }
-  .datechip[data-lvl="1"]{ --lvl:var(--lvl1) }
-  .datechip[data-lvl="2"]{ --lvl:var(--lvl2) }
-  .datechip[data-lvl="3"]{ --lvl:var(--lvl3) }
-
-  .todaychip{
-    grid-column:2;justify-self:center;
-    font-family:var(--mono);font-size:11px;color:var(--muted);
-    background:color-mix(in srgb,var(--ink3) 78%,transparent);
-    padding:7px 12px;border-radius:99px;display:flex;align-items:center;gap:5px;
-  }
-  .todaychip b{color:var(--paper);font-weight:500;font-variant-numeric:tabular-nums}
-  .todaychip.sessionmode{color:var(--coral);background:color-mix(in srgb,var(--coral) 16%,var(--ink3));gap:8px}
-  .todaychip.sessionmode button{background:none;border:0;color:inherit;font-size:13px;line-height:1;padding:0;cursor:pointer}
-
-  .toast{
-    position:absolute;left:50%;bottom:100px;transform:translate(-50%,8px);z-index:5;
-    font-family:var(--mono);font-size:12.5px;color:var(--paper);
-    background:var(--ink3);padding:8px 14px;border-radius:8px;
-    opacity:0;pointer-events:none;transition:opacity .18s ease,transform .18s ease;
-    white-space:nowrap;
-  }
-  .toast.on{opacity:1;transform:translate(-50%,0)}
-
-  /* ── 오늘 스크러버: 하단 수평 라인 — 카드 넘길 때마다 점 하나 추가, 항상 균일 간격으로
-     재배치. 드래그하면 가장 가까운 점으로 스냅해 그 카드를 엿본다(2026-09-04 실기기
-     피드백으로 추가). 점 2개 미만이면 스크럽할 게 없어 아예 숨긴다. */
-  .scrubber{flex:none;padding:8px 20px;touch-action:none;display:none}
-  .scrubber.on{display:block}
+  /* ── 스크러버: 소챕터(최대 10장) 안에서 훑어보기 — 드래그하면 그 카드로 바로 이동 ── */
+  .scrubber{flex:none;padding:6px 20px 4px;touch-action:none}
   .scrubtrack{position:relative;height:16px}
   .scrubtrack .track{position:absolute;left:0;right:0;top:50%;height:2px;background:var(--ink3);transform:translateY(-50%);border-radius:2px}
   .scrubtrack .dot{position:absolute;top:50%;width:6px;height:6px;border-radius:50%;background:var(--faint);transform:translate(-50%,-50%);transition:background-color .1s ease}
   .scrubtrack .dot.cur{background:var(--coral);width:9px;height:9px}
+  .studyfoot{flex:none;padding:0 20px 8px;font-family:var(--mono);font-size:11px;color:var(--muted);text-align:center}
 
+  /* ── 시험(exam) ── */
+  .examwrap{display:flex;flex-direction:column;height:100%;padding:0 22px}
+  .examprog{flex:none;font-family:var(--mono);font-size:11px;color:var(--muted);padding:10px 0 0;text-align:center}
+  .examcard{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:18px;overflow-y:auto}
+  .examtitle{font-family:var(--serif);font-size:clamp(24px,7vw,32px);line-height:1.25;color:var(--paper);text-align:center;text-wrap:balance}
+  .examreveal{align-self:center;background:var(--ink3);color:var(--coral);border:0;border-radius:99px;padding:13px 26px;font-family:var(--sans);font-size:14px;cursor:pointer}
+  .examreveal:active{background:var(--ink4)}
+  /* min-height:0으로 .content{min-height:100%}를 상쇄 — 안 그러면 시험 화면의 justify-content:center
+     플렉스가 이 블록을 부모 높이만큼 억지로 늘려서, 위로 넘친 제목이 위쪽으로 잘려 보인다. */
+  .exambody{min-height:0;max-height:44vh;overflow-y:auto;-webkit-user-select:text;user-select:text}
+  .examjudge{display:flex;gap:10px;padding:6px 0 22px;flex:none}
+  .examjudge[hidden]{display:none}
+  .examjudge button{flex:1;border:0;border-radius:12px;padding:14px 8px;font-family:var(--sans);font-size:14px;cursor:pointer}
+  .examjudge .know{background:color-mix(in srgb,var(--know) 20%,var(--ink3));color:var(--know)}
+  .examjudge .dontknow{background:color-mix(in srgb,var(--coral) 16%,var(--ink3));color:var(--coral)}
+
+  .examresult{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;height:100%;padding:0 24px;text-align:center}
+  .examresult .score{font-family:var(--serif);font-size:34px;color:var(--paper)}
+  .examresult .best{font-family:var(--mono);font-size:12px;color:var(--muted)}
+  .examresult .actions{display:flex;flex-direction:column;gap:8px;width:100%;margin-top:8px}
+  .examresult button{background:var(--ink3);color:var(--paper);border:0;border-radius:10px;padding:13px;font-family:var(--sans);font-size:13.5px;cursor:pointer}
+  .examresult button.primary{background:color-mix(in srgb,var(--coral) 20%,var(--ink3));color:var(--coral)}
+
+  /* ── 본문 드래그 선택 → 제목으로 변경 ── */
+  .retitlePop{position:fixed;z-index:9;background:var(--coral);color:var(--ink);font-family:var(--sans);font-size:12.5px;font-weight:600;padding:9px 14px;border-radius:99px;box-shadow:0 4px 16px rgba(0,0,0,.4);cursor:pointer;-webkit-user-select:none;user-select:none}
+  .retitlePop[hidden]{display:none}
+
+  .toast{position:fixed;left:50%;bottom:36px;transform:translate(-50%,8px);z-index:8;font-family:var(--mono);font-size:12.5px;color:var(--paper);background:var(--ink3);padding:8px 14px;border-radius:8px;opacity:0;pointer-events:none;transition:opacity .18s ease,transform .18s ease;white-space:nowrap}
+  .toast.on{opacity:1;transform:translate(-50%,0)}
+
+  .loadbox{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:var(--ink)}
+  .loadbox[hidden]{display:none}
+  .loadbox h2{font-family:var(--serif);font-weight:300;font-size:22px;margin:0;color:var(--paper)}
+  .loadbox p{margin:0;color:var(--muted);font-size:13px}
+  .loadbox button{margin-top:6px;background:var(--ink3);color:var(--paper);border:0;border-radius:8px;padding:9px 16px;font-size:13px;cursor:pointer}
+
+  /* ── 설정 시트(글자 크기) ── */
   .sheetback{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:6;opacity:0;pointer-events:none;transition:opacity .22s ease}
   .sheetback.on{opacity:1;pointer-events:auto}
   .sheet{
     position:fixed;left:0;right:0;bottom:0;max-width:520px;margin:0 auto;z-index:7;
-    background:var(--ink2);border-radius:18px 18px 0 0;
-    max-height:78dvh;display:flex;flex-direction:column;
+    background:var(--ink2);border-radius:18px 18px 0 0;padding:14px 18px calc(20px + env(safe-area-inset-bottom));
     transform:translateY(100%);transition:transform .26s cubic-bezier(.2,.7,.3,1);
-    padding-bottom:env(safe-area-inset-bottom);
     box-shadow:0 -8px 30px rgba(0,0,0,.4);
   }
   .sheet.on{transform:translateY(0)}
-  .sheethandle{width:36px;height:4px;background:var(--ink4);border-radius:3px;margin:10px auto 4px}
-  .sheetsettings{padding:10px 18px 4px;display:flex;flex-direction:column;gap:8px;border-bottom:1px solid var(--ink3);margin-bottom:6px}
-  .sliderow{display:flex;align-items:center;gap:10px}
+  .sheethandle{width:36px;height:4px;background:var(--ink4);border-radius:3px;margin:0 auto 14px}
+  .sliderow{display:flex;align-items:center;gap:10px;margin:8px 0}
   .sliderow label{flex:none;width:38px;font-family:var(--mono);font-size:11px;color:var(--muted)}
-  .sliderow input[type="range"]{
-    flex:1;-webkit-appearance:none;appearance:none;height:6px;border-radius:999px;outline:none;background:linear-gradient(to right,var(--coral) 0%,var(--coral) var(--fill,50%),var(--ink4) var(--fill,50%),var(--ink4) 100%);
-  }
+  .sliderow input[type="range"]{flex:1;-webkit-appearance:none;appearance:none;height:6px;border-radius:999px;outline:none;background:linear-gradient(to right,var(--coral) 0%,var(--coral) var(--fill,50%),var(--ink4) var(--fill,50%),var(--ink4) 100%)}
   .sliderow input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:16px;border-radius:50%;background:var(--coral);cursor:pointer;border:2px solid var(--ink)}
   .sliderow input[type="range"]::-moz-range-track{height:6px;border-radius:999px;background:var(--ink4)}
   .sliderow input[type="range"]::-moz-range-progress{height:6px;border-radius:999px;background:var(--coral)}
   .sliderow input[type="range"]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--coral);border:2px solid var(--ink);cursor:pointer}
   .sliderow .val{flex:none;width:38px;text-align:right;font-family:var(--mono);font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
-  .sheetsearch{padding:10px 18px 6px}
-  .sheetsearch input{
-    width:100%;background:var(--ink3);border:0;border-radius:9px;color:var(--paper);
-    font-family:var(--sans);font-size:14px;padding:9px 12px;
-  }
-  .sheetsearch input::placeholder{color:var(--muted)}
-  .sheettabs{display:flex;gap:6px;padding:8px 18px 4px;overflow-x:auto}
-  .stab{
-    flex:none;background:var(--ink3);border:0;border-radius:99px;color:var(--muted);
-    font-family:var(--mono);font-size:11.5px;padding:7px 13px;cursor:pointer;white-space:nowrap;
-  }
-  .stab.on{background:var(--coral);color:var(--ink)}
-  .calhead{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:14px 18px 8px}
-  .backlink{background:none;border:0;color:var(--coral);font:inherit;text-transform:none;letter-spacing:0;padding:0;margin-right:6px;cursor:pointer}
-  #calArea{flex:1;min-height:0;overflow-y:auto;-webkit-user-select:text;user-select:text}
-  .calweekday{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;padding:0 18px 4px;font-family:var(--mono);font-size:9.5px;color:var(--muted);text-align:center}
-  .calgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;padding:0 18px 6px}
-  /* 캘린더는 베이크오프 3라운드 확정(2026-09-04): 칸 모양=C2(플랫), 오늘 칸=C1(코랄 링),
-     개수 숫자=C3(크고 밝은 흰색) 조합. 상세: ~/.claude/design-system/projects/shorts-deck.md */
-  .calcell{aspect-ratio:1;border-radius:5px;border:0;cursor:pointer;position:relative;background:var(--ink3)}
-  .calcell.blank{background:transparent;pointer-events:none}
-  .calcell .dnum{position:absolute;top:3px;left:5px;font-family:var(--mono);font-size:9px;color:var(--muted)}
-  .calcell .dcnt{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:14px;font-weight:300;color:var(--paper)}
-  .calcell.today{box-shadow:0 0 0 1.5px var(--coral),0 2px 6px rgba(255,143,107,.3)}
-  .calcell.today .dcnt{color:var(--coral)}
-  .calcell:disabled{cursor:default;opacity:.4}
-  .sheetlist{padding:6px 18px 22px}
-  .srow{
-    display:flex;align-items:center;justify-content:space-between;gap:10px;
-    padding:11px 0;border-bottom:1px solid var(--ink3);cursor:pointer;
-  }
-  .srow .sf{font-family:var(--serif);font-size:15px;color:var(--paper)}
-  .srow .ss{font-family:var(--mono);font-size:10px;padding:3px 8px;border-radius:99px;background:var(--ink3);color:var(--muted);flex:none}
-  .sempty{color:var(--muted);font-size:13px;padding:26px 0;text-align:center}
 
   @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
 <div id="app">
-  <div class="topstrip" id="topstrip">
-    <div class="todaychip" id="bottomCounter">오늘 <b id="todayN">0</b>개</div>
-    <div id="dateSlot"></div>
-  </div>
-  <div class="topbar" id="topbar">
-    <a class="title" id="cardTitle" href="#" target="_blank" rel="noopener"></a>
-  </div>
-  <div class="peek peek-prev" id="peekPrev">
-    <div class="title" id="peekPrevTitle"></div>
-    <div class="content peekbody" id="peekPrevBody"></div>
-  </div>
-  <div class="peek peek-next" id="peekNext">
-    <div class="title" id="peekNextTitle"></div>
-    <div class="content peekbody" id="peekNextBody"></div>
+  <div class="topbar2" id="topbar2">
+    <button class="navbtn" id="backBtn" hidden aria-label="뒤로">&#8592;</button>
+    <div class="topbar2-title" id="topbarTitle">Shorts Deck</div>
+    <button class="navbtn" id="hlBtn" hidden aria-label="형광펜 모드">&#128397;</button>
+    <button class="navbtn" id="gearBtn" aria-label="설정">&#9881;</button>
   </div>
 
-  <div class="stage" id="stage">
-    <div class="scroller" id="scroller">
-      <div class="content" id="content"></div>
-    </div>
+  <div class="views" id="views">
+    <section class="view" id="viewChapters"></section>
+    <section class="view" id="viewChapter" hidden></section>
 
-    <div class="steppop" id="stepPop">
-      <button data-s="3">3차</button>
-      <button data-s="2">2차</button>
-      <button data-s="1">1차</button>
-      <button data-s="0">0</button>
-    </div>
-    <div class="rail">
-      <button class="railbtn sheetbtn" id="pullTab" aria-label="모아보기 열기">&#9776;</button>
-      <button class="railbtn undo" id="undoBtn" disabled aria-label="되돌리기">&#8634;</button>
-      <button class="railbtn done" id="doneBtn" aria-label="완료 (꾹 누르면 차수 선택)">
-        <svg class="pressring" viewBox="0 0 46 46"><circle cx="23" cy="23" r="20"></circle></svg>
-        <span>&#10003;</span>
-      </button>
-    </div>
+    <section class="view" id="viewStudy" hidden>
+      <div class="stage" id="studyStage">
+        <div class="scroller" id="scroller">
+          <a class="cardtitle" id="cardTitle" href="#" target="_blank" rel="noopener"></a>
+          <div class="content" id="content"></div>
+        </div>
+        <div class="peek peek-prev" id="peekPrev"><div class="cardtitle" id="peekPrevTitle"></div><div class="content peekbody" id="peekPrevBody"></div></div>
+        <div class="peek peek-next" id="peekNext"><div class="cardtitle" id="peekNextTitle"></div><div class="content peekbody" id="peekNextBody"></div></div>
+      </div>
+      <div class="scrubber" id="scrubber"><div class="scrubtrack" id="scrubTrack"><div class="track"></div></div></div>
+      <div class="studyfoot" id="studyFoot"></div>
+    </section>
 
-    <div class="toast" id="toast"></div>
-    <div class="loadbox" id="loading"><h2>불러오는 중</h2><p id="loadmsg">Notion에서 카드를 가져옴</p></div>
+    <section class="view" id="viewExam" hidden></section>
+
+    <div class="loadbox" id="loading"><h2 id="loadTitle">불러오는 중</h2><p id="loadMsg">Notion에서 카드를 가져옴</p></div>
   </div>
-
-  <div class="scrubber" id="scrubber"><div class="scrubtrack" id="scrubTrack"><div class="track"></div></div></div>
+  <div class="toast" id="toast"></div>
+  <div class="retitlePop" id="retitlePop" hidden>이 문장을 제목으로</div>
 </div>
 
 <div class="sheetback" id="sheetback"></div>
-<div class="sheet" id="sheet">
-  <div class="sheethandle" id="sheetHandle"></div>
-  <div class="sheetsettings">
-    <div class="sliderow"><label for="titleScale">제목</label><input type="range" id="titleScale" min="0.7" max="1.4" step="0.02" value="1"><span class="val" id="titleScaleVal"></span></div>
-    <div class="sliderow"><label for="bodyScale">본문</label><input type="range" id="bodyScale" min="0.8" max="1.5" step="0.02" value="1"><span class="val" id="bodyScaleVal"></span></div>
-  </div>
-  <div class="sheetsearch"><input id="searchInput" placeholder="검색"></div>
-  <div class="sheettabs" id="stepTabs"></div>
-  <div class="calhead" id="calHead"></div>
-  <div id="calArea"></div>
+<div class="sheet" id="settingsSheet">
+  <div class="sheethandle"></div>
+  <div class="sliderow"><label for="titleScale">제목</label><input type="range" id="titleScale" min="0.7" max="1.4" step="0.02" value="1"><span class="val" id="titleScaleVal"></span></div>
+  <div class="sliderow"><label for="bodyScale">본문</label><input type="range" id="bodyScale" min="0.8" max="1.5" step="0.02" value="1"><span class="val" id="bodyScaleVal"></span></div>
 </div>
 
 <script>
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>]/g, (m) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;' }[m]));
 const escBr = (s) => String(s == null ? '' : s).split(/<br\s*\/?>/i).map(esc).join('<br>');
+function lsGet(k){ try { return localStorage.getItem(k); } catch (e) { return null; } }
+function lsSet(k, v){ try { localStorage.setItem(k, v); } catch (e) {} }
 
-const local = {
-  get(k, d){ try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } },
-  set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
-};
-
-const cardKeyOf = (front) => String(front || '').toLowerCase().replace(/[^a-z0-9가-힣]+/g, ' ').trim();
-
-/* ── 원본 블록 렌더링 ────────────────────────────────────────
-   서버는 Notion 원본 블록을 그대로 보내고, 렌더는 여기(표시 시점)에서 한다.
-   그래야 렌더 로직을 바꿔도 재동기화가 필요 없다. 옛 캐시/씨앗(cards.seed.json)의
-   평문 문자열 형식도 함께 지원한다(둘 다 typeof로 구분). */
+/* ── 원본 블록 렌더링(서버가 압축해 보낸 Notion 블록을 표시 시점에 그린다) ── */
 function richHtml(rich){
   return (rich || []).map((t) => {
     let s = esc(t.t);
@@ -325,33 +248,36 @@ function tableHtml(b){
     return '<tr>' + row.map((cell) => '<' + tag + '>' + richHtml(cell) + '</' + tag + '>').join('') + '</tr>';
   }).join('') + '</table>';
 }
-function blockHtml(b){
+// data-blk=detail 배열 인덱스 — 형광펜이 DOM 선택을 다시 그 블록의 rich 배열로 매핑할 때 씀.
+// to_do(체크글자가 rich 앞에 붙어 오프셋이 어긋남)·code·divider·table은 형광펜 대상에서 뺀다.
+function blockHtml(b, i){
   if (!b) return '';
+  const blk = i == null ? '' : ' data-blk="' + i + '"';
   switch (b.type){
-    case 'heading_1': return '<h3>' + richHtml(b.rich) + '</h3>';
-    case 'heading_2': return '<h4>' + richHtml(b.rich) + '</h4>';
-    case 'heading_3': return '<h5>' + richHtml(b.rich) + '</h5>';
-    case 'bulleted_list_item': return '<li>' + richHtml(b.rich) + '</li>';
-    case 'numbered_list_item': return '<li>' + richHtml(b.rich) + '</li>';
-    case 'quote': return '<blockquote>' + richHtml(b.rich) + '</blockquote>';
-    case 'callout': return '<div class="callout">' + richHtml(b.rich) + '</div>';
+    case 'heading_1': return '<h3' + blk + '>' + richHtml(b.rich) + '</h3>';
+    case 'heading_2': return '<h4' + blk + '>' + richHtml(b.rich) + '</h4>';
+    case 'heading_3': return '<h5' + blk + '>' + richHtml(b.rich) + '</h5>';
+    case 'bulleted_list_item': return '<li' + blk + '>' + richHtml(b.rich) + '</li>';
+    case 'numbered_list_item': return '<li' + blk + '>' + richHtml(b.rich) + '</li>';
+    case 'quote': return '<blockquote' + blk + '>' + richHtml(b.rich) + '</blockquote>';
+    case 'callout': return '<div class="callout"' + blk + '>' + richHtml(b.rich) + '</div>';
     case 'to_do': return '<div>' + (b.checked ? '&#9745; ' : '&#9744; ') + richHtml(b.rich) + '</div>';
     case 'code': return '<pre><code>' + richHtml(b.rich) + '</code></pre>';
     case 'divider': return '<hr>';
     case 'table': return tableHtml(b);
-    default: return b.rich ? '<p>' + richHtml(b.rich) + '</p>' : '';
+    default: return b.rich ? '<p' + blk + '>' + richHtml(b.rich) + '</p>' : '';
   }
 }
 function blocksHtml(blocks){
   let html = '', open = null;
-  for (const b of blocks || []){
+  (blocks || []).forEach((b, i) => {
     const isLi = b.type === 'bulleted_list_item' || b.type === 'numbered_list_item';
     const tag = b.type === 'numbered_list_item' ? 'ol' : 'ul';
     if (isLi){
       if (open !== tag){ if (open) html += '</' + open + '>'; html += '<' + tag + '>'; open = tag; }
     } else if (open){ html += '</' + open + '>'; open = null; }
-    html += blockHtml(b);
-  }
+    html += blockHtml(b, i);
+  });
   if (open) html += '</' + open + '>';
   return html;
 }
@@ -365,144 +291,15 @@ function detailHtml(c){
   if (typeof c.detail[0] === 'string') return c.detail.map((t) => '<p>' + escBr(t) + '</p>').join('');
   return blocksHtml(c.detail);
 }
-// 1단이 폐지돼 힌트+해설을 한 화면에 이어 붙인다(2026-09-04 UX 재설계).
 function cardBodyHtml(c){
   const h = hintHtml(c);
-  return (h ? '<p class="lhint">' + h + '</p>' : '') + detailHtml(c)
+  return (h ? '<p class="lhint" data-blk="hint">' + h + '</p>' : '') + detailHtml(c)
     + (c.url ? '<a class="src" href="' + esc(c.url) + '" target="_blank" rel="noopener">원본 쇼츠 &#8599;</a>' : '');
 }
 function peekBodyHtml(c){
   if (!c) return '';
   const h = hintHtml(c);
   return (h ? '<p class="lhint">' + h + '</p>' : '') + detailHtml(c);
-}
-
-/* ── 카드 공급 ──────────────────────────────────────────── */
-// 생성일자 오름차순(오래된 것부터, Notion에서 쓰던 방식과 동일 — 2026-09-04 결정)으로
-// 서버가 순서대로 내려준다. 커서(마지막으로 받은 카드의 created)를 저장해 다음 접속에도
-// 이어서 받는다 — 매번 처음(가장 오래된 카드)부터 다시 시작하지 않도록.
-function getCursor(){ return lsGet('sd_cursor'); }
-function setCursor(created){ if (created) lsSet('sd_cursor', created); }
-async function fetchBatch(n){
-  const after = getCursor();
-  const res = await fetch('/api/cards?n=' + n + (after ? '&after=' + encodeURIComponent(after) : ''));
-  const d = await res.json();
-  if (d.error) throw new Error(d.error);
-  if (d.cards?.length){
-    local.set('sd_last', { cards: d.cards, at: Date.now() });
-    setCursor(d.cards[d.cards.length - 1].created);
-    return d.cards;
-  }
-  throw new Error(d.syncing ? '동기화 중' : '카드 없음');
-}
-async function fetchWithFallback(n){
-  try { return await fetchBatch(n); }
-  catch (e) {
-    const c = local.get('sd_last', null);
-    if (c?.cards?.length) return c.cards;
-    const res = await fetch('/cards.seed.json').catch(() => null);
-    if (res?.ok){
-      const all = await res.json();
-      return all.map((x) => ({ ...x, step: 0, n: 0 })).sort(() => Math.random() - 0.5);
-    }
-    throw e;
-  }
-}
-let fetching = false;
-async function ensureQueue(){
-  if (session || fetching || deck.length - idx > 3) return;
-  fetching = true;
-  try {
-    const more = await fetchWithFallback(8);
-    const have = new Set(deck.map((c) => c.id));
-    const fresh = more.filter((c) => !have.has(c.id));
-    if (fresh.length) deck.push(...fresh);
-  } catch (e) { /* 네트워크 실패 — 남은 큐로 계속 스와이프 가능하게 조용히 무시 */ }
-  fetching = false;
-}
-// 목록/캘린더에서 시작한 세션은 카드에 본문이 없을 수 있다(id·front·step만) — 표시 직전에 채운다.
-async function ensureBody(c){
-  if (c.detail !== undefined) return c;
-  try {
-    const res = await fetch('/api/card?id=' + encodeURIComponent(c.id));
-    const d = await res.json();
-    if (!d.error) Object.assign(c, d);
-  } catch (e) {}
-  if (c.detail === undefined) c.detail = [];
-  return c;
-}
-
-/* ── 상태 ───────────────────────────────────────────────── */
-let deck = [], idx = 0;
-let history = []; // 이동+채점 통합 스택 — 되돌리기 연타로 오늘 한 것 전부 취소 가능
-let todayList = []; // 오늘 표시된(=본) 카드, 방문 순서 그대로 — 하단 스크러버가 이 순서로 점을 그린다
-let todaySet = new Set(); // todayList의 key만 뽑은 집합(중복 판정용) — 항상 todayList와 함께 갱신
-let peekIdx = null; // 스크러버로 과거 카드를 "엿보는" 중이면 todayList 안의 인덱스. 라이브 deck/idx는 안 건드림
-let session = null; // { total, i } — 날짜별/목록 복습 세션 중일 때만
-
-// 카드가 화면에 표시될 때 오늘 목록에 추가한다(채점과 무관 — 2026-09-04 실기기 피드백으로
-// "채점한 개수"에서 "본 개수"로 트리거를 되돌림). 이미 오늘 본 카드면 아무 일도 안 하고
-// false를 반환 — 되돌리기가 "이번 이동이 새로 추가한 것"인지 판단하는 데 쓴다.
-function markCardSeen(card){
-  if (!card) return false;
-  const key = card.key || cardKeyOf(card.front);
-  if (todaySet.has(key)) return false;
-  todaySet.add(key);
-  todayList.push({ id: card.id, key, front: card.front, step: card.step || 0 });
-  fetch('/api/seen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key }) }).catch(() => {});
-  return true;
-}
-function unmarkCardSeen(key){
-  todaySet.delete(key);
-  const pos = todayList.findIndex((x) => x.key === key);
-  if (pos !== -1) todayList.splice(pos, 1);
-  fetch('/api/unseen', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ key }) }).catch(() => {});
-}
-
-function fmtDate(iso){
-  if (!iso) return null;
-  const d = new Date(iso);
-  if (isNaN(d)) return null;
-  return String(d.getFullYear()).slice(2) + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + String(d.getDate()).padStart(2, '0');
-}
-function renderBottomCounter(){
-  const el = $('bottomCounter');
-  if (session){
-    el.className = 'todaychip sessionmode';
-    el.innerHTML = '<span>' + session.i + '/' + session.total + '</span><button id="exitSession" aria-label="세션 종료">&times;</button>';
-    $('exitSession').onclick = exitSession;
-  } else {
-    el.className = 'todaychip';
-    el.innerHTML = '오늘 <b id="todayN">' + todayList.length + '</b>개';
-  }
-}
-
-// 카드 하나를 화면에 그리는 공통 부분 — 라이브 render()와 스크러버 엿보기(peekAt) 둘 다 쓴다.
-// 라이브 상태(deck/idx/history/오늘목록)는 안 건드린다 — 그건 호출한 쪽 책임.
-function displayCardDOM(c){
-  $('cardTitle').textContent = c.front;
-  $('cardTitle').href = c.url || '#';
-  $('content').innerHTML = cardBodyHtml(c);
-  $('scroller').scrollTop = 0;
-  const lvl = Math.min(c.step || 0, 3);
-  const d = fmtDate(c.created);
-  $('dateSlot').innerHTML = d ? '<span class="datechip" data-lvl="' + lvl + '">' + esc(d) + '</span>' : '';
-}
-
-async function render(){
-  const c = deck[idx];
-  if (!c){
-    if (session) { showSessionComplete(session.total); return; }
-    $('loadmsg').textContent = '더 가져오는 중…'; $('loading').classList.remove('hide'); return;
-  }
-  $('loading').classList.add('hide');
-  await ensureBody(c);
-  displayCardDOM(c);
-  renderBottomCounter();
-  renderScrubber();
-  $('undoBtn').disabled = !history.length;
-  closeStepPop();
-  ensureQueue();
 }
 
 /* ── 토스트 ── */
@@ -514,390 +311,443 @@ function toast(msg){
   toastT = setTimeout(() => t.classList.remove('on'), 1200);
 }
 
-/* ── 채점: 완료(n+1, 롱프레스=차수 텔레포트) / 되돌리기 ──
-   "몰랐다/틀렸다" 신호는 두지 않는다(2026-09-04 결정) — 채점 없이 그냥 넘기면 스킵일 뿐.
-   되돌리기는 이동+채점을 합친 스택이다 — 스와이프로 넘긴 것도, 채점해서 넘어간 것도
-   되돌리기 연타 한 번으로 전부 되짚을 수 있다. 되돌리기는 항상 "진짜 마지막 라이브
-   액션"을 대상으로 한다 — 스크러버로 과거 카드를 엿보고 있어도 무시하고 라이브 스택을
-   되돌린 뒤 그 결과(새 라이브 위치)로 화면이 넘어간다(2026-09-04 실기기 피드백으로 결정).
-   그 액션이 오늘 그 카드의 "첫 조회"였다면 오늘 목록에서도 뺀다 — "본 사실은 안
-   되돌린다"던 예전 결정을 뒤집은 것(사용자 지적: 안 뒤집으면 "5개 보고 마지막 걸
-   되돌렸는데 오늘 카운트가 그대로 5"인 게 부자연스럽다). */
-function commitStep(newStep, label){
-  const c = deck[idx];
-  const revert = { step: c.step || 0, n: c.n || 0 };
-  const key = c.key || cardKeyOf(c.front);
-  c.step = newStep; c.n = (c.n || 0) + 1;
-  toast(label);
-  doneBtn.classList.remove('pulse'); void doneBtn.offsetWidth; doneBtn.classList.add('pulse');
-  fetch('/api/grade', {
+/* ── API ── */
+async function apiChapters(){ const r = await fetch('/api/chapters'); return r.json(); }
+async function apiChapter(id){ const r = await fetch('/api/chapter?id=' + encodeURIComponent(id)); return r.json(); }
+async function apiSubchapter(id, mode){ const r = await fetch('/api/subchapter?id=' + encodeURIComponent(id) + '&mode=' + mode); return r.json(); }
+function apiAnswer(subId, key, know){
+  return fetch('/api/answer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subId, key, know }) })
+    .then((r) => r.json()).catch(() => null);
+}
+async function apiRetitle(pageId, oldKey, newTitle){
+  const r = await fetch('/api/retitle', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pageId, oldKey, newTitle }) });
+  return r.json();
+}
+
+/* ── 본문 드래그 선택 → 제목으로 변경 ──
+   노션 DB가 AI 질의응답 기준이라 제목(이름)에 단어 하나·한글 질문이 그대로 들어간 행이
+   섞여 있음. 1,323건을 노션에서 손으로 고치는 대신, 학습/시험 중 본문에서 원하는 예문을
+   드래그해 그 자리에서 제목으로 바꾼다(2026-09-05). */
+let retitleCtx = null; // { getCard: () => 현재 카드 }
+function setRetitleContext(getCard){ retitleCtx = { getCard }; }
+function clearRetitleContext(){ retitleCtx = null; hideRetitlePop(); }
+function hideRetitlePop(){ $('retitlePop').hidden = true; }
+function showRetitlePop(rect, text){
+  const pop = $('retitlePop');
+  pop.hidden = false;
+  pop.dataset.text = text;
+  const w = pop.offsetWidth || 120;
+  pop.style.left = Math.max(8, Math.min(window.innerWidth - 8 - w, rect.left + rect.width / 2 - w / 2)) + 'px';
+  pop.style.top = Math.max(8, rect.top - 44) + 'px';
+}
+document.addEventListener('selectionchange', () => {
+  if (!retitleCtx || highlightMode) return; // 형광펜 모드 중엔 같은 선택으로 "제목으로" 팝업을 안 띄운다
+  const sel = document.getSelection();
+  const text = sel && !sel.isCollapsed ? sel.toString().trim() : '';
+  if (!text){ hideRetitlePop(); return; }
+  const range = sel.getRangeAt(0);
+  const rect = range.getBoundingClientRect();
+  if (!rect || (!rect.width && !rect.height)){ hideRetitlePop(); return; }
+  showRetitlePop(rect, text);
+});
+$('retitlePop').addEventListener('pointerdown', async (e) => {
+  e.preventDefault(); // 선택 해제 방지
+  const text = $('retitlePop').dataset.text;
+  const card = retitleCtx && retitleCtx.getCard();
+  hideRetitlePop();
+  if (!text || !card) return;
+  const res = await apiRetitle(card.id, card.key, text).catch(() => null);
+  if (res && res.ok){
+    card.front = res.front; card.key = res.key;
+    if (currentView === 'study') $('cardTitle').textContent = card.front;
+    if (currentView === 'exam') { const el = $('examTitle'); if (el) el.textContent = card.front; }
+    toast('제목 변경됨');
+  } else toast('제목 변경 실패');
+});
+
+/* ── 형광펜 모드 ── (youtube_dual_subtitle 확장과 동일 정책)
+   버튼을 켜면 모드가 유지된다 — 이후 본문에서 드래그할 때마다(mouseup) 자동으로 그 구간의
+   code(=형광펜) 여부를 뒤집는다. 이미 형광펜된 구간을 클릭(드래그 아님)해도 그 구간 전체가
+   해제된다. 버튼을 다시 끄면 모드 해제(본문 선택은 평소처럼 아무 일도 안 함). */
+let highlightMode = false;
+function setHighlightMode(on){
+  highlightMode = on;
+  $('hlBtn').classList.toggle('active', on);
+}
+$('hlBtn').addEventListener('click', () => setHighlightMode(!highlightMode));
+
+function currentCardForHighlight(){
+  return currentView === 'study' ? studyCards[studyIdx] : (currentView === 'exam' ? examCards[examIdx] : null);
+}
+function plainOffsetInBlock(blockEl, node, offset){
+  const walker = document.createTreeWalker(blockEl, NodeFilter.SHOW_TEXT);
+  let pos = 0;
+  while (walker.nextNode()){
+    if (walker.currentNode === node) return pos + offset;
+    pos += walker.currentNode.nodeValue.length;
+  }
+  return null;
+}
+function findBlockEl(node){
+  const el = node.nodeType === 1 ? node : node.parentElement;
+  return el ? el.closest('[data-blk]') : null;
+}
+function getHighlightTarget(){
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return null;
+  const range = sel.getRangeAt(0);
+  const startBlk = findBlockEl(range.startContainer), endBlk = findBlockEl(range.endContainer);
+  if (!startBlk || !endBlk || startBlk !== endBlk) return null;
+  const start = plainOffsetInBlock(startBlk, range.startContainer, range.startOffset);
+  const end = plainOffsetInBlock(startBlk, range.endContainer, range.endOffset);
+  if (start == null || end == null || start >= end) return null;
+  return { blk: startBlk.dataset.blk, start, end };
+}
+async function doHighlight(blk, start, end){
+  const card = currentCardForHighlight();
+  if (!card) return;
+  const field = blk === 'hint' ? 'hint' : 'detail';
+  const blockIndex = blk === 'hint' ? null : Number(blk);
+  const res = await fetch('/api/highlight', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ pageId: c.id, key, step: newStep }),
-  }).catch(() => {});
-  goNext({ revert, key, pageId: c.id });
+    body: JSON.stringify({ pageId: card.id, field, blockIndex, start, end }),
+  }).then((r) => r.json()).catch(() => null);
+  if (res && res.ok){
+    Object.assign(card, res.card);
+    if (currentView === 'study') renderStudyCard();
+    else { const el = $('examBody'); if (el) el.innerHTML = cardBodyHtml(card); }
+  } else toast('형광펜 실패');
 }
-function advance(){ const c = deck[idx]; const next = Math.min((c.step || 0) + 1, 3); commitStep(next, '완료 → ' + next + '차'); }
-function teleport(step){
-  if (peekIdx != null) promotePeekToLive(() => commitStep(step, (step === 0 ? '0으로 이동' : step + '차로 이동')));
-  else commitStep(step, (step === 0 ? '0으로 이동' : step + '차로 이동'));
+function tryAutoHighlight(){
+  if (!highlightMode) return;
+  const t = getHighlightTarget();
+  if (!t) return;
+  window.getSelection().removeAllRanges();
+  doHighlight(t.blk, t.start, t.end);
 }
-// 스크러버로 과거 카드를 엿보다가 완료(또는 텔레포트)하면: 그 카드를 라이브 위치로
-// 승격시킨 뒤(지금 자리를 대신 차지) 정상 채점 흐름을 그대로 탄다 — 스와이프로 거기까지
-// 가서 채점한 것과 결과적으로 같다.
-function promotePeekToLive(after){
-  const target = todayList[peekIdx];
-  peekIdx = null;
-  if (!target) return;
-  deck[idx] = { ...deck[idx], ...target };
-  (after || advance)();
+function onHighlightAreaClick(e){
+  if (!highlightMode) return;
+  const code = e.target.closest('code.hl');
+  if (!code) return;
+  // selectNodeContents(code)는 텍스트 오프셋이 아니라 자식 노드 인덱스로 범위를 잡아
+  // plainOffsetInBlock의 텍스트노드 매칭과 안 맞는다 — 실제 첫/끝 텍스트노드로 범위를 잡는다.
+  const walker = document.createTreeWalker(code, NodeFilter.SHOW_TEXT);
+  let first = null, last = null;
+  while (walker.nextNode()){ if (!first) first = walker.currentNode; last = walker.currentNode; }
+  if (!first) return;
+  const range = document.createRange();
+  range.setStart(first, 0);
+  range.setEnd(last, last.nodeValue.length);
+  const sel = window.getSelection();
+  sel.removeAllRanges(); sel.addRange(range);
+  tryAutoHighlight();
 }
-function undo(){
-  if (!history.length) return;
-  const h = history.pop();
-  if (h.revert){
-    const c = deck[h.idx];
-    c.step = h.revert.step; c.n = h.revert.n;
-    fetch('/api/grade', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pageId: h.pageId, key: h.key, undo: true, prev: h.revert.step === 0 && h.revert.n === 0 ? null : h.revert }),
-    }).catch(() => {});
+// 학습(#content)·시험 리빌 본문(#examBody, 동적으로 생성됨)에 위임 방식으로 붙인다.
+document.addEventListener('mouseup', (e) => {
+  if (!highlightMode) return;
+  if (!e.target.closest('#content, #examBody')) return;
+  setTimeout(tryAutoHighlight, 0);
+});
+document.addEventListener('click', (e) => {
+  if (!highlightMode) return;
+  if (!e.target.closest('#content, #examBody')) return;
+  onHighlightAreaClick(e);
+});
+
+/* ── 라우팅: 챕터개요 / 챕터상세 / 학습 / 시험 ── */
+let currentView = 'chapters';
+let currentChapterId = null;
+let backHandler = null;
+
+function showView(name, title, back){
+  currentView = name;
+  ['viewChapters', 'viewChapter', 'viewStudy', 'viewExam'].forEach((id) => { $(id).hidden = (id !== 'view' + name[0].toUpperCase() + name.slice(1)); });
+  $('topbarTitle').textContent = title;
+  backHandler = back || null;
+  $('backBtn').hidden = !backHandler;
+  const inCard = name === 'study' || name === 'exam';
+  $('hlBtn').hidden = !inCard;
+  if (!inCard){ clearRetitleContext(); setHighlightMode(false); }
+  $('loading').hidden = true;
+}
+$('backBtn').addEventListener('click', () => { if (backHandler) backHandler(); });
+$('gearBtn').addEventListener('click', () => { $('settingsSheet').classList.add('on'); $('sheetback').classList.add('on'); });
+$('sheetback').addEventListener('click', () => { $('settingsSheet').classList.remove('on'); $('sheetback').classList.remove('on'); });
+
+function showLoading(title, msg, retry){
+  $('loadTitle').textContent = title;
+  $('loadMsg').textContent = msg;
+  const box = $('loading');
+  box.hidden = false;
+  let btn = box.querySelector('button');
+  if (retry){
+    if (!btn){ btn = document.createElement('button'); box.appendChild(btn); }
+    btn.textContent = '다시 시도';
+    btn.onclick = retry;
+  } else if (btn) btn.remove();
+}
+
+/* ── 챕터 개요(홈) ── */
+async function loadChapters(){
+  showLoading('불러오는 중', '챕터 목록을 가져옴');
+  let data;
+  try { data = await apiChapters(); }
+  catch (e) { showLoading('불러오기 실패', String(e.message || e), loadChapters); return; }
+  if (data.syncing && !(data.chapters || []).length){
+    showLoading('동기화 중', 'Notion에서 카드를 가져오는 중 — 잠시 후 다시 시도', loadChapters);
+    return;
   }
-  if (h.firstSeenToday && h.seenKey) unmarkCardSeen(h.seenKey);
-  if (session && h.sessionI != null) session.i = h.sessionI;
-  idx = h.idx;
-  peekIdx = null; // 엿보던 중이었어도 되돌리기 결과(새 라이브 위치)로 화면을 넘긴다
-  toast('되돌림');
-  render();
+  renderChapters(data);
 }
-$('undoBtn').addEventListener('click', undo);
-
-const doneBtn = $('doneBtn'), stepPop = $('stepPop');
-const pressRing = doneBtn.querySelector('.pressring circle');
-const LONGPRESS_MS = 450;
-let pressT = null, longPressed = false;
-function openStepPop(){
-  const c = peekIdx != null ? todayList[peekIdx] : deck[idx];
-  if (!c) return;
-  stepPop.querySelectorAll('button').forEach((b) => b.classList.toggle('cur', Number(b.dataset.s) === (c.step || 0)));
-  stepPop.classList.add('on');
+function renderChapters(data){
+  showView('chapters', 'Shorts Deck', null);
+  const chapters = data.chapters || [];
+  if (!chapters.length){ $('viewChapters').innerHTML = '<div class="emptymsg">카드가 없음</div>'; return; }
+  $('viewChapters').innerHTML = '<div class="listwrap">' + chapters.map((c, i) => {
+    const pct = c.total ? Math.round(c.current / c.total * 100) : 0;
+    return '<button class="row" data-id="' + esc(c.id) + '">'
+      + '<div class="row-top"><span class="row-label">챕터 ' + (i + 1) + '<span class="row-range">' + c.start + '~' + c.end + '</span></span>'
+      + '<span class="row-score">' + c.current + '/' + c.total + '<span class="best">최고 ' + c.best + '</span></span></div>'
+      + '<div class="row-bar"><i style="width:' + pct + '%"></i></div>'
+      + '</button>';
+  }).join('') + '</div>';
 }
-function closeStepPop(){ stepPop.classList.remove('on'); }
-function startPressRing(){
-  pressRing.style.transition = 'none'; pressRing.style.strokeDashoffset = '126'; pressRing.style.opacity = '1';
-  void pressRing.getBoundingClientRect();
-  pressRing.style.transition = 'stroke-dashoffset ' + LONGPRESS_MS + 'ms linear';
-  pressRing.style.strokeDashoffset = '0';
-}
-function resetPressRing(){
-  pressRing.style.transition = 'opacity .12s ease'; pressRing.style.opacity = '0';
-}
-doneBtn.addEventListener('pointerdown', () => {
-  longPressed = false;
-  startPressRing();
-  pressT = setTimeout(() => { longPressed = true; resetPressRing(); openStepPop(); }, LONGPRESS_MS);
-});
-doneBtn.addEventListener('pointerup', () => {
-  clearTimeout(pressT);
-  resetPressRing();
-  if (longPressed) return;
-  if (peekIdx != null) promotePeekToLive();
-  else if (deck[idx]) advance();
-});
-doneBtn.addEventListener('pointerleave', () => { clearTimeout(pressT); resetPressRing(); });
-stepPop.addEventListener('click', (e) => {
-  const b = e.target.closest('button'); if (!b) return;
-  teleport(Number(b.dataset.s));
-});
-document.addEventListener('pointerdown', (e) => {
-  if (stepPop.classList.contains('on') && !stepPop.contains(e.target) && e.target !== doneBtn) closeStepPop();
+$('viewChapters').addEventListener('click', (e) => {
+  const row = e.target.closest('.row'); if (!row) return;
+  loadChapter(row.dataset.id);
 });
 
-function goNext(revertInfo){
-  peekIdx = null; // 라이브 이동은 엿보기를 무조건 종료시킨다
-  const fromIdx = idx;
-  const sessionI = session ? session.i : null;
-  const entry = { idx: fromIdx, revert: revertInfo ? revertInfo.revert : null, key: revertInfo?.key, pageId: revertInfo?.pageId, sessionI, firstSeenToday: false, seenKey: null };
-  history.push(entry);
-  if (session){
-    session.i++;
-    if (session.i > session.total){ showSessionComplete(session.total); return; }
+/* ── 챕터 상세(소챕터 10개) ── */
+async function loadChapter(id){
+  currentChapterId = id;
+  showLoading('불러오는 중', '소챕터 목록을 가져옴');
+  let data;
+  try { data = await apiChapter(id); }
+  catch (e) { showLoading('불러오기 실패', String(e.message || e), () => loadChapter(id)); return; }
+  if (data.error){ showLoading('불러오기 실패', data.error, () => loadChapter(id)); return; }
+  renderChapterDetail(data);
+}
+function renderChapterDetail(data){
+  showView('chapter', '챕터 ' + (Number(data.id.slice(1)) + 1), loadChapters);
+  const rows = data.subchapters.map((s, i) => {
+    return '<div class="subrow" data-id="' + esc(s.id) + '">'
+      + '<div class="subrow-top"><span class="subrow-label">소챕터 ' + (i + 1) + ' · ' + s.start + '~' + s.end + '</span>'
+      + '<span class="subrow-score">' + s.current + '/' + s.total + '<span class="best">최고 ' + s.best + '</span></span></div>'
+      + '<div class="subrow-actions">'
+      + '<button class="subbtn" data-act="all">전체보기</button>'
+      + '<button class="subbtn" data-act="unknown">모르는 것만</button>'
+      + '<button class="subbtn exam" data-act="exam">시험보기</button>'
+      + '</div></div>';
+  }).join('');
+  $('viewChapter').innerHTML = '<div class="chaphead"><div class="num">' + data.current + '/' + data.total + ' <b>최고 ' + data.best + '</b></div><div class="lbl">이 챕터에서 안다고 판정한 카드 수</div></div><div class="listwrap">' + rows + '</div>';
+}
+$('viewChapter').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-act]'); if (!btn) return;
+  const subId = btn.closest('.subrow').dataset.id;
+  const act = btn.dataset.act;
+  if (act === 'all') enterStudyFromServer(subId, 'all');
+  else if (act === 'unknown') enterStudyFromServer(subId, 'unknown');
+  else if (act === 'exam') enterExam(subId);
+});
+
+/* ── 학습(스와이프) ── */
+let studyCards = [], studyIdx = 0, studySubId = null;
+async function enterStudyFromServer(subId, mode){
+  showLoading('불러오는 중', '카드를 가져옴');
+  let data;
+  try { data = await apiSubchapter(subId, mode); }
+  catch (e) { showLoading('불러오기 실패', String(e.message || e), () => enterStudyFromServer(subId, mode)); return; }
+  if (data.error){ showLoading('불러오기 실패', data.error, () => enterStudyFromServer(subId, mode)); return; }
+  if (!data.cards.length){
+    loadChapter(currentChapterId);
+    toast(mode === 'unknown' ? '이 소챕터는 모두 알고 있음' : '카드 없음');
+    return;
   }
-  idx = (idx + 1) % Math.max(deck.length, 1);
-  const dest = deck[idx];
-  if (dest){ entry.seenKey = dest.key || cardKeyOf(dest.front); entry.firstSeenToday = markCardSeen(dest); }
-  render();
+  enterStudy(subId, data.cards);
 }
-function showSessionComplete(n){
-  $('content').innerHTML = '<div class="donecard"><div class="donecheck">&#10003;</div><div class="donetext">오늘 ' + n + '개 복습 완료</div></div>';
-  $('cardTitle').textContent = ''; $('dateSlot').innerHTML = '';
-  setTimeout(exitSession, 900);
+function enterStudy(subId, cards){
+  studySubId = subId; studyCards = cards; studyIdx = 0;
+  showView('study', '학습', () => loadChapter(currentChapterId));
+  setRetitleContext(() => studyCards[studyIdx]);
+  renderStudyCard();
 }
-function goPrev(){
-  peekIdx = null; // 라이브 이동은 엿보기를 무조건 종료시킨다
-  const entry = { idx, revert: null, sessionI: session ? session.i : null, firstSeenToday: false, seenKey: null };
-  history.push(entry);
-  idx = (idx - 1 + Math.max(deck.length, 1)) % Math.max(deck.length, 1);
-  const dest = deck[idx];
-  if (dest){ entry.seenKey = dest.key || cardKeyOf(dest.front); entry.firstSeenToday = markCardSeen(dest); }
-  render();
-}
-
-/* ── 오늘 스크러버: todayList 길이만큼 점을 균일 간격으로(첫 점은 항상 맨 왼쪽) 그리고,
-   드래그하면 가장 가까운 점으로 스냅해 그 카드를 엿본다. 라이브 deck/idx/history는
-   안 건드린다 — 완료 버튼을 누르면 그때 promotePeekToLive()가 라이브로 승격시킨다. */
-const scrubber = $('scrubber'), scrubTrack = $('scrubTrack');
-function renderScrubber(){
-  const n = todayList.length;
-  if (n < 2){ scrubber.classList.remove('on'); scrubTrack.querySelectorAll('.dot').forEach((d) => d.remove()); return; }
-  scrubber.classList.add('on');
-  const curKey = peekIdx != null ? todayList[peekIdx]?.key : (deck[idx]?.key || cardKeyOf(deck[idx]?.front || ''));
-  let dots = scrubTrack.querySelectorAll('.dot');
-  while (dots.length < n){ const d = document.createElement('div'); d.className = 'dot'; scrubTrack.appendChild(d); dots = scrubTrack.querySelectorAll('.dot'); }
-  while (dots.length > n){ dots[dots.length - 1].remove(); dots = scrubTrack.querySelectorAll('.dot'); }
-  todayList.forEach((it, i) => {
-    const left = n > 1 ? (i / (n - 1)) * 100 : 0;
-    dots[i].style.left = left + '%';
-    dots[i].classList.toggle('cur', it.key === curKey);
-  });
-}
-async function peekAt(i){
-  const c = todayList[i];
+function renderStudyCard(){
+  const c = studyCards[studyIdx];
   if (!c) return;
-  peekIdx = i;
-  await ensureBody(c);
-  displayCardDOM(c);
-  renderScrubber();
+  $('cardTitle').textContent = c.front;
+  $('cardTitle').href = c.url || '#';
+  $('content').innerHTML = cardBodyHtml(c);
+  $('scroller').scrollTop = 0;
+  $('studyFoot').textContent = (studyIdx + 1) + ' / ' + studyCards.length;
+  renderStudyScrubber();
+}
+function renderStudyScrubber(){
+  const n = studyCards.length;
+  const scrubber = $('scrubber'), track = $('scrubTrack');
+  if (n < 2){ scrubber.style.display = 'none'; return; }
+  scrubber.style.display = 'block';
+  let dots = track.querySelectorAll('.dot');
+  while (dots.length < n){ const d = document.createElement('div'); d.className = 'dot'; track.appendChild(d); dots = track.querySelectorAll('.dot'); }
+  while (dots.length > n){ dots[dots.length - 1].remove(); dots = track.querySelectorAll('.dot'); }
+  dots.forEach((d, i) => { d.style.left = (n > 1 ? (i / (n - 1)) * 100 : 0) + '%'; d.classList.toggle('cur', i === studyIdx); });
 }
 function scrubIndexFromX(clientX){
-  const rect = scrubTrack.getBoundingClientRect();
-  const n = todayList.length;
+  const rect = $('scrubTrack').getBoundingClientRect();
+  const n = studyCards.length;
   if (n < 2) return 0;
   const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
   return Math.round(ratio * (n - 1));
 }
 let scrubbing = false;
-scrubber.addEventListener('pointerdown', (e) => {
-  if (todayList.length < 2) return;
+$('scrubber').addEventListener('pointerdown', (e) => {
+  if (studyCards.length < 2) return;
   scrubbing = true;
-  try { scrubber.setPointerCapture(e.pointerId); } catch (err) {}
-  peekAt(scrubIndexFromX(e.clientX));
+  try { $('scrubber').setPointerCapture(e.pointerId); } catch (err) {}
+  studyIdx = scrubIndexFromX(e.clientX); renderStudyCard();
 });
-scrubber.addEventListener('pointermove', (e) => {
+$('scrubber').addEventListener('pointermove', (e) => {
   if (!scrubbing) return;
   const i = scrubIndexFromX(e.clientX);
-  if (i !== peekIdx) peekAt(i);
+  if (i !== studyIdx){ studyIdx = i; renderStudyCard(); }
 });
-scrubber.addEventListener('pointerup', () => { scrubbing = false; });
-scrubber.addEventListener('pointercancel', () => { scrubbing = false; });
+$('scrubber').addEventListener('pointerup', () => { scrubbing = false; });
+$('scrubber').addEventListener('pointercancel', () => { scrubbing = false; });
 
-/* ── 좌우=이전/다음(채점 없음, 드래그 중 옆 카드 제목+본문이 살짝 보임), 상하=스크롤(네이티브) ── */
-const content = $('content'), scroller = $('scroller'), topbar = $('topbar');
+/* ── 좌우 스와이프=이전/다음(채점 없음, 소챕터 안에서 순환), 상하=스크롤(네이티브) ── */
+const content = $('content'), scroller = $('scroller'), cardTitleEl = $('cardTitle');
 const peekPrev = $('peekPrev'), peekNext = $('peekNext');
-const COMMIT_RATIO = 0.5;
-const FLICK_MS = 300;
-const FLICK_RATIO = 0.18;
-const TRANSITION_MS = 280;
+const COMMIT_RATIO = 0.5, FLICK_MS = 300, FLICK_RATIO = 0.18, TRANSITION_MS = 280, DRAG_SENS = 1.15;
 let sx = 0, sy = 0, dx = 0, dy = 0, mode = null, dragging = false, dragW = 1, startT = 0;
-
-function prevCard(){ return deck[(idx - 1 + Math.max(deck.length,1)) % Math.max(deck.length,1)]; }
-function nextCard(){ return deck[(idx + 1) % Math.max(deck.length,1)]; }
+function studyPrev(){ return studyCards[(studyIdx - 1 + studyCards.length) % studyCards.length]; }
+function studyNext(){ return studyCards[(studyIdx + 1) % studyCards.length]; }
 function setDragX(px){
-  content.style.transform = 'translateX(' + px + 'px)';
-  topbar.style.transform = 'translateX(' + px + 'px)';
-  peekPrev.style.transform = 'translateX(calc(-100% + ' + px + 'px))';
-  peekNext.style.transform = 'translateX(calc(100% + ' + px + 'px))';
+  content.style.transform = 'translateX(' + px + 'px)'; cardTitleEl.style.transform = 'translateX(' + px + 'px)';
+  peekPrev.style.transform = 'translateX(calc(-100% + ' + px + 'px))'; peekNext.style.transform = 'translateX(calc(100% + ' + px + 'px))';
 }
-function resetDragX(){
-  content.style.transform = ''; topbar.style.transform = '';
-  peekPrev.style.transform = ''; peekNext.style.transform = '';
-}
-function setDragTransition(t){
-  content.style.transition = t; topbar.style.transition = t;
-  peekPrev.style.transition = t; peekNext.style.transition = t;
-}
-const DRAG_SENS = 1.15;
+function resetDragX(){ content.style.transform = ''; cardTitleEl.style.transform = ''; peekPrev.style.transform = ''; peekNext.style.transform = ''; }
+function setDragTransition(t){ content.style.transition = t; cardTitleEl.style.transition = t; peekPrev.style.transition = t; peekNext.style.transition = t; }
 function dragCurve(rawDx, w){
-  const amp = rawDx * DRAG_SENS;
-  const sign = amp < 0 ? -1 : 1, abs = Math.abs(amp);
+  const amp = rawDx * DRAG_SENS, sign = amp < 0 ? -1 : 1, abs = Math.abs(amp);
   return abs <= w ? amp : sign * (w + (abs - w) * 0.3);
 }
-
 scroller.addEventListener('pointerdown', (e) => {
-  if (deck.length < 2) return;
+  if (studyCards.length < 2) return;
   dragging = true; mode = null; sx = e.clientX; sy = e.clientY; dx = 0; dy = 0;
   dragW = scroller.offsetWidth || 1; startT = e.timeStamp;
   try { scroller.setPointerCapture(e.pointerId); } catch (err) {}
   setDragTransition('none');
-  const pc = prevCard(), nc = nextCard();
-  $('peekPrevTitle').textContent = pc ? pc.front : '';
-  $('peekPrevBody').innerHTML = peekBodyHtml(pc);
-  $('peekNextTitle').textContent = nc ? nc.front : '';
-  $('peekNextBody').innerHTML = peekBodyHtml(nc);
+  const pc = studyPrev(), nc = studyNext();
+  $('peekPrevTitle').textContent = pc ? pc.front : ''; $('peekPrevBody').innerHTML = peekBodyHtml(pc);
+  $('peekNextTitle').textContent = nc ? nc.front : ''; $('peekNextBody').innerHTML = peekBodyHtml(nc);
 });
 scroller.addEventListener('pointermove', (e) => {
   if (!dragging) return;
   dx = e.clientX - sx; dy = e.clientY - sy;
-  if (mode === null && (Math.abs(dx) > 10 || Math.abs(dy) > 10)){
-    mode = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v';
-  }
+  if (mode === null && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) mode = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v';
   if (mode === 'h') setDragX(dragCurve(dx, dragW));
 });
 scroller.addEventListener('pointerup', (e) => {
   if (!dragging) return;
   dragging = false;
   if (mode === 'h'){
-    const elapsed = e.timeStamp - startT;
-    const ratio = Math.abs(dx) / dragW;
+    const elapsed = e.timeStamp - startT, ratio = Math.abs(dx) / dragW;
     const isFlick = elapsed <= FLICK_MS && ratio >= FLICK_RATIO;
     const commit = isFlick || ratio >= COMMIT_RATIO;
     setDragTransition('transform ' + TRANSITION_MS + 'ms cubic-bezier(.2,.7,.3,1)');
     if (commit && dx < 0){
       setDragX(-dragW);
-      content.addEventListener('transitionend', function onEnd(){
-        content.removeEventListener('transitionend', onEnd);
-        setDragTransition('none'); resetDragX(); goNext();
-      }, { once: true });
+      content.addEventListener('transitionend', function onEnd(){ content.removeEventListener('transitionend', onEnd); setDragTransition('none'); resetDragX(); studyIdx = (studyIdx + 1) % studyCards.length; renderStudyCard(); }, { once: true });
     } else if (commit && dx > 0){
       setDragX(dragW);
-      content.addEventListener('transitionend', function onEnd(){
-        content.removeEventListener('transitionend', onEnd);
-        setDragTransition('none'); resetDragX(); goPrev();
-      }, { once: true });
-    } else {
-      resetDragX();
-    }
+      content.addEventListener('transitionend', function onEnd(){ content.removeEventListener('transitionend', onEnd); setDragTransition('none'); resetDragX(); studyIdx = (studyIdx - 1 + studyCards.length) % studyCards.length; renderStudyCard(); }, { once: true });
+    } else resetDragX();
   }
   mode = null;
 });
 scroller.addEventListener('pointercancel', () => { dragging = false; mode = null; resetDragX(); });
 
-/* ── 하단 시트: 검색/차수탭 목록과 캘린더(+날짜별 목록)는 같은 자리(#calArea)를 공유한다 ── */
-const sheet = $('sheet'), sheetback = $('sheetback');
-let sheetFilter = null, sheetQuery = '';
-let dateListActive = null; // { date, items }
-let indexItems = null; // 검색/차수탭용 — 열 때 한 번 받아온다(약 100KB)
-let calDays = null; // /api/calendar 결과
-
-async function openSheet(){
-  sheet.classList.add('on'); sheetback.classList.add('on');
-  sheetFilter = null; sheetQuery = ''; dateListActive = null; $('searchInput').value = '';
-  renderTabs();
-  requestAnimationFrame(updateCalArea);
-  loadCalendar();
+/* ── 시험 ──
+   제목만 → "정답 확인" 탭 → 본문 리빌 → "알고 있었음/몰랐음" 최종 확정(2단계 자기평가,
+   되돌리기 없음). 순서는 매번 섞는다. 통과 기준(소챕터 5/10, 대챕터 80/100)은 게이트가
+   아니라 순수 최고기록 현황판 — 통과 못해도 다음 챕터/소챕터는 그대로 열려 있다. */
+function shuffle(arr){
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
 }
-function closeSheet(){ sheet.classList.remove('on'); sheetback.classList.remove('on'); }
-$('pullTab').addEventListener('click', openSheet);
-sheetback.addEventListener('click', closeSheet);
-
-const sheetHandle = $('sheetHandle');
-let sheetDragging = false, sheetMoved = false, ssy = 0, sdy = 0;
-sheet.addEventListener('pointerdown', (e) => {
-  ssy = e.clientY; sdy = 0; sheetMoved = false;
-  const fromHandle = e.target === sheetHandle;
-  sheetDragging = fromHandle || $('calArea').scrollTop <= 0;
-});
-sheet.addEventListener('pointermove', (e) => {
-  if (!sheetDragging) return;
-  sdy = e.clientY - ssy;
-  if (sdy <= 8) return;
-  if (!sheetMoved){ sheetMoved = true; sheet.style.transition = 'none'; try { sheet.setPointerCapture(e.pointerId); } catch (err) {} }
-  sheet.style.transform = 'translateY(' + sdy + 'px)';
-});
-sheet.addEventListener('pointerup', () => {
-  if (!sheetDragging) return;
-  sheetDragging = false;
-  if (!sheetMoved) return;
-  sheetMoved = false;
-  sheet.style.transition = 'transform .22s cubic-bezier(.2,.7,.3,1)';
-  if (sdy > 90){
-    sheet.style.transform = 'translateY(100%)';
-    setTimeout(() => { closeSheet(); sheet.style.transition = ''; sheet.style.transform = ''; }, 200);
-  } else {
-    sheet.style.transform = '';
-  }
-});
-sheet.addEventListener('pointercancel', () => { sheetDragging = false; sheetMoved = false; sheet.style.transform = ''; });
-
-function renderTabs(){
-  const labels = ['0', '1차', '2차', '3차'];
-  $('stepTabs').innerHTML = ['<button class="stab' + (sheetFilter === 'all' ? ' on' : '') + '" data-f="all">전체</button>']
-    .concat(labels.map((l, i) => '<button class="stab' + (sheetFilter === String(i) ? ' on' : '') + '" data-f="' + i + '">' + l + '</button>'))
-    .join('');
+let examSubId = null, examCards = [], examIdx = 0, examResults = {}, examLastSub = null, examLastChap = null;
+async function enterExam(subId){
+  showLoading('불러오는 중', '문제를 가져옴');
+  let data;
+  try { data = await apiSubchapter(subId, 'all'); }
+  catch (e) { showLoading('불러오기 실패', String(e.message || e), () => enterExam(subId)); return; }
+  if (data.error || !data.cards.length){ showLoading('불러오기 실패', data.error || '카드 없음', () => enterExam(subId)); return; }
+  examSubId = subId; examCards = shuffle(data.cards); examIdx = 0; examResults = {};
+  showView('exam', '시험', () => loadChapter(currentChapterId));
+  setRetitleContext(() => examCards[examIdx]);
+  renderExamView();
 }
-$('stepTabs').addEventListener('click', (e) => {
-  const b = e.target.closest('.stab'); if (!b) return;
-  dateListActive = null;
-  sheetFilter = (sheetFilter === b.dataset.f) ? null : b.dataset.f;
-  renderTabs(); updateCalArea();
-});
-$('searchInput').addEventListener('input', (e) => {
-  dateListActive = null;
-  sheetQuery = e.target.value.trim().toLowerCase(); updateCalArea();
-});
-
-async function ensureIndexItems(){
-  if (indexItems) return indexItems;
-  try {
-    const res = await fetch('/api/index');
-    const d = await res.json();
-    indexItems = d.items || [];
-  } catch (e) { indexItems = []; }
-  return indexItems;
-}
-function filteredItems(){
-  let items = indexItems || [];
-  if (sheetFilter && sheetFilter !== 'all') items = items.filter((it) => Math.min(it.step, 3) === Number(sheetFilter));
-  if (sheetQuery) items = items.filter((it) => it.front.toLowerCase().includes(sheetQuery));
-  return items;
-}
-function renderPickList(items, emptyMsg){
-  const labels = ['0', '1차', '2차', '3차'];
-  $('calArea').innerHTML = items.length
-    ? '<div class="sheetlist">' + items.map((it) => '<div class="srow" data-id="' + esc(it.id) + '"><span class="sf">' + esc(it.front) + '</span><span class="ss">' + labels[Math.min(it.step, 3)] + '</span></div>').join('') + '</div>'
-    : '<div class="sempty">' + emptyMsg + '</div>';
-  const listEl = $('calArea').querySelector('.sheetlist');
-  if (listEl) listEl.addEventListener('click', (e) => {
-    const row = e.target.closest('.srow'); if (!row) return;
-    const clickPos = items.findIndex((it) => it.id === row.dataset.id);
-    startListSession(items, clickPos);
+function renderExamView(){
+  $('viewExam').innerHTML =
+    '<div class="examwrap"><div class="examprog" id="examProg"></div>' +
+    '<div class="examcard" id="examCard"></div>' +
+    '<div class="examjudge" id="examJudge" hidden><button class="dontknow" data-k="0">몰랐음</button><button class="know" data-k="1">알고 있었음</button></div>' +
+    '</div>';
+  renderExamCard();
+  $('examJudge').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    judgeCard(b.dataset.k === '1');
   });
 }
-async function updateCalArea(){
-  if (dateListActive){
-    const { date, items } = dateListActive;
-    $('calHead').innerHTML = '<button class="backlink" id="calBack">&larr; 캘린더</button> ' + fmtCalHeadDate(date) + ' 본 것 · 골라서 이어보기';
-    renderPickList(items, '해당 날짜에 본 카드 없음');
-    $('calBack').addEventListener('click', () => { dateListActive = null; updateCalArea(); });
-    return;
-  }
-  const listMode = sheetQuery.length > 0 || sheetFilter != null;
-  if (!listMode){
-    $('calHead').textContent = '';
-    renderCalendarGrid();
-    return;
-  }
-  $('calHead').textContent = '전체 목록 · 골라서 이어보기';
-  await ensureIndexItems();
-  renderPickList(filteredItems(), '해당하는 카드 없음');
+function renderExamCard(){
+  if (examIdx >= examCards.length){ renderExamResult(); return; }
+  $('examProg').textContent = (examIdx + 1) + ' / ' + examCards.length;
+  const c = examCards[examIdx];
+  $('examCard').innerHTML = '<div class="examtitle" id="examTitle">' + esc(c.front) + '</div>'
+    + '<button class="examreveal" id="examReveal">정답 확인</button>';
+  $('examJudge').hidden = true;
+  $('examReveal').addEventListener('click', () => {
+    $('examCard').innerHTML = '<div class="examtitle" id="examTitle">' + esc(c.front) + '</div>'
+      + '<div class="content exambody" id="examBody">' + cardBodyHtml(c) + '</div>';
+    $('examJudge').hidden = false;
+  }, { once: true });
 }
-function fmtCalHeadDate(dateStr){
-  const today = todayKST();
-  if (dateStr === today) return '오늘';
-  const [, m, d] = dateStr.split('-');
-  return Number(m) + '/' + Number(d);
+async function judgeCard(know){
+  const c = examCards[examIdx];
+  examResults[c.key] = know;
+  // 결과 화면의 "최고기록"이 마지막 카드 응답을 놓친 채(경쟁 상태) 그리는 걸 막기 위해
+  // 기다린다 — 카드당 한 번뿐인 탭이라 짧은 대기는 무마찰 원칙에 안 걸린다.
+  const res = await apiAnswer(examSubId, c.key, know);
+  if (res && res.ok){ examLastSub = res.sub; examLastChap = res.chap; }
+  examIdx++;
+  renderExamCard();
 }
-function todayKST(){
-  const d = new Date(Date.now() + 9 * 3600000);
-  return d.toISOString().slice(0, 10);
+function renderExamResult(){
+  const total = examCards.length;
+  const score = examCards.filter((c) => examResults[c.key]).length;
+  const wrong = examCards.filter((c) => !examResults[c.key]);
+  const bestLine = examLastSub ? '이 소챕터 최고기록 ' + examLastSub.best + '/' + examLastSub.total : '';
+  let actions = '<button class="primary" id="examExit">챕터로 돌아가기</button>';
+  if (wrong.length){
+    actions = '<button id="examRetryStudy">오답만 다시 복습(' + wrong.length + ')</button>'
+      + '<button id="examRetryExam">오답만 바로 재시험</button>' + actions;
+  }
+  $('viewExam').innerHTML = '<div class="examresult"><div class="score">' + score + ' / ' + total + '</div>'
+    + '<div class="best">' + esc(bestLine) + '</div>'
+    + '<div class="actions">' + actions + '</div></div>';
+  clearRetitleContext();
+  const exit = $('examExit'); if (exit) exit.addEventListener('click', () => loadChapter(currentChapterId));
+  const rs = $('examRetryStudy'); if (rs) rs.addEventListener('click', () => enterStudy(examSubId, wrong));
+  const re = $('examRetryExam'); if (re) re.addEventListener('click', () => {
+    examCards = shuffle(wrong); examIdx = 0; examResults = {};
+    showView('exam', '시험', () => loadChapter(currentChapterId));
+    setRetitleContext(() => examCards[examIdx]);
+    renderExamView();
+  });
 }
 
-/* 글자크기 슬라이더 — 제목/본문 따로, pill 트랙+코랄 채움(design-bakeoff 라운드2 확정) */
-function lsGet(k){ try { return localStorage.getItem(k); } catch (err) { return null; } }
-function lsSet(k, v){ try { localStorage.setItem(k, v); } catch (err) {} }
-function setSliderFill(el){
-  const pct = (el.value - el.min) / (el.max - el.min) * 100;
-  el.style.setProperty('--fill', pct + '%');
-}
+/* 글자크기 슬라이더 */
+function setSliderFill(el){ const pct = (el.value - el.min) / (el.max - el.min) * 100; el.style.setProperty('--fill', pct + '%'); }
 function readPx(el){ return Math.round(parseFloat(getComputedStyle(el).fontSize)) + 'px'; }
 const titleScale = $('titleScale'), bodyScale = $('bodyScale');
 const savedTScale = lsGet('sd_tscale'), savedBScale = lsGet('sd_bscale');
@@ -906,109 +756,19 @@ if (savedBScale) bodyScale.value = savedBScale;
 function applyTitleScale(){
   document.documentElement.style.setProperty('--tscale', titleScale.value);
   $('titleScaleVal').textContent = readPx($('cardTitle'));
-  lsSet('sd_tscale', titleScale.value);
-  setSliderFill(titleScale);
+  lsSet('sd_tscale', titleScale.value); setSliderFill(titleScale);
 }
 function applyBodyScale(){
   document.documentElement.style.setProperty('--bscale', bodyScale.value);
   $('bodyScaleVal').textContent = readPx(content);
-  lsSet('sd_bscale', bodyScale.value);
-  setSliderFill(bodyScale);
+  lsSet('sd_bscale', bodyScale.value); setSliderFill(bodyScale);
 }
 titleScale.addEventListener('input', applyTitleScale);
 bodyScale.addEventListener('input', applyBodyScale);
 
-/* ── 캘린더: 서버 /api/calendar(최근 28일)+/api/day(날짜별 목록) ── */
-async function loadCalendar(){
-  try {
-    const res = await fetch('/api/calendar?days=28');
-    const d = await res.json();
-    calDays = d.days || [];
-  } catch (e) { calDays = null; }
-  if (!dateListActive && !(sheetQuery.length > 0 || sheetFilter != null)) renderCalendarGrid();
-}
-function renderCalendarGrid(){
-  if (!calDays){ $('calArea').innerHTML = ''; return; }
-  const today = todayKST();
-  const first = new Date(calDays[0].date + 'T00:00:00Z');
-  const lead = first.getUTCDay();
-  let cells = '';
-  for (let i = 0; i < lead; i++) cells += '<div class="calcell blank"></div>';
-  calDays.forEach((day) => {
-    const isToday = day.date === today;
-    const n = isToday ? todaySet.size : day.count;
-    const disabled = n === 0 && !isToday;
-    const dnum = Number(day.date.slice(8, 10));
-    cells += '<button class="calcell' + (isToday ? ' today' : '') + '" data-date="' + day.date + '"' + (disabled ? ' disabled' : '') + '>'
-      + '<span class="dnum">' + dnum + '</span>' + (n > 0 ? '<span class="dcnt">' + n + '</span>' : '') + '</button>';
-  });
-  $('calArea').innerHTML =
-    '<div class="calweekday">' + ['일', '월', '화', '수', '목', '금', '토'].map((w) => '<span>' + w + '</span>').join('') + '</div>' +
-    '<div class="calgrid">' + cells + '</div>';
-  $('calArea').querySelector('.calgrid').addEventListener('click', async (e) => {
-    const b = e.target.closest('.calcell'); if (!b || b.disabled) return;
-    const date = b.dataset.date;
-    dateListActive = { date, items: [] };
-    updateCalArea();
-    try {
-      const res = await fetch('/api/day?date=' + encodeURIComponent(date));
-      const d = await res.json();
-      dateListActive = { date, items: d.items || [] };
-    } catch (err) { dateListActive = { date, items: [] }; }
-    updateCalArea();
-  });
-}
-
-/* ── 목록 항목(날짜별/전체 목록 공통) → 거기서부터 순차 복습(본문은 표시 직전에 지연 로드) ── */
-function startListSession(items, clickPos){
-  const slice = items.slice(clickPos);
-  deck = slice.map((it) => ({ id: it.id, key: it.key, front: it.front, step: it.step, n: it.n || 0, url: it.url }));
-  idx = 0;
-  session = { total: deck.length, i: 1 };
-  history = [];
-  peekIdx = null;
-  closeSheet();
-  markCardSeen(deck[0]);
-  render();
-  toast('여기서부터 복습 · ' + deck.length + '개');
-}
-function exitSession(){
-  session = null;
-  history = [];
-  peekIdx = null;
-  (async () => {
-    deck = await fetchWithFallback(8).catch(() => []);
-    idx = 0;
-    markCardSeen(deck[0]);
-    render();
-  })();
-}
-
-/* ── 시작 ───────────────────────────────────────────────── */
-(async () => {
-  applyTitleScale(); applyBodyScale();
-  document.documentElement.style.setProperty('--topstrip-h', $('topstrip').offsetHeight + 'px');
-  try {
-    const cards = await fetchWithFallback(8);
-    if (!cards.length){
-      $('loadmsg').textContent = '카드가 없음 — Notion DB를 확인';
-      return;
-    }
-    deck = cards; idx = 0;
-    // 오늘 목록(카운터+스크러버 원본)은 서버가 들고 있는 오늘 하루치로 먼저 채운다(정확한
-    // 중복 방지) — 첫 렌더 전에 끝나야 첫 카드의 "오늘 첫 조회 여부" 판단도 정확해진다.
-    try {
-      const res = await fetch('/api/day?date=' + todayKST());
-      const d = await res.json();
-      todayList = d.items || [];
-      todaySet = new Set(todayList.map((it) => it.key));
-    } catch (e) {}
-    markCardSeen(deck[idx]); // 첫 카드는 되돌리기 대상 히스토리가 없어 여기서 직접 표시
-    render();
-  } catch (e) {
-    $('loadmsg').textContent = '불러오기 실패 — ' + e.message;
-  }
-})();
+/* ── 시작 ── */
+applyTitleScale(); applyBodyScale();
+loadChapters();
 </script>
 </body>
 </html>

@@ -1,13 +1,20 @@
 /**
  * Shorts Deck — Cloudflare Worker
  *
- * 하는 일 다섯:
- *   1. public/ 정적 자산(앱) 서빙          → 앱과 API가 같은 출처 = CORS 문제 자체가 없음
- *   2. GET  /api/cards   완료도=0 70% + 복습 때 된 카드 30%로 한 묶음을 골라 반환
- *   3. GET  /api/index   모아보기용 가벼운 전체 목록(제목·차수만, 카드 본문 없음)
- *   4. GET  /api/card    id 하나의 전체 본문(원본 블록) 반환 — 모아보기에서 되짚어볼 때
- *   5. GET  /api/sync    Notion → 카드 변환을 "예산만큼만" 진행하고 커서를 남김
- *   6. POST /api/grade   채점을 KV(원본) + Notion 속성(미러) 양쪽에 기록. body.undo:true면 직전 1건 되돌리기
+ * 2026-09-05 전면 재설계: "로그라이크식 챕터 클리어" 구조로 교체(deep-interview로 정리).
+ *   기존 무한 스와이프 덱 + 0~3차 채점 + 되돌리기 + 캘린더 + 전역검색은 전부 폐기.
+ *   새 모델: 카드 전체를 생성일자순으로 100장씩 대챕터 → 그 안을 10장씩 소챕터로 나눔.
+ *   카드 상태는 앱 자체의 이진값(안다/모른다)뿐 — 노션 0~3차와의 연동은 끊었다(사용자 결정,
+ *   이유: 압박이 문제가 아니라 노션 UI 자체의 마찰이 방치 원인이었다는 판단). 게이트(잠금)도
+ *   없다 — 모든 챕터는 처음부터 자유 열람, 최고기록은 순수 진행 현황판.
+ *
+ * 하는 일:
+ *   1. public/ 정적 자산(앱) 서빙
+ *   2. GET  /api/chapters         대챕터 전체 개요(현재/최고 점수)
+ *   3. GET  /api/chapter?id=cN    대챕터 하나의 소챕터 10개 상세(현재/최고 점수 + 카드 제목·known)
+ *   4. GET  /api/subchapter?id=cNsM&mode=all|unknown   소챕터 하나의 카드 전체 본문(학습·시험 공용)
+ *   5. POST /api/answer           시험 정답 기록(안다/모른다) + 소챕터·대챕터 점수 갱신(최고기록 포함)
+ *   6. GET  /api/sync             Notion → 카드 변환을 "예산만큼만" 진행하고 커서를 남김
  *
  * ⚠ 왜 Worker가 반드시 필요한가 — api.notion.com은 Access-Control-Allow-Origin을
  *   보내지 않는다(2026-09-03 실측). 크롬 확장은 host_permissions로 CORS를 면제받아
@@ -18,29 +25,30 @@
  *   2026-09-03). 카드 하나를 만들려면 본문 블록 조회가 1~2회 필요해서 21장만 해도
  *   약 60회다. 그래서 진행 커서를 KV에 두고 여러 번에 나눠 처리하며, cron이 이어 돌린다.
  *
- * ⚠ 저장 구조(2026-09-03 개편) — 예전엔 sync:state에 "이미 처리한 카드 전량"을
- *   통째로 담았다. 1,101/1,323장을 넘기자 그 값이 약 1.7MB로 불어났고, 매 5분 cron
- *   틱마다 그걸 파싱·직렬화하다 무료 CPU 10ms를 넘겨 503이 연속으로 났다(실측: 148·
- *   823·1040장에서는 멀쩡했고 1,040을 넘긴 뒤부터 6/6 실패).
- *   그래서 지금은 인덱스(제목·차수·버킷번호만, 전량 ~100KB)와 버킷(본문 50장 단위)을
- *   분리해 저장한다. sync:state가 들고 있는 카드 본문은 "현재 채우는 중인 버킷"
- *   하나(최대 50장)뿐이라 크기가 항상 유계다.
+ * ⚠ 저장 구조(2026-09-03 개편) — 인덱스(제목·차수·버킷번호만, 전량 ~100KB)와 버킷(본문
+ *   50장 단위)을 분리해 저장한다. sync:state가 들고 있는 카드 본문은 "현재 채우는 중인
+ *   버킷" 하나(최대 50장)뿐이라 크기가 항상 유계다(예전엔 누적 전량을 통째로 들고 있다가
+ *   1,101장을 넘긴 시점부터 CPU 10ms를 넘겨 503이 연속으로 났다).
  */
 
 const NOTION = 'https://api.notion.com/v1';
 const NOTION_VERSION = '2022-06-28'; // 크롬 확장(youtube_dual_subtitle)과 동일 — 검증된 조합
 
 const K_STATE = 'sync:state';
-const K_SCHEMA = 'schema:v1';
-const K_GRADES = 'grades';
 const K_INDEX = 'index:v2';
 const K_BUCKET = 'bucket:v2:'; // + 번호
-const K_CARDS_OLD = 'cards:v1'; // 옛 포맷 — done 시점에 정리
+const K_KNOWN = 'known:v1';    // { [cardKey]: true } — 안다로 판정된 카드만 기록(모른다=부재)
+const K_BEST = 'best:v1';      // { sub:{ [subId]: n }, chap:{ [chapId]: n } } — 최고기록(단조증가)
 
 const BUCKET_SIZE = 50;             // ⚠ 카드별 개별 KV 저장은 불가 — 무료 쓰기 1,000회/일에 걸린다
-const PARSER_VERSION = 2;           // 포맷을 바꾸면 올릴 것 — 증분 로직이 옛 포맷을 재사용하지 않게
+const PARSER_VERSION = 3;           // 포맷을 바꾸면 올릴 것 — 증분 로직이 옛 포맷을 재사용하지 않게
+                                     // (v3, 2026-09-05: 블록에 원본 block.id 추가 — 형광펜 토글을
+                                     //  Notion에 되쓰려면 필요)
 const SUB_BUDGET = 40;              // 50 상한에서 여유 10회를 남긴다
 const STALE_MS = 6 * 60 * 60 * 1000; // 캐시가 이보다 오래되면 cron이 새 동기화를 시작
+
+const SUB_SIZE = 10;  // 소챕터 카드 수
+const CHAP_SIZE = 10; // 대챕터당 소챕터 수(= 대챕터 카드 수 100)
 
 /* ── Notion 호출 (서브요청 예산 관리) ─────────────────────── */
 
@@ -81,41 +89,16 @@ async function kvPut(env, key, value, budget) {
 }
 
 /* ── 스키마 판별 ─────────────────────────────────────────── */
-
-/**
- * ⚠ 이 DB엔 비슷해 보이는 두 컬럼이 있고 의미가 정반대다(2026-09-03 실측):
- *   완료도(select) = 0 / 1차 완료 / 2차 완료 / 3차 완료  → 진도
- *   상태  (select) = 쉬움 / 적당함 / 어려움 / 완료        → 체감 난이도
- * 채점(이해·애매·모름)이 가는 곳은 난이도다. 게다가 둘 다 select 타입이라 타입으로는
- * 구분이 불가능하다 — 그래서 타입이 아니라 **옵션 내용**으로 역할을 판별한다.
- */
+// 채점을 노션에 반영하지 않기로 했으므로(2026-09-05) 진도/난이도 컬럼은 더 이상 안 찾는다.
+// title/url만 있으면 카드 조립에 충분하다.
 async function discoverSchema(token, dbId, budget) {
   const db = await notion(token, `/databases/${dbId}`, {}, budget);
   const props = db.properties || {};
   const find = (pred) => Object.keys(props).find((n) => pred(n, props[n]));
-  const opts = (n) => {
-    const d = props[n];
-    return (d?.status?.options || d?.select?.options || []).map((o) => o.name);
-  };
-  const byOptions = (re) => Object.keys(props).find(
-    (n) => (props[n].type === 'select' || props[n].type === 'status') && opts(n).some((o) => re.test(o))
-  );
-
-  const difficulty = byOptions(/쉬움|어려|easy|hard/i);
-  const progress = byOptions(/차 완료|진행 중|시작 전/i);
-
   return {
     dbTitle: (db.title || []).map((t) => t.plain_text).join(''),
     title: find((n, p) => p.type === 'title'),
     url: find((n, p) => p.type === 'url'),
-    count: find((n, p) => p.type === 'number' && /횟수|count|review/i.test(n))
-        || find((n, p) => p.type === 'number'),
-    difficulty,
-    difficultyType: difficulty ? props[difficulty].type : null,
-    difficultyOptions: difficulty ? opts(difficulty) : [],
-    progress,
-    progressType: progress ? props[progress].type : null,
-    progressOptions: progress ? opts(progress) : [],
   };
 }
 
@@ -149,12 +132,52 @@ function compactBlock(b) {
   if (Array.isArray(v.rich_text)) {
     const rich = richText(v.rich_text);
     if (!rich.some((x) => x.t)) return null; // 빈 줄
-    const out = { type, rich };
+    const out = { type, id: b.id, rich }; // id — 형광펜 토글을 Notion 블록에 되쓸 때 필요(PARSER_VERSION 3)
     if (type === 'to_do') out.checked = !!v.checked;
     if (type === 'code') out.language = v.language || null;
     return out;
   }
   return null;
+}
+
+/* ── 형광펜(인라인 코드 annotation) 토글 ──────────────────────
+   본문에서 드래그 선택한 구간의 code 여부를 뒤집는다. 이미 code인 부분과 아닌 부분이
+   섞여 있으면(예: 절반만 형광펜) "새로 칠하기"로 본다 — 이미 칠해진 부분은 그대로 두고
+   안 칠해진 부분만 칠한다(youtube_dual_subtitle 확장의 정책과 동일). 선택 전체가 이미
+   code 하나로 덮여 있을 때만 "지우기"로 본다. */
+function sliceRich(items, start, end) {
+  const before = [], middle = [], after = [];
+  let pos = 0;
+  for (const it of items) {
+    const runStart = pos, runEnd = pos + it.t.length;
+    pos = runEnd;
+    if (runEnd <= start) { before.push(it); continue; }
+    if (runStart >= end) { after.push(it); continue; }
+    const segs = [];
+    if (runStart < start) segs.push([runStart, start, before]);
+    const midS = Math.max(runStart, start), midE = Math.min(runEnd, end);
+    if (midS < midE) segs.push([midS, midE, middle]);
+    if (runEnd > end) segs.push([end, runEnd, after]);
+    for (const [s, e, bucket] of segs) {
+      const txt = it.t.slice(s - runStart, e - runStart);
+      if (txt) bucket.push({ ...it, t: txt });
+    }
+  }
+  return { before, middle, after };
+}
+function toggleCodeInRich(items, start, end) {
+  const { before, middle, after } = sliceRich(items, start, end);
+  if (!middle.length) return items;
+  const allCode = middle.every((it) => it.code);
+  const newMiddle = middle.map((it) => (allCode ? { ...it, code: false } : (it.code ? it : { ...it, code: true })));
+  return [...before, ...newMiddle, ...after].filter((it) => it.t.length);
+}
+function toNotionRichText(rich) {
+  return (rich || []).map((t) => ({
+    type: 'text',
+    text: { content: t.t, ...(t.href ? { link: { url: t.href } } : {}) },
+    annotations: { bold: !!t.bold, italic: !!t.italic, strikethrough: !!t.strike, underline: !!t.underline, code: !!t.code, color: 'default' },
+  }));
 }
 
 function plainOf(blk) {
@@ -189,7 +212,7 @@ const LATIN = /[A-Za-z]{2,}/;
 
 /**
  * 실측(21/21)한 본문 구조: [자막 문맥] → 「영어 + 한국어 뜻」 한 줄 → 해설 → 표.
- * 그 "한 줄"이 1단계 힌트가 된다 — 탭하면 전문(힌트+해설)이 바로 열린다.
+ * 그 "한 줄"이 1단계 힌트가 된다 — 화면엔 힌트+해설을 한 번에 이어 붙여 보여준다.
  */
 function splitBody(blocks) {
   let body = blocks.filter((b) => b && plainOf(b).trim());
@@ -232,8 +255,6 @@ async function loadPrevIndex(env, budget) {
 
 /**
  * 한 번 호출될 때마다 서브요청 예산만큼만 진행하고 커서를 KV에 남긴다.
- * sync:state가 들고 있는 것: 행 목록(가벼움) + 지금 채우는 중인 버킷 하나(최대 50장)
- * + 누적 인덱스(가벼움, ~100KB) + 이전 인덱스 맵(가벼움). "본문 전량"은 절대 안 들고 있는다.
  * 반환: { done, processed, total } — done이 false면 한 번 더 부르면 된다.
  */
 async function syncStep(env, token, dbId) {
@@ -243,10 +264,6 @@ async function syncStep(env, token, dbId) {
   // 새 동기화 시작 — 스키마 + 행 목록을 먼저 확보한다(카드 본문은 아직 안 읽음).
   if (!st) {
     const schema = await discoverSchema(token, dbId, budget);
-    // ⚠ 이 한 줄을 빼지 말 것 — writeGrade가 이 캐시를 그대로 믿는다. 2026-09-03 실측:
-    //   사용자가 `완료도`를 status→select로 바꾼 뒤에도 KV엔 옛 status 스키마가 남아 있었고,
-    //   채점 PATCH가 {status:{...}}로 나가 검증 실패 → 채점이 Notion에 조용히 유실됐다.
-    await kvPut(env, K_SCHEMA, JSON.stringify(schema), budget);
     const rows = [];
     let cursor;
     do {
@@ -296,15 +313,13 @@ async function syncStep(env, token, dbId) {
   }
 
   // 증분 재사용을 위한 이전 인덱스(제목·수정시각·버킷번호만) — 가볍고(~100KB) 유계라
-  // state에 계속 들고 있어도 안전하다(옛 설계가 문제였던 건 "본문 전량"을 들고 있던 것).
+  // state에 계속 들고 있어도 안전하다.
   if (!st.prevIndex) {
     st.prevIndex = await loadPrevIndex(env, budget);
   }
 
   // 증분: 수정되지 않은 행은 옛 버킷에서 그대로 복사해 Notion 본문을 다시 읽지 않는다.
-  // ⚠ 없으면 캐시가 낡을 때마다(6시간) 1300장을 통째로 다시 긁게 된다. 재저장된 카드는
-  //   pageId가 바뀌므로 옛 인덱스에 없어 자연히 새 카드로 잡힌다.
-  let curOldBucket = null; // {num, byId} — 이 호출 안에서만 쓰는 임시 캐시(연속 행이 같은 옛 버킷에 몰려 있어 재사용됨)
+  let curOldBucket = null; // {num, byId} — 이 호출 안에서만 쓰는 임시 캐시
   let reused = 0;
 
   try {
@@ -362,7 +377,6 @@ async function syncStep(env, token, dbId) {
       schema: st.schema, items: st.items, builtAt: new Date().toISOString(), parserVersion: PARSER_VERSION,
     }));
     await env.KV.delete(K_STATE);
-    await env.KV.delete(K_CARDS_OLD); // 옛 포맷 정리(있었다면)
   } else {
     await env.KV.put(K_STATE, JSON.stringify(st));
   }
@@ -371,126 +385,42 @@ async function syncStep(env, token, dbId) {
 
 const rt = (arr) => (arr || []).map((t) => t.plain_text || '').join('');
 
-/* ── 채점 기록 ───────────────────────────────────────────── */
+/* ── 챕터 구조 ───────────────────────────────────────────────
+   전체 카드를 생성일자 오름차순으로 정렬해 10장씩 소챕터, 10개 소챕터(=100장)씩
+   대챕터로 나눈다. 마지막 챕터/소챕터는 100/10장이 안 채워질 수 있다(의도된 동작,
+   나중에 처리 방식을 다시 볼 예정 — CLAUDE.md 참고). 게이트(잠금)는 없다 — 모든
+   챕터/소챕터는 처음부터 자유 열람, 점수는 순수 진행 현황판이다. */
 
-// 진도(완료도) 옵션 — 실측: 첫 옵션은 "0차"가 아니라 그냥 "0". step 0은 그 옵션으로.
-function progressOptionFor(options, step) {
-  if (step <= 0) return options.find((o) => o === '0') || options.find((o) => /^0/.test(o)) || null;
-  return options.find((o) => new RegExp('^' + Math.min(step, 3) + '차').test(o)) || null;
+function sortedByCreated(items) {
+  return [...items].sort((a, b) => new Date(a.created) - new Date(b.created));
+}
+function chunk(arr, size) {
+  const out = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+function buildChapters(items) {
+  const subs = chunk(sortedByCreated(items), SUB_SIZE);
+  return chunk(subs, CHAP_SIZE); // chaps[chapIdx][subIdxInChap] = 인덱스 항목 배열(최대 10)
+}
+function knownCountFor(items, known) {
+  return items.filter((it) => known[it.key]).length;
+}
+function parseSubId(id) {
+  const m = /^c(\d+)s(\d+)$/.exec(String(id || ''));
+  return m ? { chap: Number(m[1]), sub: Number(m[2]) } : null;
+}
+function parseChapId(id) {
+  const m = /^c(\d+)$/.exec(String(id || ''));
+  return m ? Number(m[1]) : null;
 }
 
-/* ── 하루 활동 로그(캘린더+오늘 스크러버용) ───────
-   "그날 표시된(본) 카드 키" 집합을 날짜순으로 KV에 쌓는다(순서 보존 — 스크러버가 방문
-   순서대로 점을 그려야 해서 배열이지 Set이 아니다). 트리거는 "채점"이 아니라 "화면에
-   표시"다(2026-09-04 실기기 테스트에서 발견 — 원래 UX 규약도 "본 개수"였는데 포팅 때
-   KV 쓰기 예산을 과하게 걱정해 "채점한 개수"로 잘못 좁혔었다). 걱정이 과했던 이유: 같은
-   카드를 하루에 여러 번 다시 봐도 키 중복 제거로 쓰기가 또 안 나간다 — 실제 쓰기 횟수는
-   "그날 처음 본 새 카드 수"만큼만 발생해서, 하루 200장을 봐도 200회로 무료 한도
-   (1,000회/일)에 전혀 안 걸린다. 되돌리기는 이 기록을 지우지 않는다 — "봤다"는 사실
-   자체는 안 되돌린다는 결정(CLAUDE.md UX 규약)과 일치. */
-const K_DAILY = 'daily:v1:'; // + YYYY-MM-DD(KST)
-
-function dayKeyKST(ms) {
-  const d = new Date(ms + 9 * 3600000); // UTC+9로 밀어서 그 날짜의 UTC 자정 기준 문자열을 뽑는다
-  return d.toISOString().slice(0, 10);
-}
-
-async function markSeenToday(env, key, atMs) {
-  const dk = K_DAILY + dayKeyKST(atMs);
-  const raw = await env.KV.get(dk);
-  const keys = raw ? JSON.parse(raw) : [];
-  if (!keys.includes(key)) {
-    keys.push(key);
-    await env.KV.put(dk, JSON.stringify(keys));
-  }
-  return keys.length;
-}
-
-// name === null이면 속성을 비운다(되돌리기가 "한 번도 채점 안 한 상태"로 복구할 때 씀).
-const optionPayload = (type, name) =>
-  name == null
-    ? (type === 'select' ? { select: null } : { status: null })
-    : (type === 'select' ? { select: { name } } : { status: { name } });
-
-/**
- * 채점 한 번 = 완료도(진도)를 클라이언트가 정한 목표 차수(step)로 직접 설정 + 복습 횟수 +1.
- * ⚠ 2026-09-04 UX 재설계로 "이해/애매/모름" 3단 채점이 폐지됐다 — 완료 버튼 탭은 항상
- *   n+1(step=min(현재+1,3)), 롱프레스는 임의 차수로 텔레포트. 어느 쪽이든 클라이언트가
- *   최종 목표 step을 계산해 보내고, 서버는 그 값을 그대로 반영한다(증감 로직 없음).
- *   "몰랐다/틀렸다" 신호가 없어졌으므로 상태(난이도) 컬럼은 더 이상 채점에서 건드리지 않는다.
- * ⚠ 횟수(n)와 차수(step)는 별개 축 — 텔레포트로 차수만 바꿔도 n은 그대로 +1 된다(그
- *   순간도 "봤다"로 치는 것).
- */
-async function writeGrade(env, token, dbId, { pageId, key, step }) {
-  const at = Date.now();
-  // 1) KV — 진실의 원본. pageId가 churn해도 제목 키로 살아남는다.
-  const all = JSON.parse((await env.KV.get(K_GRADES)) || '{}');
-  const prev = all[key] || { n: 0, step: 0 };
-  const n = prev.n + 1;
-  all[key] = { n, step, at };
-  await env.KV.put(K_GRADES, JSON.stringify(all));
-
-  // 1-b) 오늘 활동 로그 — 캘린더가 읽는 원본(위 markSeenToday 참조).
-  await markSeenToday(env, key, at);
-
-  // 2) Notion — best effort. 실패해도 채점은 이미 KV에 남았으므로 안전 퇴화.
-  let notionOk = false;
-  try {
-    let schema = JSON.parse((await env.KV.get(K_SCHEMA)) || 'null');
-    if (!schema) {
-      schema = await discoverSchema(token, dbId);
-      await env.KV.put(K_SCHEMA, JSON.stringify(schema));
-    }
-    const props = {};
-    if (schema.count) props[schema.count] = { number: n };
-    if (schema.progress) {
-      const opt = progressOptionFor(schema.progressOptions, step);
-      if (opt) props[schema.progress] = optionPayload(schema.progressType, opt);
-    }
-    if (Object.keys(props).length) {
-      await notion(token, `/pages/${pageId}`, { method: 'PATCH', body: JSON.stringify({ properties: props }) });
-      notionOk = true;
-    }
-  } catch (e) { /* 삼키고 notionOk:false로 정직하게 알린다 */ }
-
-  return { ok: true, n, step, notionOk };
-}
-
-/**
- * 되돌리기 — 이동+채점 통합 히스토리에서 스택 팝 한 건씩(다단계, 클라이언트가 스택을 들고
- * 연속 호출). "잘못 매긴 채점 복구"가 목적이라 복습 횟수(n)까지 되돌린다 — writeGrade의
- * "횟수는 단조증가" 원칙의 유일한 예외. prev가 null이면 "한 번도 채점 안 한 상태"로 복구.
- * ⚠ 오늘 활동 로그(daily:v1:*)는 되돌리지 않는다 — "봤다"는 사실 자체는 안 되돌린다는
- *   결정(CLAUDE.md UX 규약, 2026-09-04)과 일치.
- */
-async function undoGrade(env, token, dbId, { pageId, key, prev }) {
-  const all = JSON.parse((await env.KV.get(K_GRADES)) || '{}');
-  if (prev) all[key] = { n: prev.n, step: prev.step, at: Date.now() };
-  else delete all[key];
-  await env.KV.put(K_GRADES, JSON.stringify(all));
-
-  const n = prev ? prev.n : 0;
-  const step = prev ? prev.step : 0;
-  let notionOk = false;
-  try {
-    let schema = JSON.parse((await env.KV.get(K_SCHEMA)) || 'null');
-    if (!schema) {
-      schema = await discoverSchema(token, dbId);
-      await env.KV.put(K_SCHEMA, JSON.stringify(schema));
-    }
-    const props = {};
-    if (schema.count) props[schema.count] = { number: n };
-    if (schema.progress) {
-      const opt = progressOptionFor(schema.progressOptions, step);
-      if (opt) props[schema.progress] = optionPayload(schema.progressType, opt);
-    }
-    if (Object.keys(props).length) {
-      await notion(token, `/pages/${pageId}`, { method: 'PATCH', body: JSON.stringify({ properties: props }) });
-      notionOk = true;
-    }
-  } catch (e) { /* 삼키고 notionOk:false로 정직하게 알린다 */ }
-
-  return { ok: true, n, step, notionOk };
+async function loadKnownAndBest(env) {
+  const known = JSON.parse((await env.KV.get(K_KNOWN)) || '{}');
+  const best = JSON.parse((await env.KV.get(K_BEST)) || '{}');
+  if (!best.sub) best.sub = {};
+  if (!best.chap) best.chap = {};
+  return { known, best };
 }
 
 /* ── 라우팅 ──────────────────────────────────────────────── */
@@ -498,45 +428,80 @@ async function undoGrade(env, token, dbId, { pageId, key, prev }) {
 const json = (o, status = 200) =>
   new Response(JSON.stringify(o), { status, headers: { 'Content-Type': 'application/json; charset=utf-8' } });
 
-/**
- * 뽑기: 생성일자 오름차순(오래된 것부터) 그대로 — 사용자가 Notion에서 쓰던 방식과
- * 동일(2026-09-04 결정, 완료도 0/복습 구분·가중치 전부 폐기). `after`(마지막으로 받은
- * 카드의 created)를 기준으로 그다음 지점부터 이어서 n개를 뽑고, 끝에 닿으면 처음으로
- * 되감는다(고리형 — 기존 덱 순환 방식과 동일한 정신).
- */
-function pickByDate(items, n, after) {
-  const sorted = [...items].sort((a, b) => new Date(a.created) - new Date(b.created));
-  if (!sorted.length) return [];
-  let start = 0;
-  if (after) {
-    const afterMs = new Date(after).getTime();
-    start = sorted.findIndex((it) => new Date(it.created).getTime() > afterMs);
-    if (start === -1) start = 0; // 끝까지 다 왔으면 처음으로
-  }
-  const out = [];
-  for (let i = 0; i < n && i < sorted.length; i++) out.push(sorted[(start + i) % sorted.length]);
-  return out;
-}
-
-async function handleCards(env, url) {
-  const n = Math.min(Math.max(parseInt(url.searchParams.get('n') || '8', 10) || 8, 1), 30);
-  const after = url.searchParams.get('after') || null;
+async function handleChapters(env) {
   const idxRaw = await env.KV.get(K_INDEX);
-  const grades = JSON.parse((await env.KV.get(K_GRADES)) || '{}');
   const st = JSON.parse((await env.KV.get(K_STATE)) || 'null');
-  const syncing = !!st;
-
-  if (!idxRaw) {
-    return json({
-      cards: [], total: 0, syncing: true,
-      progress: st ? { processed: st.i, total: st.rows.length } : null,
-    }, 202);
-  }
+  if (!idxRaw) return json({ chapters: [], total: 0, syncing: true, progress: st ? { processed: st.i, total: st.rows.length } : null }, 202);
 
   const idx = JSON.parse(idxRaw);
-  const candidates = pickByDate(idx.items, n, after);
+  const { known, best } = await loadKnownAndBest(env);
+  const chaps = buildChapters(idx.items);
+
+  let pos = 0;
+  const chapters = chaps.map((subs, ci) => {
+    const items = subs.flat();
+    const id = 'c' + ci;
+    const start = pos + 1;
+    pos += items.length;
+    return { id, start, end: pos, total: items.length, current: knownCountFor(items, known), best: best.chap[id] || 0 };
+  });
+
+  return json({ chapters, total: idx.items.length, syncing: !!st, builtAt: idx.builtAt });
+}
+
+async function handleChapterDetail(env, chapId) {
+  const ci = parseChapId(chapId);
+  if (ci == null) return json({ error: 'bad id' }, 400);
+  const idxRaw = await env.KV.get(K_INDEX);
+  if (!idxRaw) return json({ error: '동기화 중' }, 202);
+
+  const idx = JSON.parse(idxRaw);
+  const { known, best } = await loadKnownAndBest(env);
+  const chaps = buildChapters(idx.items);
+  const subsInChap = chaps[ci];
+  if (!subsInChap) return json({ error: 'not found' }, 404);
+
+  let pos = 0;
+  for (let k = 0; k < ci; k++) pos += chaps[k].flat().length; // 이 챕터 시작 위치
+
+  const chapId2 = 'c' + ci;
+  const chapItems = subsInChap.flat();
+  const subchapters = [];
+  for (let si = 0; si < subsInChap.length; si++) {
+    const items = subsInChap[si];
+    const subId = chapId2 + 's' + si;
+    const start = pos + 1;
+    pos += items.length;
+    subchapters.push({
+      id: subId, start, end: pos, total: items.length,
+      current: knownCountFor(items, known), best: best.sub[subId] || 0,
+      cards: items.map((it) => ({ key: it.key, front: it.front, known: !!known[it.key] })),
+    });
+  }
+
+  return json({
+    id: chapId2, total: chapItems.length,
+    current: knownCountFor(chapItems, known), best: best.chap[chapId2] || 0,
+    subchapters,
+  });
+}
+
+// 학습·시험 공용 — 소챕터 카드의 전체 본문을 반환한다(카드 10장뿐이라 미리 다 실어 보내도
+// 가볍다 — 시험 중 "안다" 리빌 때마다 다시 불러올 필요가 없다).
+async function handleSubchapter(env, subId, mode) {
+  const parsed = parseSubId(subId);
+  if (!parsed) return json({ error: 'bad id' }, 400);
+  const idxRaw = await env.KV.get(K_INDEX);
+  if (!idxRaw) return json({ error: '동기화 중' }, 202);
+
+  const idx = JSON.parse(idxRaw);
+  const chaps = buildChapters(idx.items);
+  const items = chaps[parsed.chap]?.[parsed.sub];
+  if (!items) return json({ error: 'not found' }, 404);
+
+  const { known } = await loadKnownAndBest(env);
   const byBucket = new Map();
-  for (const it of candidates) {
+  for (const it of items) {
     if (!byBucket.has(it.bucket)) byBucket.set(it.bucket, []);
     byBucket.get(it.bucket).push(it.id);
   }
@@ -544,109 +509,131 @@ async function handleCards(env, url) {
   for (const [num, ids] of byBucket) {
     const raw = await env.KV.get(K_BUCKET + num);
     if (!raw) continue;
-    for (const c of JSON.parse(raw).cards) {
-      if (ids.includes(c.id)) byId.set(c.id, { ...c, step: grades[c.key]?.step || 0, n: grades[c.key]?.n || 0 });
-    }
+    for (const c of JSON.parse(raw).cards) if (ids.includes(c.id)) byId.set(c.id, c);
   }
-  // 버킷별로 묶어 읽었으니 candidates(날짜순)를 기준으로 다시 순서를 맞춘다.
-  const cards = candidates.map((it) => byId.get(it.id)).filter(Boolean);
+  let cards = items.map((it) => ({ ...(byId.get(it.id) || {}), id: it.id, key: it.key, front: it.front, url: it.url, created: it.created, known: !!known[it.key] }));
+  if (mode === 'unknown') cards = cards.filter((c) => !c.known);
+
+  return json({ id: subId, cards });
+}
+
+// 시험 정답 기록 — 소챕터·대챕터의 현재 점수를 다시 계산하고, 최고기록을 필요하면 올린다
+// (단조증가 — 나중에 다시 도전해서 점수가 낮아져도 최고기록은 안 내려간다).
+async function handleAnswer(env, body) {
+  const { subId, key, know } = body || {};
+  if (!subId || !key || typeof know !== 'boolean') return json({ error: 'subId/key/know 필요' }, 400);
+  const parsed = parseSubId(subId);
+  if (!parsed) return json({ error: 'bad subId' }, 400);
+
+  const idxRaw = await env.KV.get(K_INDEX);
+  if (!idxRaw) return json({ error: '동기화 중' }, 202);
+  const idx = JSON.parse(idxRaw);
+  const chaps = buildChapters(idx.items);
+  const subItems = chaps[parsed.chap]?.[parsed.sub];
+  if (!subItems) return json({ error: 'not found' }, 404);
+  const chapItems = chaps[parsed.chap].flat();
+
+  const { known, best } = await loadKnownAndBest(env);
+  if (know) known[key] = true; else delete known[key];
+  await env.KV.put(K_KNOWN, JSON.stringify(known));
+
+  const chapId = 'c' + parsed.chap;
+  const subScore = knownCountFor(subItems, known);
+  const chapScore = knownCountFor(chapItems, known);
+  best.sub[subId] = Math.max(best.sub[subId] || 0, subScore);
+  best.chap[chapId] = Math.max(best.chap[chapId] || 0, chapScore);
+  await env.KV.put(K_BEST, JSON.stringify(best));
 
   return json({
-    cards,
-    total: idx.items.length,
-    builtAt: idx.builtAt,
-    syncing,
-    progress: st ? { processed: st.i, total: st.rows.length } : null,
+    ok: true,
+    sub: { id: subId, current: subScore, best: best.sub[subId], total: subItems.length },
+    chap: { id: chapId, current: chapScore, best: best.chap[chapId], total: chapItems.length },
   });
 }
 
-// 모아보기 — 가벼운 전체 목록(본문 없음, 제목·차수만). 1,323장이 약 100KB라 통째로 내려도 된다.
-async function handleIndex(env) {
+// 본문에서 드래그 선택한 예문을 카드 제목(=노션 이름 속성)으로 바꾼다. 원본 DB가
+// AI 질의응답 기준으로 만들어져 있어(단어만 있거나, 한글 질문이 그대로 제목이 된 행이
+// 섞여 있음) 노션에서 1,323건을 손으로 고치는 대신 앱 쓰다가 그때그때 고치자는 결정
+// (2026-09-05). 미러가 아니라 원본 자체를 고치는 것 — 되돌리기 없음(오타 교정이라
+// 신중하게 한 번에 하는 걸 전제, 잘못 고쳤으면 다시 드래그해서 고치면 됨).
+async function handleRetitle(env, token, body) {
+  const { pageId, oldKey, newTitle } = body || {};
+  const title = String(newTitle || '').trim();
+  if (!pageId || !oldKey || !title) return json({ error: 'pageId/oldKey/newTitle 필요' }, 400);
+
   const idxRaw = await env.KV.get(K_INDEX);
-  const st = JSON.parse((await env.KV.get(K_STATE)) || 'null');
-  if (!idxRaw) {
-    return json({ items: [], total: 0, syncing: true, progress: st ? { processed: st.i, total: st.rows.length } : null }, 202);
-  }
+  if (!idxRaw) return json({ error: '동기화 중' }, 202);
   const idx = JSON.parse(idxRaw);
-  const grades = JSON.parse((await env.KV.get(K_GRADES)) || '{}');
-  const items = idx.items.map((it) => {
-    const g = grades[it.key];
-    return { id: it.id, key: it.key, front: it.front, step: g?.step || 0, n: g?.n || 0, lastAt: g?.at || null };
-  });
-  return json({
-    items, total: items.length, builtAt: idx.builtAt, syncing: !!st,
-    progress: st ? { processed: st.i, total: st.rows.length } : null,
-  });
+  const item = idx.items.find((it) => it.id === pageId);
+  if (!item) return json({ error: 'not found' }, 404);
+
+  const newKey = cardKey(title);
+
+  // 1) Notion — 제목(이름) 속성 자체를 고친다. 실패해도 로컬은 진행(마찰 최소화 —
+  //    화면엔 바로 반영돼야 함), notionOk로 정직하게 알린다.
+  let notionOk = false;
+  if (idx.schema?.title && token) {
+    try {
+      await notion(token, `/pages/${pageId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ properties: { [idx.schema.title]: { title: [{ text: { content: title } }] } } }),
+      });
+      notionOk = true;
+    } catch (e) { /* 삼키고 notionOk:false로 정직하게 알린다 */ }
+  }
+
+  // 2) 인덱스 + 3) 해당 버킷의 카드 갱신
+  item.front = title; item.key = newKey;
+  await env.KV.put(K_INDEX, JSON.stringify(idx));
+  const raw = await env.KV.get(K_BUCKET + item.bucket);
+  if (raw) {
+    const bucket = JSON.parse(raw);
+    const card = bucket.cards.find((c) => c.id === pageId);
+    if (card) { card.front = title; card.key = newKey; await env.KV.put(K_BUCKET + item.bucket, JSON.stringify(bucket)); }
+  }
+
+  // 4) 이미 "안다"로 판정돼 있었다면 새 키로 이어받는다(표기만 바뀐 같은 카드이므로).
+  const { known } = await loadKnownAndBest(env);
+  if (known[oldKey]) { delete known[oldKey]; known[newKey] = true; await env.KV.put(K_KNOWN, JSON.stringify(known)); }
+
+  return json({ ok: true, key: newKey, front: title, notionOk });
 }
 
-// 모아보기에서 카드 하나를 되짚어볼 때만 쓰는 단건 조회(id로 버킷을 찾아 그 카드만 반환).
-async function handleCard(env, id) {
+// 형광펜 토글 — 본문 블록(hint 또는 detail[i])의 rich-text에서 [start,end) 구간의 code
+// 여부를 뒤집고, KV(버킷)와 Notion 블록(진짜 원본, 미러 아님) 양쪽에 반영한다.
+async function handleHighlight(env, token, body) {
+  const { pageId, field, blockIndex, start, end } = body || {};
+  if (!pageId || (field !== 'hint' && field !== 'detail') || typeof start !== 'number' || typeof end !== 'number' || start >= end) {
+    return json({ error: 'pageId/field/start/end 필요' }, 400);
+  }
   const idxRaw = await env.KV.get(K_INDEX);
-  if (!idxRaw) return json({ error: '아직 동기화 안 됨' }, 404);
+  if (!idxRaw) return json({ error: '동기화 중' }, 202);
   const idx = JSON.parse(idxRaw);
-  const item = idx.items.find((it) => it.id === id);
+  const item = idx.items.find((it) => it.id === pageId);
   if (!item) return json({ error: 'not found' }, 404);
   const raw = await env.KV.get(K_BUCKET + item.bucket);
-  const card = raw ? JSON.parse(raw).cards.find((c) => c.id === id) : null;
+  if (!raw) return json({ error: 'not found' }, 404);
+  const bucket = JSON.parse(raw);
+  const card = bucket.cards.find((c) => c.id === pageId);
   if (!card) return json({ error: 'not found' }, 404);
-  const grades = JSON.parse((await env.KV.get(K_GRADES)) || '{}');
-  const g = grades[card.key];
-  return json({ ...card, step: g?.step || 0, n: g?.n || 0 });
-}
 
-// 카드가 화면에 표시될 때마다 클라이언트가 부른다(채점과 무관) — 오늘 카운터+캘린더+
-// 하단 스크러버의 원본. 같은 카드를 다시 봐도 markSeenToday가 중복 제거하므로 매번 불러도 안전.
-async function handleSeen(env, body) {
-  if (!body.key) return json({ error: 'key 필요' }, 400);
-  const count = await markSeenToday(env, body.key, Date.now());
-  return json({ ok: true, count });
-}
+  const block = field === 'hint' ? card.hint : card.detail?.[blockIndex];
+  if (!block || !Array.isArray(block.rich)) return json({ error: '이 블록은 형광펜을 지원 안 함' }, 400);
 
-// 되돌리기가 "봤다"는 사실 자체까지 취소할 때 부른다(2026-09-04 실기기 피드백으로 결정
-// 뒤집음 — 예전엔 되돌리기가 오늘 카운트는 안 건드렸는데, 그 방향으로 가면 "5개 보고
-// 마지막 걸 되돌렸는데 오늘 카운트가 그대로 5"인 게 부자연스럽다는 지적). 클라이언트가
-// 이 카드의 오늘 첫 조회가 이번 되돌리기 대상이 맞다고 판단했을 때만 부른다 — 그날 다른
-// 경로로 이미 한 번 더 본 카드까지 지우면 안 되므로, 판단은 클라이언트의 히스토리 스택이
-// 한다(요청 자체는 그냥 이 카드를 오늘 목록에서 뺀다).
-async function handleUnseen(env, body) {
-  if (!body.key) return json({ error: 'key 필요' }, 400);
-  const dk = K_DAILY + dayKeyKST(Date.now());
-  const raw = await env.KV.get(dk);
-  const keys = raw ? JSON.parse(raw) : [];
-  const next = keys.filter((k) => k !== body.key);
-  if (next.length !== keys.length) await env.KV.put(dk, JSON.stringify(next));
-  return json({ ok: true, count: next.length });
-}
+  block.rich = toggleCodeInRich(block.rich, start, end);
+  await env.KV.put(K_BUCKET + item.bucket, JSON.stringify(bucket));
 
-// 하단 시트 캘린더 — 최근 N일(기본 28)의 날짜별 활동 개수. 하루 1건씩 KV 읽기라
-// N=28이면 28회, 요청당 50회 상한 안쪽이라 여유 있다.
-async function handleCalendar(env, url) {
-  const days = Math.min(Math.max(parseInt(url.searchParams.get('days') || '28', 10) || 28, 1), 42);
-  const now = Date.now();
-  const out = [];
-  for (let i = days - 1; i >= 0; i--) {
-    const date = dayKeyKST(now - i * 86400000);
-    const raw = await env.KV.get(K_DAILY + date);
-    out.push({ date, count: raw ? JSON.parse(raw).length : 0 });
+  let notionOk = false;
+  if (block.id && token) {
+    try {
+      const payload = { [block.type]: { rich_text: toNotionRichText(block.rich) } };
+      if (block.type === 'to_do') payload.to_do.checked = !!block.checked;
+      await notion(token, `/blocks/${block.id}`, { method: 'PATCH', body: JSON.stringify(payload) });
+      notionOk = true;
+    } catch (e) { /* 삼키고 notionOk:false로 정직하게 알린다 */ }
   }
-  return json({ days: out });
-}
 
-// 캘린더에서 특정 날짜를 눌렀을 때 — 그날 채점된 카드 목록(제목·차수만, 모아보기와 동일 모양).
-async function handleDay(env, date) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '')) return json({ error: 'date 형식 오류(YYYY-MM-DD)' }, 400);
-  const raw = await env.KV.get(K_DAILY + date);
-  const keys = raw ? JSON.parse(raw) : [];
-  if (!keys.length) return json({ items: [] });
-  const idxRaw = await env.KV.get(K_INDEX);
-  if (!idxRaw) return json({ items: [] });
-  const idx = JSON.parse(idxRaw);
-  const byKey = new Map(idx.items.map((it) => [it.key, it]));
-  const grades = JSON.parse((await env.KV.get(K_GRADES)) || '{}');
-  const items = keys.map((k) => byKey.get(k)).filter(Boolean).map((it) => ({
-    id: it.id, key: it.key, front: it.front, step: grades[it.key]?.step || 0,
-  }));
-  return json({ items });
+  return json({ ok: true, card, notionOk });
 }
 
 export default {
@@ -654,17 +641,19 @@ export default {
     const url = new URL(request.url);
     const { NOTION_TOKEN: token, NOTION_DB_ID: dbId } = env;
 
-    if (url.pathname === '/api/cards') return handleCards(env, url);
-    if (url.pathname === '/api/index') return handleIndex(env);
-    if (url.pathname === '/api/card') return handleCard(env, url.searchParams.get('id') || '');
-    if (url.pathname === '/api/calendar') return handleCalendar(env, url);
-    if (url.pathname === '/api/day') return handleDay(env, url.searchParams.get('date') || '');
-    if (url.pathname === '/api/seen' && request.method === 'POST') {
-      try { return await handleSeen(env, await request.json()); }
+    if (url.pathname === '/api/chapters') return handleChapters(env);
+    if (url.pathname === '/api/chapter') return handleChapterDetail(env, url.searchParams.get('id') || '');
+    if (url.pathname === '/api/subchapter') return handleSubchapter(env, url.searchParams.get('id') || '', url.searchParams.get('mode') || 'all');
+    if (url.pathname === '/api/answer' && request.method === 'POST') {
+      try { return await handleAnswer(env, await request.json()); }
       catch (e) { return json({ error: String(e.message || e) }, 500); }
     }
-    if (url.pathname === '/api/unseen' && request.method === 'POST') {
-      try { return await handleUnseen(env, await request.json()); }
+    if (url.pathname === '/api/retitle' && request.method === 'POST') {
+      try { return await handleRetitle(env, token, await request.json()); }
+      catch (e) { return json({ error: String(e.message || e) }, 500); }
+    }
+    if (url.pathname === '/api/highlight' && request.method === 'POST') {
+      try { return await handleHighlight(env, token, await request.json()); }
       catch (e) { return json({ error: String(e.message || e) }, 500); }
     }
 
@@ -673,17 +662,6 @@ export default {
       if (url.searchParams.get('restart') === '1') await env.KV.delete(K_STATE);
       try { return json(await syncStep(env, token, dbId)); }
       catch (e) { return json({ error: String(e.message || e) }, 502); }
-    }
-
-    if (url.pathname === '/api/grade' && request.method === 'POST') {
-      if (!token || !dbId) return json({ error: 'NOTION_TOKEN / NOTION_DB_ID 미설정' }, 500);
-      try {
-        const body = await request.json();
-        if (!body.key) return json({ error: 'key 필요' }, 400);
-        if (body.undo) return json(await undoGrade(env, token, dbId, body));
-        if (typeof body.step !== 'number') return json({ error: 'step 필요(목표 차수 0~3)' }, 400);
-        return json(await writeGrade(env, token, dbId, body));
-      } catch (e) { return json({ error: String(e.message || e) }, 500); }
     }
 
     return env.ASSETS.fetch(request);
