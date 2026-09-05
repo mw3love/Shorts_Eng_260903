@@ -254,7 +254,7 @@
   .sheetback.on{opacity:1;pointer-events:auto}
   .sheet{
     position:fixed;left:0;right:0;bottom:0;max-width:520px;margin:0 auto;z-index:11;
-    background:var(--ink2);border-radius:18px 18px 0 0;max-height:42dvh;display:flex;flex-direction:column;
+    background:var(--ink2);border-radius:18px 18px 0 0;max-height:58dvh;display:flex;flex-direction:column;
     transform:translateY(100%);transition:transform .26s cubic-bezier(.2,.7,.3,1);
     padding-bottom:env(safe-area-inset-bottom);box-shadow:0 -8px 30px rgba(0,0,0,.4);
   }
@@ -289,7 +289,7 @@
   .chaprow-score .best{display:block;font-size:11px;font-weight:400;color:var(--coral);margin-top:1px}
   .chaprow-bar{height:5px;border-radius:3px;background:var(--ink4);overflow:hidden}
   .chaprow-bar i{display:block;height:100%;background:var(--coral);border-radius:3px}
-  .chaprow-exam{align-self:flex-start;background:var(--ink4);border:0;border-radius:9px;color:var(--coral);font-family:var(--sans);font-size:11.5px;padding:7px 10px;cursor:pointer}
+  .chaprow-exam{flex:none;white-space:nowrap;background:var(--ink4);border:0;border-radius:9px;color:var(--coral);font-family:var(--sans);font-size:11px;padding:6px 9px;cursor:pointer}
   .trashsec{padding:4px 16px 18px}
   .trashtoggle{width:100%;background:none;border:0;color:var(--muted);font-family:var(--sans);font-size:12.5px;padding:10px 2px;cursor:pointer;text-align:left}
   .trashrow{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--ink3);border-radius:10px;padding:10px 12px;margin-top:6px}
@@ -299,7 +299,7 @@
   .trashrow .ta button.del{color:var(--coral)}
   /* 폰트 슬라이더는 스크롤 영역 밖·시트 맨 아래 고정 — 엄지에 가장 가깝고, 챕터 목록을
      아무리 스크롤해도 자리가 안 변한다(2026-09-05 사용자 선택). */
-  .sheetsettings{flex:none;padding:8px 18px 6px;display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--ink3)}
+  .sheetsettings{flex:none;padding:10px 18px 8px;display:flex;flex-direction:column;gap:20px;border-top:1px solid var(--ink3)}
   .sliderow{display:flex;align-items:center;gap:10px}
   .sliderow label{flex:none;width:38px;font-family:var(--mono);font-size:11px;color:var(--muted)}
   .sliderow input[type="range"]{flex:1;-webkit-appearance:none;appearance:none;height:6px;border-radius:999px;outline:none;background:linear-gradient(to right,var(--coral) 0%,var(--coral) var(--fill,50%),var(--ink4) var(--fill,50%),var(--ink4) 100%)}
@@ -396,6 +396,7 @@
   <div class="sheethandle"><button class="sheetclose" id="sheetClose" aria-label="닫기">&#10005;</button></div>
   <div class="sheetscroll">
     <div class="chaplist" id="chapList"></div>
+    <div class="trashsec" id="archiveSec"></div>
     <div class="trashsec" id="trashSec"></div>
   </div>
   <div class="sheetsettings">
@@ -539,9 +540,11 @@ function apiPostKey(path, key, pageId){
     .then((r) => r.json()).catch(() => null);
 }
 const apiArchive = (key, pageId) => apiPostKey('/api/archive', key, pageId);
+const apiArchiveRestore = (key, pageId) => apiPostKey('/api/archive/restore', key, pageId);
 const apiTrash = (key, pageId) => apiPostKey('/api/trash', key, pageId);
 const apiTrashRestore = (key, pageId) => apiPostKey('/api/trash/restore', key, pageId);
 const apiTrashDelete = (key) => apiPostKey('/api/trash/delete', key);
+async function apiArchiveList(){ const r = await fetch('/api/archive'); return r.json(); }
 async function apiTrashList(){ const r = await fetch('/api/trash'); return r.json(); }
 async function apiRetitle(pageId, oldKey, newTitle){
   const r = await fetch('/api/retitle', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pageId, oldKey, newTitle }) });
@@ -1273,6 +1276,7 @@ $('sheetClose').addEventListener('click', closeSheet);
 function openSheet(){
   $('sheet').classList.add('on'); $('sheetback').classList.add('on');
   renderChapList();
+  renderArchiveToggle();
   renderTrashToggle();
 }
 function closeSheet(){ $('sheet').classList.remove('on'); $('sheetback').classList.remove('on'); }
@@ -1285,9 +1289,9 @@ async function renderChapList(){
     const pct = c.total ? Math.round(c.current / c.total * 100) : 0;
     return '<div class="chaprow" data-idx="' + i + '" data-id="' + esc(c.id) + '" data-act="go">'
       + '<div class="chaprow-top"><span class="chaprow-label"><b>챕터 ' + (i + 1) + '</b><span class="chaprow-range">' + c.start + '~' + c.end + '</span></span>'
+      + '<button class="chaprow-exam" data-act="exam">전체시험</button>'
       + '<span class="chaprow-score">' + c.current + '/' + c.total + '<span class="best">최고 ' + c.best + '</span></span></div>'
       + '<div class="chaprow-bar"><i style="width:' + pct + '%"></i></div>'
-      + '<button class="chaprow-exam" data-act="exam">전체시험(' + c.total + '문제)</button>'
       + '</div>';
   }).join('');
 }
@@ -1305,6 +1309,37 @@ $('chapList').addEventListener('click', (e) => {
     enterChapterExam(id);
   }
 });
+
+/* ── 보관함(완전히 앎, 시트 하단) — 휴지통과 같은 모양, "완전삭제" 개념이 없어 복구만. ──
+   보관은 롱프레스 한 번으로 로테이션에서 영구히 빠지는데 되돌릴 길이 없었다(2026-09-06
+   사용자 요청 — 실수로 누르거나 마음이 바뀌었을 때 대비). */
+let archiveOpen = false;
+async function renderArchiveToggle(){
+  const data = await apiArchiveList().catch(() => ({ items: [] }));
+  const n = (data.items || []).length;
+  $('archiveSec').innerHTML = '<button class="trashtoggle" id="archiveToggleBtn">🎓 완전히 앎 (' + n + ')' + (archiveOpen ? ' ▲' : ' ▼') + '</button><div id="archiveList"></div>';
+  $('archiveToggleBtn').addEventListener('click', () => { archiveOpen = !archiveOpen; renderArchiveToggle().then(() => { if (archiveOpen) renderArchiveList(data.items); }); });
+  if (archiveOpen) renderArchiveList(data.items);
+}
+function renderArchiveList(items){
+  const el = $('archiveList');
+  if (!items.length){ el.innerHTML = '<div style="padding:10px 2px;color:var(--muted);font-size:12.5px">비어 있음</div>'; return; }
+  el.innerHTML = items.map((it) => '<div class="trashrow" data-key="' + esc(it.key) + '">'
+    + '<span class="tf">' + esc(it.front) + '</span>'
+    + '<div class="ta"><button data-act="restore">복구</button></div>'
+    + '</div>').join('');
+  el.querySelectorAll('[data-act]').forEach((btn) => btn.addEventListener('click', async () => {
+    const key = btn.closest('.trashrow').dataset.key;
+    const item = items.find((it) => it.key === key);
+    await apiArchiveRestore(key, item && item.id);
+    // 트래시 복구(위)와 같은 이유로 캐시를 지운다 — subchapterAll/subCache에 남은
+    // archived:true 때문에 앱에서 안 보이는 걸 막는다.
+    subCache.clear();
+    const entry = currentSubEntry(key);
+    if (entry){ entry.archived = false; applyFilter(); }
+    renderArchiveToggle();
+  }));
+}
 
 /* ── 휴지통(시트 하단) — 접혀 있다가 누르면 목록이 펼쳐짐. 복구/완전삭제 둘 다 여기서. ── */
 let trashOpen = false;

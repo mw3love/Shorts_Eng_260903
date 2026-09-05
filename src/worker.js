@@ -700,27 +700,44 @@ async function handleTrash(env, token, dbId, body) {
   return json({ ok: true, notionOk });
 }
 
-async function handleTrashList(env) {
-  const trashed = JSON.parse((await env.KV.get(K_TRASHED)) || '{}');
-  const keys = Object.keys(trashed);
-  if (!keys.length) return json({ items: [] });
+// 보관/휴지통 둘 다 "숨김 플래그 하나 + 목록 조회 + 복구" 모양이 완전히 같아 공유한다.
+async function listFlagged(env, flagKey) {
+  const flagged = JSON.parse((await env.KV.get(flagKey)) || '{}');
+  const keys = Object.keys(flagged);
+  if (!keys.length) return [];
   const idxRaw = await env.KV.get(K_INDEX);
-  if (!idxRaw) return json({ items: [] });
+  if (!idxRaw) return [];
   const idx = JSON.parse(idxRaw);
   const byKey = new Map(idx.items.map((it) => [it.key, it]));
-  const items = keys.map((k) => byKey.get(k)).filter(Boolean).map((it) => ({ key: it.key, front: it.front, id: it.id }));
-  return json({ items });
+  return keys.map((k) => byKey.get(k)).filter(Boolean).map((it) => ({ key: it.key, front: it.front, id: it.id }));
 }
+async function unflagAndReset(env, token, dbId, flagKey, key, pageId) {
+  const flagged = JSON.parse((await env.KV.get(flagKey)) || '{}');
+  delete flagged[key];
+  await env.KV.put(flagKey, JSON.stringify(flagged));
+  // 보관/휴지통을 보낼 때 각각 '완전히 앎'/'휴지통'을 썼으니 복구할 때도 되돌려야 한다
+  // (2026-09-06 라운드12에서 트래시 쪽만 새로 쓰고 이 대칭을 놓쳤던 것을 실기기 피드백으로
+  // 발견·수정 — 보관 쪽 복구 기능을 새로 추가하면서 처음부터 대칭을 맞춘다).
+  return writeReviewStatus(env, token, dbId, pageId, '미확인');
+}
+
+async function handleTrashList(env) { return json({ items: await listFlagged(env, K_TRASHED) }); }
+async function handleArchiveList(env) { return json({ items: await listFlagged(env, K_ARCHIVED) }); }
 
 async function handleTrashRestore(env, token, dbId, body) {
   const { key, pageId } = body || {};
   if (!key) return json({ error: 'key 필요' }, 400);
-  const trashed = JSON.parse((await env.KV.get(K_TRASHED)) || '{}');
-  delete trashed[key];
-  await env.KV.put(K_TRASHED, JSON.stringify(trashed));
-  // 휴지통 보낼 때 '휴지통'을 썼으니 되돌릴 때도 되돌려야 한다 — 2026-09-06 라운드12에서
-  // handleTrash()만 새로 쓰고 이 대칭을 놓쳤던 것을 실기기 피드백으로 발견·수정.
-  const notionOk = await writeReviewStatus(env, token, dbId, pageId, '미확인');
+  const notionOk = await unflagAndReset(env, token, dbId, K_TRASHED, key, pageId);
+  return json({ ok: true, notionOk });
+}
+// 보관("완전히 앎")도 휴지통과 같은 방식으로 복구 가능하게 한다(2026-09-06, 사용자 요청 —
+// 롱프레스로 보관을 잘못 누르거나 마음이 바뀌었을 때 되돌릴 길이 없었다). known 플래그는
+// 안 건드린다 — 이 앱엔 known을 다시 false로 되돌리는 길이 시험 채점(handleAnswer)뿐이고,
+// 보관 복구는 "다시 로테이션에 보이게" 이상의 의미를 갖지 않는다(트래시 복구와 동일 원칙).
+async function handleArchiveRestore(env, token, dbId, body) {
+  const { key, pageId } = body || {};
+  if (!key) return json({ error: 'key 필요' }, 400);
+  const notionOk = await unflagAndReset(env, token, dbId, K_ARCHIVED, key, pageId);
   return json({ ok: true, notionOk });
 }
 
@@ -872,8 +889,12 @@ export default {
       try { return await handleAnswer(env, token, dbId, await request.json()); }
       catch (e) { return json({ error: String(e.message || e) }, 500); }
     }
-    if (url.pathname === '/api/archive' && request.method === 'POST') {
-      try { return await handleArchive(env, token, dbId, await request.json()); }
+    if (url.pathname === '/api/archive') {
+      if (request.method === 'GET') { try { return await handleArchiveList(env); } catch (e) { return json({ error: String(e.message || e) }, 500); } }
+      if (request.method === 'POST') { try { return await handleArchive(env, token, dbId, await request.json()); } catch (e) { return json({ error: String(e.message || e) }, 500); } }
+    }
+    if (url.pathname === '/api/archive/restore' && request.method === 'POST') {
+      try { return await handleArchiveRestore(env, token, dbId, await request.json()); }
       catch (e) { return json({ error: String(e.message || e) }, 500); }
     }
     if (url.pathname === '/api/trash') {
