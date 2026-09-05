@@ -201,18 +201,19 @@
   .knowpop button{border:0;background:var(--ink4);color:var(--paper);border-radius:9px;padding:12px;font-size:13px;cursor:pointer;text-align:left}
   .knowpop button.trash{color:var(--coral)}
 
-  /* ── 제목 롱프레스 메뉴(유튜브 링크 / 제목 수정) — 본문 드래그 선택 기반 방식은
-     폐기했다(2026-09-05 실기기 피드백: 선택 시작은 되는데 네이티브 콜아웃 메뉴와
-     우리 팝업이 겹쳐 지저분했고, 핸들로 정교하게 조정할 때 스와이프에 뺏겼다).
-     .knowpop과 같은 스타일 재사용, 위치만 같은 하단(엄지 반경)에 그대로. ── */
-  .titleEdit input{
-    width:100%;background:var(--ink4);color:var(--paper);border:0;border-radius:9px;
-    padding:12px;font-size:14px;font-family:var(--sans);
+  /* ── 제목 롱프레스 → 그 자리에서 바로 편집 — 메뉴·입력창 팝업 둘 다 폐기했다
+     (2026-09-05 사용자 요청: 단계를 줄이자). .cardtitle 타이포는 그대로 물려받고
+     입력 관련 속성만 여기서 뒤집는다. [hidden] 규칙은 별도 명시가 필요하다 —
+     .cardtitle이 display:block이라 author 스타일이 UA 기본 규칙을 이긴다(이 프로젝트
+     에서 .navbtn·.examjudge·#viewStudy·.lightbox로 이미 네 번 밟은 함정). ── */
+  .cardtitle-input{
+    width:100%;box-sizing:border-box;background:transparent;border:0;
+    border-bottom:1px solid var(--coral);outline:0;
+    -webkit-user-select:text;user-select:text;-webkit-touch-callout:default;
   }
-  .titleEdit .row{display:flex;gap:8px}
-  .titleEdit .row button{flex:1;text-align:center}
-  .titleEdit .row button.primary{color:var(--know)}
-  #titleMenuLink.disabled{color:var(--faint);pointer-events:none}
+  /* .cardtitle 자체가 display:block이라 이 규칙이 없으면 [hidden]이 안 먹는다 —
+     #cardTitle과 #cardTitleInput 둘 다 이 클래스를 쓰므로 하나로 같이 잡는다. */
+  .cardtitle[hidden]{display:none}
 
   .toast{position:fixed;left:50%;bottom:calc(var(--barh) + 18px);transform:translate(-50%,8px);z-index:8;font-family:var(--mono);font-size:12.5px;color:var(--paper);background:var(--ink3);padding:8px 14px;border-radius:8px;opacity:0;pointer-events:none;transition:opacity .18s ease,transform .18s ease;white-space:nowrap}
   .toast.on{opacity:1;transform:translate(-50%,0)}
@@ -340,6 +341,7 @@
     <div class="stage" id="stage">
       <div class="scroller" id="scroller">
         <a class="cardtitle" id="cardTitle" href="#" target="_blank" rel="noopener"></a>
+        <input class="cardtitle cardtitle-input" id="cardTitleInput" type="text" autocomplete="off" hidden>
         <div class="content" id="content"></div>
       </div>
       <div class="peek peek-prev" id="peekPrev"><div class="cardtitle" id="peekPrevTitle"></div><div class="content peekbody" id="peekPrevBody"></div></div>
@@ -381,14 +383,6 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <div class="knowpop" id="titleMenu" hidden>
-    <button id="titleMenuLink">유튜브 원본 보기</button>
-    <button id="titleMenuEdit">제목 수정</button>
-  </div>
-  <div class="knowpop titleEdit" id="titleEditPop" hidden>
-    <input id="titleEditInput" type="text" placeholder="새 제목" autocomplete="off">
-    <div class="row"><button id="titleEditCancel">취소</button><button class="primary" id="titleEditSave">저장</button></div>
-  </div>
 </div>
 
 <div class="lightbox" id="lightbox" hidden>
@@ -558,47 +552,42 @@ async function apiHighlight(pageId, field, blockIndex, start, end){
   return r.json();
 }
 
-/* ── 제목 롱프레스 메뉴(유튜브 링크 / 제목 수정) ──
-   예전엔 본문에서 예문을 드래그 선택하면 팝업이 떴는데, 선택 시작 자체는 됐지만
-   iOS 기본 콜아웃 메뉴와 겹쳐 지저분했고 핸들로 정교하게 조정할 때 스와이프에
-   뺏겼다(2026-09-05 실기기 피드백, 사진으로 확인). 제목을 길게 눌러 메뉴를 띄우는
-   방식으로 교체 — 드래그 선택 자체가 필요 없어져 그 문제를 원천적으로 피한다. */
+/* ── 제목 롱프레스 → 그 자리에서 바로 편집 ──
+   예전엔 롱프레스→메뉴 팝업→입력창 팝업까지 3단계였다(그 전엔 드래그 선택 기반이라
+   iOS 콜아웃 메뉴와 겹쳐 더 지저분했다). 메뉴도 팝업도 없이, 제목 텍스트 자리에
+   `<input>`을 그대로 겹쳐 편집한다 — 짧은 탭은 원래대로 유튜브 이동(`<a>` 그대로)이라
+   메뉴의 "유튜브 링크" 항목도 따로 필요 없다(2026-09-05 사용자 요청). */
 let retitleCtx = null;
 function setRetitleContext(getCard){ retitleCtx = { getCard }; }
-function clearRetitleContext(){ retitleCtx = null; hideTitleMenu(); hideTitleEdit(); }
-function hideTitleMenu(){ $('titleMenu').hidden = true; }
-function hideTitleEdit(){ $('titleEditPop').hidden = true; }
-function showTitleMenu(){
+function clearRetitleContext(){ retitleCtx = null; cancelTitleEdit(); }
+
+let titleEditing = false;
+function beginTitleEdit(){
   const card = retitleCtx && retitleCtx.getCard(); if (!card) return;
-  $('titleMenuLink').classList.toggle('disabled', !card.url);
-  $('titleMenu').hidden = false;
+  titleEditing = true;
+  const input = $('cardTitleInput');
+  input.value = card.front;
+  $('cardTitle').hidden = true;
+  input.hidden = false;
+  input.focus();
+  input.select();
 }
-document.addEventListener('pointerdown', (e) => {
-  if (!$('titleMenu').hidden && !e.target.closest('#titleMenu') && e.target.id !== 'cardTitle') hideTitleMenu();
-  if (!$('titleEditPop').hidden && !e.target.closest('#titleEditPop')) hideTitleEdit();
-});
-$('titleMenuLink').addEventListener('click', () => {
-  const card = retitleCtx && retitleCtx.getCard();
-  hideTitleMenu();
-  if (card && card.url) window.open(card.url, '_blank', 'noopener');
-});
-$('titleMenuEdit').addEventListener('click', () => {
-  const card = retitleCtx && retitleCtx.getCard(); if (!card) return;
-  hideTitleMenu();
-  $('titleEditInput').value = card.front;
-  $('titleEditPop').hidden = false;
-  $('titleEditInput').focus();
-});
-$('titleEditCancel').addEventListener('click', hideTitleEdit);
+function cancelTitleEdit(){
+  if (!titleEditing) return;
+  titleEditing = false;
+  $('cardTitleInput').hidden = true;
+  $('cardTitle').hidden = false;
+}
 // 응답을 기다리지 않고 화면부터 바꾼다(markKnown()과 같은 패턴) — Notion PATCH + KV
 // 읽기/쓰기가 순차로 쌓여 2초 가까이 걸리는데, 그동안 화면이 안 바뀌어 "안 바뀐 줄"
 // 알았다는 게 실기기 피드백이었다. key는 서버가 정하는 정규화 규칙을 그대로 믿어야
 // 하므로 응답 오기 전까진 안 건드린다 — 그 사이 "안다" 등을 눌러도 옛 key로 정상 동작.
-$('titleEditSave').addEventListener('click', () => {
-  const card = retitleCtx && retitleCtx.getCard(); if (!card) return;
-  const text = $('titleEditInput').value.trim();
-  hideTitleEdit();
-  if (!text || text === card.front) return;
+function commitTitleEdit(){
+  if (!titleEditing) return;
+  const card = retitleCtx && retitleCtx.getCard();
+  const text = $('cardTitleInput').value.trim();
+  cancelTitleEdit();
+  if (!card || !text || text === card.front) return;
   const oldFront = card.front, oldKey = card.key;
   card.front = text;
   if (!examMode) $('cardTitle').textContent = text;
@@ -610,13 +599,18 @@ $('titleEditSave').addEventListener('click', () => {
     else { const el = $('examTitle'); if (el) el.textContent = oldFront; }
     toast('제목 변경 실패');
   });
+}
+$('cardTitleInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter'){ e.preventDefault(); commitTitleEdit(); }
+  else if (e.key === 'Escape'){ e.preventDefault(); cancelTitleEdit(); }
 });
+$('cardTitleInput').addEventListener('blur', commitTitleEdit);
 // 롱프레스 판정 뒤엔 그 손을 떼는 click이 링크 이동으로 이어지지 않게 막는다
-// (#cardTitle이 href를 가진 <a>라 평소 탭은 그대로 유튜브로 이동한다).
+// (#cardTitle이 href를 가진 <a>라 평소 짧은 탭은 그대로 유튜브로 이동한다).
 let titlePressT = null, titleLongPressed = false;
 $('cardTitle').addEventListener('pointerdown', () => {
   titleLongPressed = false;
-  titlePressT = setTimeout(() => { titleLongPressed = true; showTitleMenu(); }, 450);
+  titlePressT = setTimeout(() => { titleLongPressed = true; beginTitleEdit(); }, 450);
 });
 $('cardTitle').addEventListener('pointerup', () => clearTimeout(titlePressT));
 $('cardTitle').addEventListener('pointerleave', () => clearTimeout(titlePressT));
@@ -1093,7 +1087,7 @@ function beginSwipeTracking(e){
   $('peekNextTitle').textContent = nc ? nc.front : ''; $('peekNextBody').innerHTML = peekBodyHtml(nc);
 }
 scroller.addEventListener('pointerdown', (e) => {
-  if (studyCards.length < 2 || examMode || highlightMode) return;
+  if (studyCards.length < 2 || examMode || highlightMode || titleEditing) return;
   // 이미 선택된 텍스트가 있으면(선택 핸들을 드래그하는 중) 스와이프 트래킹 자체를
   // 시작하지 않는다 — 여기서 캡처를 걸면 핸들 드래그가 그 자리에서 끊긴다.
   if (!window.getSelection().isCollapsed) return;
@@ -1106,7 +1100,7 @@ scroller.addEventListener('pointerdown', (e) => {
 // 핸들로 정교하게 조정하는 단계까지 통째로 네이티브에 맡겨야 안전해서, "가로우세
 // 판정"류 휴리스틱보다 이쪽이 확실하다(2026-09-05 실기기 피드백).
 scroller.addEventListener('pointermove', (e) => {
-  if (studyCards.length < 2 || examMode || highlightMode) return;
+  if (studyCards.length < 2 || examMode || highlightMode || titleEditing) return;
   const mdx = e.clientX - sx, mdy = e.clientY - sy;
   if (!dragging && !selectPrimed){
     // 가로 이동이 세로보다 뚜렷할 때만 스와이프로 캡처한다 — 길게 누르는 동안의 세로
