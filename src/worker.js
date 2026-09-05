@@ -15,10 +15,14 @@
  *   4. GET  /api/subchapter?id=cNsM&mode=all|unknown   소챕터 하나의 카드 전체 본문(학습·시험 공용)
  *   5. GET  /api/chapterexam?id=cN  대챕터 전체(100장) 시험용 — 카드마다 원래 소속 subId를 붙여 반환
  *   6. POST /api/answer           시험 정답 기록(안다/모른다) + 소챕터·대챕터 점수 갱신(최고기록 포함)
- *   7. POST /api/retitle          본문에서 드래그 선택한 예문으로 카드 제목(Notion 이름 속성 원본)을 고침
- *   8. POST /api/highlight        본문 인라인 코드(형광펜) annotation 토글 — KV+Notion 블록 원본 동시 반영
- *   9. GET  /api/image?id=blockId  Notion 자체 호스팅 이미지의 프리사인드 URL을 매번 새로 받아 리다이렉트
- *  10. GET  /api/sync             Notion → 카드 변환을 "예산만큼만" 진행하고 커서를 남김
+ *   7. POST /api/archive          "완전히 안다" 보관 — known도 같이 세팅, 전체보기·시험 로테이션에서만 제외
+ *   8. GET/POST /api/trash        휴지통 목록 조회 / 보내기(로컬 소프트 삭제, 노션 원본 안 건드림)
+ *   9. POST /api/trash/restore    휴지통에서 복구
+ *  10. POST /api/trash/delete     휴지통에서 "진짜 삭제" — 이때만 노션 페이지를 archived로 전환 + 인덱스에서 제거
+ *  11. POST /api/retitle          본문에서 드래그 선택한 예문으로 카드 제목(Notion 이름 속성 원본)을 고침
+ *  12. POST /api/highlight        본문 인라인 코드(형광펜) annotation 토글 — KV+Notion 블록 원본 동시 반영
+ *  13. GET  /api/image?id=blockId  Notion 자체 호스팅 이미지의 프리사인드 URL을 매번 새로 받아 리다이렉트
+ *  14. GET  /api/sync             Notion → 카드 변환을 "예산만큼만" 진행하고 커서를 남김
  *
  * ⚠ 왜 Worker가 반드시 필요한가 — api.notion.com은 Access-Control-Allow-Origin을
  *   보내지 않는다(2026-09-03 실측). 크롬 확장은 host_permissions로 CORS를 면제받아
@@ -43,6 +47,10 @@ const K_INDEX = 'index:v2';
 const K_BUCKET = 'bucket:v2:'; // + 번호
 const K_KNOWN = 'known:v1';    // { [cardKey]: true } — 안다로 판정된 카드만 기록(모른다=부재)
 const K_BEST = 'best:v1';      // { sub:{ [subId]: n }, chap:{ [chapId]: n } } — 최고기록(단조증가)
+const K_ARCHIVED = 'archived:v1'; // { [cardKey]: true } — "완전히 안다, 더 안 봐도 됨". 전체보기·시험
+                                   // 로테이션에서만 빠진다 — known/총량 점수는 안 건드린다(순수 가시성 플래그).
+const K_TRASHED = 'trashed:v1';   // { [cardKey]: true } — 로컬 소프트 삭제. 휴지통 화면에서 "진짜 삭제"를
+                                   // 눌러야 그때 Notion 페이지를 archived로 전환한다(그 전까진 원본 안전).
 
 const BUCKET_SIZE = 50;             // ⚠ 카드별 개별 KV 저장은 불가 — 무료 쓰기 1,000회/일에 걸린다
 const PARSER_VERSION = 4;           // 포맷을 바꾸면 올릴 것 — 증분 로직이 옛 포맷을 재사용하지 않게
@@ -437,6 +445,11 @@ async function loadKnownAndBest(env) {
   if (!best.chap) best.chap = {};
   return { known, best };
 }
+async function loadFlags(env) {
+  const archived = JSON.parse((await env.KV.get(K_ARCHIVED)) || '{}');
+  const trashed = JSON.parse((await env.KV.get(K_TRASHED)) || '{}');
+  return { archived, trashed };
+}
 
 /* ── 라우팅 ──────────────────────────────────────────────── */
 
@@ -515,6 +528,7 @@ async function handleSubchapter(env, subId, mode) {
   if (!items) return json({ error: 'not found' }, 404);
 
   const { known } = await loadKnownAndBest(env);
+  const { archived, trashed } = await loadFlags(env);
   const byBucket = new Map();
   for (const it of items) {
     if (!byBucket.has(it.bucket)) byBucket.set(it.bucket, []);
@@ -526,7 +540,10 @@ async function handleSubchapter(env, subId, mode) {
     if (!raw) continue;
     for (const c of JSON.parse(raw).cards) if (ids.includes(c.id)) byId.set(c.id, c);
   }
-  let cards = items.map((it) => ({ ...(byId.get(it.id) || {}), id: it.id, key: it.key, front: it.front, url: it.url, created: it.created, known: !!known[it.key] }));
+  let cards = items.map((it) => ({
+    ...(byId.get(it.id) || {}), id: it.id, key: it.key, front: it.front, url: it.url, created: it.created,
+    known: !!known[it.key], archived: !!archived[it.key], trashed: !!trashed[it.key],
+  }));
   if (mode === 'unknown') cards = cards.filter((c) => !c.known);
 
   return json({ id: subId, cards });
@@ -561,7 +578,11 @@ async function handleChapterExam(env, chapId) {
     if (!raw) continue;
     for (const c of JSON.parse(raw).cards) if (ids.includes(c.id)) byId.set(c.id, c);
   }
-  const cards = tagged.map(({ it, subId }) => ({ ...(byId.get(it.id) || {}), id: it.id, key: it.key, front: it.front, url: it.url, created: it.created, subId }));
+  const { archived, trashed } = await loadFlags(env);
+  const cards = tagged.map(({ it, subId }) => ({
+    ...(byId.get(it.id) || {}), id: it.id, key: it.key, front: it.front, url: it.url, created: it.created, subId,
+    archived: !!archived[it.key], trashed: !!trashed[it.key],
+  }));
 
   return json({ id: chapId, cards });
 }
@@ -598,6 +619,87 @@ async function handleAnswer(env, body) {
     sub: { id: subId, current: subScore, best: best.sub[subId], total: subItems.length },
     chap: { id: chapId, current: chapScore, best: best.chap[chapId], total: chapItems.length },
   });
+}
+
+// 평소 읽기(전체보기) 중 "안다" 퀵버튼 롱프레스 → 보관/휴지통 갈림길(2026-09-05 deep-interview).
+// 보관 = "완전히 안다, 더 안 봐도 됨" — known도 같이 true로 세팅하고, 전체보기·시험
+// 로테이션에서만 뺀다(점수·총량은 안 바꾼다, 순수 가시성 플래그).
+async function handleArchive(env, body) {
+  const { key } = body || {};
+  if (!key) return json({ error: 'key 필요' }, 400);
+  const [known, archived] = await Promise.all([
+    env.KV.get(K_KNOWN).then((v) => JSON.parse(v || '{}')),
+    env.KV.get(K_ARCHIVED).then((v) => JSON.parse(v || '{}')),
+  ]);
+  known[key] = true; archived[key] = true;
+  await Promise.all([env.KV.put(K_KNOWN, JSON.stringify(known)), env.KV.put(K_ARCHIVED, JSON.stringify(archived))]);
+  return json({ ok: true });
+}
+
+// 휴지통 — 로컬 소프트 삭제. 노션 원본은 "진짜 삭제"를 누르기 전까진 안 건드린다.
+async function handleTrash(env, body) {
+  const { key } = body || {};
+  if (!key) return json({ error: 'key 필요' }, 400);
+  const trashed = JSON.parse((await env.KV.get(K_TRASHED)) || '{}');
+  trashed[key] = true;
+  await env.KV.put(K_TRASHED, JSON.stringify(trashed));
+  return json({ ok: true });
+}
+
+async function handleTrashList(env) {
+  const trashed = JSON.parse((await env.KV.get(K_TRASHED)) || '{}');
+  const keys = Object.keys(trashed);
+  if (!keys.length) return json({ items: [] });
+  const idxRaw = await env.KV.get(K_INDEX);
+  if (!idxRaw) return json({ items: [] });
+  const idx = JSON.parse(idxRaw);
+  const byKey = new Map(idx.items.map((it) => [it.key, it]));
+  const items = keys.map((k) => byKey.get(k)).filter(Boolean).map((it) => ({ key: it.key, front: it.front, id: it.id }));
+  return json({ items });
+}
+
+async function handleTrashRestore(env, body) {
+  const { key } = body || {};
+  if (!key) return json({ error: 'key 필요' }, 400);
+  const trashed = JSON.parse((await env.KV.get(K_TRASHED)) || '{}');
+  delete trashed[key];
+  await env.KV.put(K_TRASHED, JSON.stringify(trashed));
+  return json({ ok: true });
+}
+
+// 휴지통에서 "진짜 삭제" — 이 순간에만 노션 페이지를 archived로 전환(노션 쪽 실제 삭제는
+// 사용자가 노션 휴지통에서 완전삭제해야 함 — 우리가 되돌릴 수 없는 걸 대신 하지 않는다).
+// 우리 인덱스·버킷에서도 즉시 제거해 다음 재동기화를 안 기다리고 바로 사라지게 한다.
+async function handleTrashDelete(env, token, body) {
+  const { key } = body || {};
+  if (!key) return json({ error: 'key 필요' }, 400);
+  const idxRaw = await env.KV.get(K_INDEX);
+  if (!idxRaw) return json({ error: '동기화 중' }, 202);
+  const idx = JSON.parse(idxRaw);
+  const item = idx.items.find((it) => it.key === key);
+  if (!item) return json({ error: 'not found' }, 404);
+
+  let notionOk = false;
+  if (token) {
+    try {
+      await notion(token, `/pages/${item.id}`, { method: 'PATCH', body: JSON.stringify({ archived: true }) });
+      notionOk = true;
+    } catch (e) { /* 삼키고 notionOk:false로 정직하게 알린다 — 로컬 제거는 그대로 진행 */ }
+  }
+
+  idx.items = idx.items.filter((it) => it.key !== key);
+  await env.KV.put(K_INDEX, JSON.stringify(idx));
+  const raw = await env.KV.get(K_BUCKET + item.bucket);
+  if (raw) {
+    const bucket = JSON.parse(raw);
+    bucket.cards = bucket.cards.filter((c) => c.id !== item.id);
+    await env.KV.put(K_BUCKET + item.bucket, JSON.stringify(bucket));
+  }
+  const trashed = JSON.parse((await env.KV.get(K_TRASHED)) || '{}');
+  delete trashed[key];
+  await env.KV.put(K_TRASHED, JSON.stringify(trashed));
+
+  return json({ ok: true, notionOk });
 }
 
 // 본문에서 드래그 선택한 예문을 카드 제목(=노션 이름 속성)으로 바꾼다. 원본 DB가
@@ -711,6 +813,22 @@ export default {
     if (url.pathname === '/api/chapterexam') return handleChapterExam(env, url.searchParams.get('id') || '');
     if (url.pathname === '/api/answer' && request.method === 'POST') {
       try { return await handleAnswer(env, await request.json()); }
+      catch (e) { return json({ error: String(e.message || e) }, 500); }
+    }
+    if (url.pathname === '/api/archive' && request.method === 'POST') {
+      try { return await handleArchive(env, await request.json()); }
+      catch (e) { return json({ error: String(e.message || e) }, 500); }
+    }
+    if (url.pathname === '/api/trash') {
+      if (request.method === 'GET') { try { return await handleTrashList(env); } catch (e) { return json({ error: String(e.message || e) }, 500); } }
+      if (request.method === 'POST') { try { return await handleTrash(env, await request.json()); } catch (e) { return json({ error: String(e.message || e) }, 500); } }
+    }
+    if (url.pathname === '/api/trash/restore' && request.method === 'POST') {
+      try { return await handleTrashRestore(env, await request.json()); }
+      catch (e) { return json({ error: String(e.message || e) }, 500); }
+    }
+    if (url.pathname === '/api/trash/delete' && request.method === 'POST') {
+      try { return await handleTrashDelete(env, token, await request.json()); }
       catch (e) { return json({ error: String(e.message || e) }, 500); }
     }
     if (url.pathname === '/api/retitle' && request.method === 'POST') {
