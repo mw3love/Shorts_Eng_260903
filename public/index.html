@@ -19,6 +19,9 @@
        그려졌다가 커밋 후 설정 크기로 튄다(2026-09-05 실기기 피드백). 변수면 같은 CSS
        규칙을 공유하므로 튐이 원리적으로 불가능하다. */
     --tscale:1; --bscale:1;
+    /* 하단 바의 실제 높이. JS가 ResizeObserver로 실측해 덮어쓴다(아래는 첫 페인트용 근사값).
+       본문 영역이 이 값만큼 위에서 끝나므로, 계산식이 실제와 어긋나면 바로 티가 난다. */
+    --barh:92px;
     --serif:"Newsreader",Georgia,"Times New Roman",serif;
     --sans:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo",sans-serif;
     --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
@@ -41,9 +44,14 @@
   #readRoot,#examView{position:absolute;inset:0}
   #readRoot[hidden],#examView[hidden]{display:none}
 
-  /* ── 학습(읽기) 화면 — 홈 화면 자체. 본문이 가로·세로 전체를 쓰고, 컨트롤은 그 위에
-     떠 있는 오버레이다(가려지는 부분은 스크롤로 보면 됨 — 2026-09-05 실기기 피드백). ── */
-  .stage{position:absolute;inset:0}
+  /* ── 학습(읽기) 화면 — 홈 화면 자체. 본문과 컨트롤을 「두 그룹으로 분리」한다:
+     본문은 스크러버 바로 위에서 끝나고, 그 아래는 컨트롤 전용 구역이다.
+     예전엔 본문이 화면 전체를 쓰고 컨트롤이 반투명 오버레이로 그 위에 떠 있었는데,
+     바 배경 그라데이션(하단 40%가 92% 불투명)이 그 뒤 텍스트를 어차피 못 읽게 만들어
+     「죽은 공간」이었고, 반쯤 비치는 글자가 스크러버·버튼과 섞여 오히려 헷갈렸다.
+     클립으로 잃는 실질 가독 영역은 거의 없고(≈750px로 동일), 대신 바를 안전 하한까지
+     내려 실제로는 넓어진다(2026-09-05 라운드6 사용자 판단). ── */
+  .stage{position:absolute;top:0;left:0;right:0;bottom:var(--barh)}
   .scroller{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;touch-action:pan-y;-webkit-user-select:text;user-select:text}
   .cardtitle{
     display:block;font-family:var(--serif);font-weight:400;
@@ -51,10 +59,10 @@
     color:var(--paper);text-decoration:none;text-wrap:balance;
     padding:calc(env(safe-area-inset-top) + 62px) 22px 6px;
   }
-  /* 하단 여백은 실제 바 높이(4 + 20 + 46 + 4 = 74px + safe-area)에 여유 18px만 더한 값.
-     예전 112px는 바보다 28px 컸다(2026-09-05 실기기 피드백 — "본문 하단 여백이 꽤 있음"). */
+  /* 본문 영역 자체가 바 위에서 끝나므로(.stage) 하단 패딩은 마지막 줄이 경계선에 닿지
+     않을 만큼만 있으면 된다 — 예전 92px는 바를 피하려던 값이라 이제 불필요하다. */
   .content{
-    padding:6px 20px calc(92px + env(safe-area-inset-bottom)) 20px;min-height:100%;
+    padding:6px 20px 18px 20px;min-height:100%;
     font-size:calc(15.5px * var(--bscale));line-height:1.7;color:var(--body-text);
     will-change:transform;
   }
@@ -100,10 +108,14 @@
   .subpos-dots i.on{background:var(--coral)}
   .subpos-dots i.half{background:linear-gradient(90deg,var(--coral) 50%,var(--ink4) 50%)}
   .subpos-chip:active{transform:scale(.95)}
+  /* 경계 전환이 매끄러워질수록 "언제 소챕터가 바뀌었는지" 알기 어려워진다 — 별도 전환
+     화면을 넣는 대신(무마찰 원칙) 주소 칩만 짧게 튀어 알린다. */
+  @keyframes subposflash{0%{transform:scale(1)}35%{transform:scale(1.16)}100%{transform:scale(1)}}
+  .subpos-chip.flash{animation:subposflash .42s ease}
 
   /* ── 챕터 완주 넛지 배너 ── */
   .chapnudge{
-    position:absolute;left:16px;right:16px;bottom:calc(104px + env(safe-area-inset-bottom));z-index:3;
+    position:absolute;left:16px;right:16px;bottom:calc(var(--barh) + 12px);z-index:3;
     background:color-mix(in srgb,var(--ink2) 94%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
     border-radius:14px;padding:12px 14px;box-shadow:0 8px 24px rgba(0,0,0,.4);
     display:flex;flex-direction:column;gap:8px;
@@ -120,11 +132,11 @@
      것만(2026-09-05 실기기 피드백: "하단은 오른손 엄지 영역이 비싼 부동산"). ── */
   .bottombar{
     position:absolute;left:0;right:0;bottom:0;z-index:2;
-    padding:4px 16px calc(4px + env(safe-area-inset-bottom));
-    background:linear-gradient(to top, rgba(11,13,16,.92) 40%, rgba(11,13,16,0));
+    padding:4px 16px max(6px, calc(env(safe-area-inset-bottom) - 8px));
+    background:var(--ink);
   }
-  .scrubber{padding:0 4px 4px;touch-action:none}
-  .scrubtrack{position:relative;height:16px}
+  .scrubber{padding:0 4px 2px;touch-action:none}
+  .scrubtrack{position:relative;height:14px}
   .scrubtrack .track{position:absolute;left:0;right:0;top:50%;height:2px;background:var(--ink4);transform:translateY(-50%);border-radius:2px}
   .scrubtrack .dot{position:absolute;top:50%;width:7px;height:7px;border-radius:50%;background:var(--faint);transform:translate(-50%,-50%);transition:background-color .1s ease}
   .scrubtrack .dot.cur{background:var(--coral);width:10px;height:10px}
@@ -161,7 +173,7 @@
   .knowbtn:active{transform:scale(.93)}
   .knowbtn.on{background:color-mix(in srgb,var(--know) 24%,var(--ink3));color:var(--know)}
   .knowpop{
-    position:absolute;left:16px;right:16px;bottom:calc(62px + env(safe-area-inset-bottom));z-index:4;
+    position:absolute;left:16px;right:16px;bottom:calc(var(--barh) - 4px);z-index:4;
     background:color-mix(in srgb,var(--ink2) 96%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
     border-radius:14px;padding:8px;box-shadow:0 8px 24px rgba(0,0,0,.4);
     display:flex;flex-direction:column;gap:6px;
@@ -174,7 +186,7 @@
   .retitlePop{position:fixed;z-index:9;background:var(--coral);color:var(--ink);font-family:var(--sans);font-size:12.5px;font-weight:600;padding:9px 14px;border-radius:99px;box-shadow:0 4px 16px rgba(0,0,0,.4);cursor:pointer;-webkit-user-select:none;user-select:none}
   .retitlePop[hidden]{display:none}
 
-  .toast{position:fixed;left:50%;bottom:112px;transform:translate(-50%,8px);z-index:8;font-family:var(--mono);font-size:12.5px;color:var(--paper);background:var(--ink3);padding:8px 14px;border-radius:8px;opacity:0;pointer-events:none;transition:opacity .18s ease,transform .18s ease;white-space:nowrap}
+  .toast{position:fixed;left:50%;bottom:calc(var(--barh) + 18px);transform:translate(-50%,8px);z-index:8;font-family:var(--mono);font-size:12.5px;color:var(--paper);background:var(--ink3);padding:8px 14px;border-radius:8px;opacity:0;pointer-events:none;transition:opacity .18s ease,transform .18s ease;white-space:nowrap}
   .toast.on{opacity:1;transform:translate(-50%,0)}
 
   .loadbox{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:var(--ink)}
@@ -347,7 +359,7 @@
 <div class="lightbox" id="lightbox" hidden>
   <img id="lbImg" alt="">
   <button class="lbclose" id="lbClose" aria-label="닫기">&#10005;</button>
-  <div class="lbhint">더블탭·핀치로 확대 · 탭하면 닫힘</div>
+  <div class="lbhint">더블탭·핀치로 확대 · 쓸어내려 닫기</div>
 </div>
 
 <div class="sheetback" id="sheetback"></div>
@@ -624,7 +636,6 @@ document.addEventListener('click', (e) => {
 
 /* ── 위치(챕터/소챕터) 상태 — localStorage에 저장해 다음 접속에도 이어본다 ── */
 let chapIdx = 0, subIdx = 0;
-let chapSubCount = 10; // 지금 챕터의 소챕터 개수(마지막 챕터는 더 적을 수 있음) — /api/chapters에서 갱신
 let totalChapters = 1;
 let allChaptersData = null; // /api/chapters 결과 캐시(시트에서 씀)
 function loadPos(){
@@ -634,7 +645,18 @@ function loadPos(){
 function savePos(){ lsSetJSON('sd_pos', { chap: chapIdx, sub: subIdx }); }
 function subId(){ return 'c' + chapIdx + 's' + subIdx; }
 function chapId(){ return 'c' + chapIdx; }
+let lastShownPos = null;
+function flashSubPos(){
+  const chip = $('subPosChip');
+  chip.classList.remove('flash');
+  void chip.offsetWidth; // 리플로우를 강제해야 같은 애니메이션이 다시 재생된다
+  chip.classList.add('flash');
+  setTimeout(() => chip.classList.remove('flash'), 460);
+}
 function updateSubPos(){
+  const pos = subId();
+  if (lastShownPos && lastShownPos !== pos) flashSubPos();
+  lastShownPos = pos;
   $('subPos').textContent = (chapIdx + 1) + '-' + (subIdx + 1);
   const known = subchapterAll.filter((c) => c.known).length;
   const total = subchapterAll.length || 1;
@@ -646,13 +668,27 @@ function updateSubPos(){
   });
 }
 
+// 소챕터 개수는 카드 총량/10 올림(마지막 소챕터만 짧을 수 있음) — 서버와 동일 규칙(SUB_SIZE=10).
+// allChaptersData가 전체 챕터를 들고 있으므로 「지금 챕터」뿐 아니라 이웃 챕터도 바로 계산된다
+// — 그래서 챕터를 넘을 때 /api/chapters를 다시 기다릴 필요가 없다(경계 전환의 로딩 제거).
+function subCountOf(c){
+  const ch = allChaptersData && allChaptersData.chapters && allChaptersData.chapters[c];
+  return ch ? Math.max(1, Math.ceil(ch.total / 10)) : 1;
+}
+// 다음(+1)/이전(-1) 소챕터의 좌표. 챕터 경계와 전체 wrap을 여기 한 곳에서 처리한다.
+function neighborPos(dir){
+  let c = chapIdx, s = subIdx + dir;
+  if (s >= subCountOf(c)){ c = (c + 1) % totalChapters; s = 0; }
+  else if (s < 0){ c = (c - 1 + totalChapters) % totalChapters; s = Math.max(0, subCountOf(c) - 1); }
+  return { chap: c, sub: s };
+}
+const posId = (p) => 'c' + p.chap + 's' + p.sub;
+
 async function refreshChapterMeta(){
-  allChaptersData = await apiChapters().catch(() => null);
-  if (allChaptersData && allChaptersData.chapters){
-    totalChapters = allChaptersData.chapters.length || 1;
-    const cur = allChaptersData.chapters[chapIdx];
-    // 소챕터 개수는 카드 총량/10 올림(마지막 소챕터만 짧을 수 있음) — 서버와 동일 규칙(SUB_SIZE=10).
-    if (cur) chapSubCount = Math.max(1, Math.ceil(cur.total / 10));
+  const data = await apiChapters().catch(() => null);
+  if (data && data.chapters){
+    allChaptersData = data;
+    totalChapters = data.chapters.length || 1;
   }
 }
 
@@ -673,19 +709,58 @@ function hideLoading(){ $('loading').hidden = true; }
 // 데이터를 다시 거르기만 하면 되므로 네트워크 왕복이 없다(2026-09-05 실기기 피드백:
 // 토글할 때마다 로딩화면이 떠서 깜빡였던 것 — 그 자체를 없앴다).
 let subchapterAll = [];
+
+/* ── 인접 소챕터 프리페치 ──
+   소챕터를 열면 곧바로 다음·이전 소챕터를 백그라운드로 받아둔다. 이것 하나로 경계 전환의
+   세 가지 문제가 같이 풀린다(2026-09-05 라운드6):
+     ⓐ 마지막 카드에서 옆으로 미리 보이던 카드가 「같은 소챕터 1번」(고리형 wrap)이라
+        손가락을 떼면 다른 카드가 나왔다 → 이제 진짜 다음 카드를 그린다
+     ⓑ 경계마다 전체화면 로딩(.loadbox, inset:0)이 떴다 → 데이터가 이미 있어 안 뜬다
+     ⓒ peek → 로딩 → 새 카드의 3단 깜빡임 → 스와이프 한 번으로 끝
+   캐시 항목은 subchapterAll과 「같은 객체」를 공유한다 — 되돌아왔을 때 "안다"·보관 표시가
+   그대로 남아 있어야 하므로 의도된 것. */
+const subCache = new Map(), subInflight = new Map();
+async function fetchSub(id){
+  if (subCache.has(id)) return subCache.get(id);
+  if (subInflight.has(id)) return subInflight.get(id); // 진행 중인 프리페치에 편승(중복 요청 방지)
+  const p = apiSubchapter(id, 'all')
+    .then((data) => {
+      if (!data || data.error || !Array.isArray(data.cards)) return null;
+      subCache.set(id, data.cards);
+      if (subCache.size > 6) subCache.delete(subCache.keys().next().value);
+      return data.cards;
+    })
+    .catch(() => null)
+    .finally(() => subInflight.delete(id));
+  subInflight.set(id, p);
+  return p;
+}
+function prefetchNeighbors(){
+  [neighborPos(1), neighborPos(-1)].forEach((p) => {
+    const id = posId(p);
+    if (id !== subId()) fetchSub(id);
+  });
+}
+
 // atEnd — 뒤로 스와이프해서 이전 소챕터로 넘어온 경우엔 첫 카드가 아니라 마지막 카드에
 // 도착해야 이동 방향과 화면이 맞는다(2026-09-05 실기기 피드백).
 async function loadSubchapter(atEnd){
-  showLoading('불러오는 중', '카드를 가져옴');
-  let data;
-  try { data = await apiSubchapter(subId(), 'all'); }
-  catch (e) { showLoading('불러오기 실패', String(e.message || e), loadSubchapter); return; }
-  if (data.error){ showLoading('불러오기 실패', data.error, loadSubchapter); return; }
-  subchapterAll = data.cards;
+  const id = subId();
+  let cards = subCache.get(id);
+  if (!cards){
+    // 캐시가 비었을 때만 로딩을 띄우되, 250ms 안에 끝나면 아예 안 보여준다 — 프리페치가
+    // 이미 절반쯤 진행돼 있는 경우가 대부분이라 이 지연 하나로 깜빡임이 사라진다.
+    const t = setTimeout(() => showLoading('불러오는 중', '카드를 가져옴'), 250);
+    cards = await fetchSub(id);
+    clearTimeout(t);
+    if (!cards){ showLoading('불러오기 실패', '카드를 못 받음', () => loadSubchapter(atEnd)); return; }
+  }
   hideLoading();
+  subchapterAll = cards;
   if (!subchapterAll.length){ toast('카드 없음'); return; }
   updateSubPos();
   applyFilter(atEnd);
+  prefetchNeighbors();
 }
 // 이미 받아둔 subchapterAll을 거르기만 한다 — 로딩화면·제목 깜빡임 없이 즉시 반영.
 // 보관·휴지통 카드는 전체보기 로테이션에서 항상 빠진다(점수·총량엔 영향 없음 — 순수 가시성).
@@ -817,31 +892,24 @@ $('filterToggle').addEventListener('click', () => {
 });
 
 /* 소챕터/챕터 경계 — 자동으로 다음 소챕터, 챕터가 끝나면 전체시험 넛지 */
+// ⚠ 여기서 /api/chapters를 기다리지 않는다 — allChaptersData가 이미 전체 챕터를 들고 있어
+// 이웃 좌표는 즉시 계산되고(subCountOf), 점수 갱신은 뒤에서 따라오면 된다. 예전엔 챕터를
+// 넘을 때마다 이 왕복이 로딩 화면을 한 번 더 만들었다.
 async function advanceSubchapter(){
-  subIdx++;
-  if (subIdx >= chapSubCount){
-    const finishedChap = chapIdx;
-    subIdx = 0;
-    chapIdx = (chapIdx + 1) % totalChapters;
-    savePos();
-    await refreshChapterMeta();
-    await loadSubchapter();
-    showChapNudge(finishedChap);
-  } else {
-    savePos();
-    await loadSubchapter();
-    toast('소챕터 ' + (subIdx + 1) + '로 이동');
-  }
+  const finishedChap = chapIdx, p = neighborPos(1), crossed = p.chap !== chapIdx;
+  chapIdx = p.chap; subIdx = p.sub;
+  savePos();
+  await loadSubchapter();
+  if (crossed) showChapNudge(finishedChap);
+  else toast('소챕터 ' + (subIdx + 1) + '로 이동');
+  refreshChapterMeta();
 }
 async function retreatSubchapter(){
-  subIdx--;
-  if (subIdx < 0){
-    chapIdx = (chapIdx - 1 + totalChapters) % totalChapters;
-    await refreshChapterMeta();
-    subIdx = chapSubCount - 1;
-  }
+  const p = neighborPos(-1);
+  chapIdx = p.chap; subIdx = p.sub;
   savePos();
   await loadSubchapter(true);
+  refreshChapterMeta();
 }
 function showChapNudge(finishedChapIdx){
   $('chapNudgeText').textContent = '챕터 ' + (finishedChapIdx + 1) + ' 다 봤음 — 전체 시험 볼까요?';
@@ -867,8 +935,23 @@ const SELECT_PRIME_MS = 450, MOVE_TOL = 10;
 let sx = 0, sy = 0, dx = 0, dy = 0, mode = null, dragging = false, dragW = 1, startT = 0;
 let pressTimer = null, selectPrimed = false;
 
-function studyPrev(){ return studyCards[(studyIdx - 1 + studyCards.length) % studyCards.length]; }
-function studyNext(){ return studyCards[(studyIdx + 1) % studyCards.length]; }
+// 소챕터 안에서는 그냥 옆 카드, 경계에서는 「실제로 도착할」 이웃 소챕터의 카드를 보여준다.
+// 예전엔 % 로 고리를 돌아 같은 소챕터 카드를 그렸고, 그래서 손가락을 떼면 화면이 바뀌었다.
+// 프리페치가 아직 안 끝났으면 null → peek이 비어 보이지만, 틀린 카드를 보여주는 것보다 낫다.
+function boundaryCard(dir){
+  const cards = subCache.get(posId(neighborPos(dir)));
+  if (!cards) return null;
+  const vis = visibleCards(cards);
+  let list = vis;
+  if (studyMode === 'unknown'){
+    const unknown = vis.filter((c) => !c.known);
+    list = unknown.length ? unknown : vis; // applyFilter의 "전부 알고 있으면 전체보기" 폴백과 같은 규칙
+  }
+  if (!list.length) return null;
+  return dir > 0 ? list[0] : list[list.length - 1];
+}
+function studyPrev(){ return studyIdx > 0 ? studyCards[studyIdx - 1] : boundaryCard(-1); }
+function studyNext(){ return studyIdx + 1 < studyCards.length ? studyCards[studyIdx + 1] : boundaryCard(1); }
 function setDragX(px){
   content.style.transform = 'translateX(' + px + 'px)'; cardTitleEl.style.transform = 'translateX(' + px + 'px)';
   peekPrev.style.transform = 'translateX(calc(-100% + ' + px + 'px))'; peekNext.style.transform = 'translateX(calc(100% + ' + px + 'px))';
@@ -1069,7 +1152,8 @@ $('chapList').addEventListener('click', (e) => {
   if (btn.dataset.act === 'go'){
     closeSheet();
     chapIdx = idx; subIdx = 0; savePos();
-    refreshChapterMeta().then(loadSubchapter);
+    loadSubchapter();       // allChaptersData는 이미 있으므로 기다릴 것이 없다
+    refreshChapterMeta();   // 점수 갱신은 뒤따라옴
   } else if (btn.dataset.act === 'exam'){
     closeSheet();
     enterChapterExam(id);
@@ -1126,6 +1210,17 @@ sheet.addEventListener('pointerup', () => {
 });
 sheet.addEventListener('pointercancel', () => { sheetDragging = false; sheetMoved = false; sheet.style.transform = ''; });
 
+/* ── 하단 바 높이 실측 → --barh ──
+   본문(.stage)이 이 값만큼 위에서 끝나므로 계산식으로 어림하지 않고 실제 렌더 높이를 쓴다.
+   safe-area·글꼴 로딩·버튼 크기가 바뀌어도 자동으로 따라온다. */
+function syncBarHeight(){
+  const h = $('bottombar').getBoundingClientRect().height;
+  if (h > 0) document.documentElement.style.setProperty('--barh', Math.round(h) + 'px');
+}
+if (window.ResizeObserver) new ResizeObserver(syncBarHeight).observe($('bottombar'));
+window.addEventListener('orientationchange', () => setTimeout(syncBarHeight, 120));
+syncBarHeight();
+
 /* ── 이미지 확대(라이트박스) ──
    초창기 수동 메모는 스크린샷을 붙여넣은 카드가 있어 본문 폭에 맞추면 글씨가 안 읽힌다.
    페이지 자체는 maximum-scale=1이라 브라우저 핀치줌이 막혀 있으므로 여기서 transform으로
@@ -1133,6 +1228,9 @@ sheet.addEventListener('pointercancel', () => { sheetDragging = false; sheetMove
    쓰인 src 문자열을 그대로 재사용하면 된다(별도 캐시를 만들지 말 것 — 1시간 만료). */
 const lb = $('lightbox'), lbImg = $('lbImg');
 const LB_MAX = 6, LB_TAP_MS = 300, LB_TAP_TOL = 8;
+// 스와이프 다운 닫기 — 우상단 ✕만으로는 엄지가 피로하다(2026-09-05 실기기 피드백).
+// 아래 방향만 받는다: 위아래를 다 받으면 확대하려다 잘못 튕겼을 때 닫히는 오작동이 는다.
+const LB_DISMISS_PX = 90, LB_DISMISS_FLICK_MS = 300, LB_DISMISS_FLICK_PX = 40, LB_DISMISS_SPAN = 260;
 let lbScale = 1, lbTx = 0, lbTy = 0, lbBase = null, lbStart = null, lbLastTap = 0;
 const lbPointers = new Map();
 
@@ -1168,7 +1266,38 @@ function openLightbox(src){
   if (lbImg.complete && lbImg.naturalWidth) lbMeasure();
   else lbImg.addEventListener('load', lbMeasure, { once: true });
 }
-function closeLightbox(){ lb.hidden = true; lbImg.src = ''; lbPointers.clear(); lbStart = null; }
+// 끌어내리는 동안 이미지가 손가락을 따라가고 배경·컨트롤이 함께 옅어진다 — 얼마나 더 끌면
+// 닫히는지 손에 보여주는 피드백. 배경은 CSS의 불투명 #000을 인라인 rgba로 잠깐 덮는다.
+function lbSetDismissProgress(dy){
+  const p = Math.min(1, Math.max(0, dy / LB_DISMISS_SPAN));
+  lbImg.style.transform = 'translate(' + lbTx + 'px,' + (lbTy + dy) + 'px) scale(' + (lbScale * (1 - p * 0.14)) + ')';
+  lb.style.backgroundColor = 'rgba(0,0,0,' + (1 - p * 0.82) + ')';
+  const o = String(1 - p);
+  $('lbClose').style.opacity = o;
+  const hint = lb.querySelector('.lbhint'); if (hint) hint.style.opacity = o;
+}
+function lbClearDismissStyles(){
+  lb.style.backgroundColor = ''; lb.style.transition = '';
+  lbImg.style.transition = '';
+  $('lbClose').style.opacity = '';
+  const hint = lb.querySelector('.lbhint'); if (hint) hint.style.opacity = '';
+}
+function lbCancelDismiss(){ // 임계에 못 미쳤을 때 제자리로
+  lbImg.style.transition = 'transform .22s cubic-bezier(.2,.7,.3,1)';
+  lb.style.transition = 'background-color .22s ease';
+  lb.style.backgroundColor = '';
+  $('lbClose').style.opacity = '';
+  const hint = lb.querySelector('.lbhint'); if (hint) hint.style.opacity = '';
+  lbApply();
+  setTimeout(lbClearDismissStyles, 240);
+}
+function lbCommitDismiss(dy){
+  lbImg.style.transition = 'transform .2s ease-out';
+  lb.style.transition = 'background-color .2s ease';
+  lbSetDismissProgress(Math.max(dy, window.innerHeight * 0.55)); // 화면 밖으로 밀어내며 페이드
+  setTimeout(closeLightbox, 200);
+}
+function closeLightbox(){ lb.hidden = true; lbImg.src = ''; lbPointers.clear(); lbStart = null; lbClearDismissStyles(); }
 $('lbClose').addEventListener('click', closeLightbox);
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !lb.hidden) closeLightbox(); });
 window.addEventListener('resize', () => { if (!lb.hidden){ lbScale = 1; lbTx = 0; lbTy = 0; lbApply(); lbMeasure(); } });
@@ -1178,7 +1307,7 @@ lb.addEventListener('pointerdown', (e) => {
   lbPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   try { lb.setPointerCapture(e.pointerId); } catch (err) {}
   if (lbPointers.size === 1){
-    lbStart = { x: e.clientX, y: e.clientY, tx: lbTx, ty: lbTy, moved: false };
+    lbStart = { x: e.clientX, y: e.clientY, tx: lbTx, ty: lbTy, moved: false, t: e.timeStamp };
   } else if (lbPointers.size === 2){
     const p = [...lbPointers.values()];
     lbStart = { pinch: true, scale: lbScale, tx: lbTx, ty: lbTy,
@@ -1197,14 +1326,26 @@ lb.addEventListener('pointermove', (e) => {
   } else if (!lbStart.pinch){
     const mdx = e.clientX - lbStart.x, mdy = e.clientY - lbStart.y;
     if (Math.abs(mdx) > LB_TAP_TOL || Math.abs(mdy) > LB_TAP_TOL) lbStart.moved = true;
-    if (lbScale > 1){ lbTx = lbStart.tx + mdx; lbTy = lbStart.ty + mdy; lbClamp(); lbApply(); }
+    // 확대 상태면 팬이 우선 — 확대해 놓고 보다가 실수로 닫히면 곤란하다.
+    if (lbScale > 1.02){ lbTx = lbStart.tx + mdx; lbTy = lbStart.ty + mdy; lbClamp(); lbApply(); return; }
+    // 기본 배율에서 아래로 끌면 닫기 제스처(위·가로 방향은 무시)
+    if (!lbStart.dismiss && mdy > LB_TAP_TOL && mdy > Math.abs(mdx)) lbStart.dismiss = true;
+    if (lbStart.dismiss) lbSetDismissProgress(Math.max(0, mdy));
   }
 });
 function lbEndPointer(e){
   lbPointers.delete(e.pointerId);
   if (lbPointers.size > 0){ lbStart = null; return; } // 핀치 중 한 손가락만 뗀 상태
   const s = lbStart; lbStart = null;
-  if (!s || s.pinch || s.moved) return;
+  if (!s) return;
+  if (s.dismiss){ // 천천히 90px 이상 끌었거나, 짧게 튕겼으면 닫는다
+    const dy = Math.max(0, e.clientY - s.y), elapsed = e.timeStamp - s.t;
+    const flick = elapsed <= LB_DISMISS_FLICK_MS && dy >= LB_DISMISS_FLICK_PX;
+    if (dy >= LB_DISMISS_PX || flick) lbCommitDismiss(dy);
+    else lbCancelDismiss();
+    return;
+  }
+  if (s.pinch || s.moved) return;
   const now = e.timeStamp;
   if (now - lbLastTap < LB_TAP_MS){ // 더블탭 = 2.5배 ↔ 원래 크기 토글
     lbLastTap = 0;
@@ -1216,7 +1357,11 @@ function lbEndPointer(e){
   setTimeout(() => { if (lbLastTap === now && lbScale <= 1.02 && !lb.hidden) closeLightbox(); }, LB_TAP_MS + 20);
 }
 lb.addEventListener('pointerup', lbEndPointer);
-lb.addEventListener('pointercancel', (e) => { lbPointers.delete(e.pointerId); lbStart = null; });
+lb.addEventListener('pointercancel', (e) => {
+  lbPointers.delete(e.pointerId);
+  const s = lbStart; lbStart = null;
+  if (s && s.dismiss) lbCancelDismiss();
+});
 
 // 본문·시험 본문의 스크린샷 탭 → 확대. 스와이프가 끝나며 딸려 오는 click은 이동거리로 거른다.
 document.addEventListener('click', (e) => {
