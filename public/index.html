@@ -29,71 +29,32 @@
   a:focus-visible,button:focus-visible{outline:2px solid var(--know);outline-offset:2px}
 
   #app{
-    position:fixed;inset:0;height:100dvh;display:flex;flex-direction:column;overflow:hidden;
+    position:fixed;inset:0;height:100dvh;overflow:hidden;
     max-width:520px;margin:0 auto;background:var(--ink);
-    padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
     -webkit-user-select:none;user-select:none;
   }
+  #readRoot,#examView{position:absolute;inset:0}
+  #readRoot[hidden],#examView[hidden]{display:none}
 
-  /* ── 상단바: 화면 공용(뒤로가기 / 제목 / 설정) ── */
-  .topbar2{display:flex;align-items:center;gap:10px;padding:10px 16px;flex:none}
-  .topbar2 .navbtn{width:34px;height:34px;border-radius:50%;border:0;background:var(--ink3);color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;flex:none;-webkit-touch-callout:none}
-  .topbar2 .navbtn[hidden]{display:none}
-  .topbar2 .navbtn:active{transform:scale(.94)}
-  .topbar2 .navbtn.active{background:color-mix(in srgb,var(--coral) 30%,var(--ink3));color:var(--coral)}
-  .topbar2-title{flex:1;font-family:var(--serif);font-size:16px;color:var(--paper);text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-
-  .views{flex:1;min-height:0;position:relative;overflow:hidden}
-  .view{position:absolute;inset:0;overflow-y:auto;-webkit-user-select:text;user-select:text}
-  .view[hidden]{display:none}
-  /* 학습/시험 화면은 자체 스크롤 영역(.scroller/.exambody)을 따로 두므로, 바깥 뷰는
-     스크롤이 아니라 세로 flex로 스테이지+스크러버+진행표시를 나눠 담는다. */
-  #viewStudy, #viewExam{overflow:hidden;display:flex;flex-direction:column}
-  #viewStudy[hidden], #viewExam[hidden]{display:none} /* ID 규칙이 .view[hidden]보다 우선하므로 다시 명시 */
-  #viewStudy .stage{flex:1;min-height:0;height:auto}
-
-  /* ── 챕터 개요 / 챕터 상세 공용 ── */
-  .listwrap{padding:6px 16px 24px;display:flex;flex-direction:column;gap:10px;-webkit-user-select:none;user-select:none}
-  .chaphead{padding:4px 16px 10px;display:flex;flex-direction:column;gap:6px}
-  .chaphead .num{font-family:var(--mono);font-size:26px;color:var(--paper);font-variant-numeric:tabular-nums}
-  .chaphead .num b{color:var(--coral);font-weight:500}
-  .chaphead .lbl{font-family:var(--mono);font-size:11px;color:var(--muted)}
-
-  .row{background:var(--ink3);border:0;border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;width:100%;text-align:left;cursor:pointer;-webkit-touch-callout:none}
-  .row:active{background:var(--ink4)}
-  .row-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
-  .row-label{font-family:var(--serif);font-size:15px;color:var(--paper)}
-  .row-range{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-left:6px}
-  .row-score{font-family:var(--mono);font-size:13px;color:var(--paper);font-variant-numeric:tabular-nums;flex:none}
-  .row-score .best{color:var(--muted);font-size:10.5px;margin-left:6px}
-  .row-bar{height:4px;border-radius:2px;background:var(--ink4);overflow:hidden}
-  .row-bar i{display:block;height:100%;background:var(--coral);border-radius:2px}
-
-  .subrow{background:var(--ink3);border-radius:12px;padding:11px 12px;display:flex;flex-direction:column;gap:8px}
-  .subrow-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
-  .subrow-label{font-family:var(--mono);font-size:12px;color:var(--muted)}
-  .subrow-score{font-family:var(--mono);font-size:13px;color:var(--paper);font-variant-numeric:tabular-nums}
-  .subrow-score .best{color:var(--muted);font-size:10.5px;margin-left:6px}
-  .subrow-actions{display:flex;gap:6px}
-  .subbtn{flex:1;background:var(--ink4);border:0;border-radius:9px;color:var(--body-text);font-family:var(--sans);font-size:12px;padding:9px 4px;cursor:pointer;-webkit-touch-callout:none}
-  .subbtn:active{background:color-mix(in srgb,var(--coral) 25%,var(--ink4))}
-  .subbtn.exam{color:var(--coral)}
-
-  .emptymsg{color:var(--muted);font-size:13px;padding:40px 20px;text-align:center}
-
-  /* ── 학습(스와이프) 화면 — 기존 카드 렌더/제스처 재사용 ── */
-  .stage{position:relative;height:100%;overflow:hidden}
-  .scroller{position:absolute;inset:0;z-index:2;overflow-y:auto;overflow-x:hidden;touch-action:pan-y;-webkit-user-select:text;user-select:text}
-  .cardtitle{display:block;font-family:var(--serif);font-weight:400;font-size:calc(clamp(22px,6vw,30px) * var(--tscale,1));line-height:1.18;letter-spacing:-.01em;color:var(--paper);text-decoration:none;text-wrap:balance;padding:8px 22px 6px}
+  /* ── 학습(읽기) 화면 — 홈 화면 자체. 본문이 가로·세로 전체를 쓰고, 컨트롤은 그 위에
+     떠 있는 오버레이다(가려지는 부분은 스크롤로 보면 됨 — 2026-09-05 실기기 피드백). ── */
+  .stage{position:absolute;inset:0}
+  .scroller{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;touch-action:pan-y;-webkit-user-select:text;user-select:text}
+  .cardtitle{
+    display:block;font-family:var(--serif);font-weight:400;
+    font-size:clamp(22px,6vw,30px);line-height:1.18;letter-spacing:-.01em;
+    color:var(--paper);text-decoration:none;text-wrap:balance;
+    padding:calc(env(safe-area-inset-top) + 44px) 22px 6px;
+  }
   .content{
-    padding:6px 60px 40px 20px;min-height:100%;
-    font-size:calc(15.5px * var(--bscale,1));line-height:1.66;color:var(--body-text);
+    padding:6px 20px calc(150px + env(safe-area-inset-bottom)) 20px;min-height:100%;
+    font-size:15.5px;line-height:1.7;color:var(--body-text);
     will-change:transform;
   }
-  .peek{position:absolute;inset:0;z-index:1;pointer-events:none;will-change:transform;display:flex;flex-direction:column;overflow:hidden}
+  .peek{position:absolute;inset:0;pointer-events:none;will-change:transform;display:flex;flex-direction:column;overflow:hidden;z-index:1}
   .peek-prev{transform:translateX(-100%)}
   .peek-next{transform:translateX(100%)}
-  .peek .cardtitle{padding:8px 22px 6px;color:var(--paper)}
+  .peek .cardtitle{padding:calc(env(safe-area-inset-top) + 44px) 22px 6px;color:var(--paper)}
   .peekbody{flex:1;min-height:0;-webkit-mask-image:linear-gradient(to bottom, black 55%, transparent 90%);mask-image:linear-gradient(to bottom, black 55%, transparent 90%)}
   .content p{margin:0 0 12px}
   .content h3{font-family:var(--serif);font-weight:400;font-size:1.3em;color:var(--paper);margin:20px 0 8px}
@@ -112,24 +73,82 @@
   .content th{color:var(--coral);font-weight:500;background:color-mix(in srgb,var(--coral) 7%,transparent)}
   .content .lhint{font-size:1.08em;font-weight:600;color:var(--paper);margin:0 0 14px}
   .content .src{display:inline-block;font-family:var(--mono);font-size:11px;color:var(--faint);text-decoration:none;border-bottom:1px solid var(--ink3);padding-bottom:2px;margin-top:4px}
+  .content .shot{max-width:100%;border-radius:10px;display:block;margin:6px 0 12px}
+  .content .shotcap{font-family:var(--mono);font-size:11px;color:var(--muted);margin:-6px 0 12px}
 
-  /* ── 스크러버: 소챕터(최대 10장) 안에서 훑어보기 — 드래그하면 그 카드로 바로 이동 ── */
-  .scrubber{flex:none;padding:6px 20px 4px;touch-action:none}
-  .scrubtrack{position:relative;height:16px}
-  .scrubtrack .track{position:absolute;left:0;right:0;top:50%;height:2px;background:var(--ink3);transform:translateY(-50%);border-radius:2px}
-  .scrubtrack .dot{position:absolute;top:50%;width:6px;height:6px;border-radius:50%;background:var(--faint);transform:translate(-50%,-50%);transition:background-color .1s ease}
-  .scrubtrack .dot.cur{background:var(--coral);width:9px;height:9px}
-  .studyfoot{flex:none;padding:0 20px 8px;font-family:var(--mono);font-size:11px;color:var(--muted);text-align:center}
+  /* ── 상단: 챕터-소챕터 주소("1-1") — 카드와 무관, 본문 위에 떠 있는 얇은 라벨 ── */
+  .subpos{
+    position:absolute;top:env(safe-area-inset-top);left:0;right:0;z-index:2;
+    display:flex;justify-content:center;padding:8px 0 0;pointer-events:none;
+  }
+  .subpos span{
+    font-family:var(--mono);font-size:11px;color:var(--muted);
+    background:color-mix(in srgb,var(--ink3) 80%,transparent);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+    padding:5px 11px;border-radius:99px;
+  }
+
+  /* ── 챕터 완주 넛지 배너 ── */
+  .chapnudge{
+    position:absolute;left:16px;right:16px;bottom:calc(158px + env(safe-area-inset-bottom));z-index:3;
+    background:color-mix(in srgb,var(--ink2) 94%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+    border-radius:14px;padding:12px 14px;box-shadow:0 8px 24px rgba(0,0,0,.4);
+    display:flex;flex-direction:column;gap:8px;
+    opacity:0;pointer-events:none;transform:translateY(16px);transition:opacity .22s ease,transform .22s ease;
+  }
+  .chapnudge.on{opacity:1;pointer-events:auto;transform:translateY(0)}
+  .chapnudge p{margin:0;font-size:13px;color:var(--paper)}
+  .chapnudge .row{display:flex;gap:8px}
+  .chapnudge button{flex:1;border:0;border-radius:9px;padding:9px;font-size:12.5px;cursor:pointer;background:var(--ink4);color:var(--body-text)}
+  .chapnudge button.primary{background:color-mix(in srgb,var(--coral) 22%,var(--ink4));color:var(--coral)}
+
+  /* ── 하단 플로팅 바: 스크러버 + 필터/시험/형광펜/시트 ── 본문 위에 떠서 엄지 반경을 채운다 ── */
+  .bottombar{
+    position:absolute;left:0;right:0;bottom:0;z-index:2;
+    padding:10px 16px calc(10px + env(safe-area-inset-bottom));
+    background:linear-gradient(to top, rgba(11,13,16,.92) 40%, rgba(11,13,16,0));
+  }
+  .scrubber{padding:2px 4px 10px;touch-action:none}
+  .scrubtrack{position:relative;height:18px}
+  .scrubtrack .track{position:absolute;left:0;right:0;top:50%;height:2px;background:var(--ink4);transform:translateY(-50%);border-radius:2px}
+  .scrubtrack .dot{position:absolute;top:50%;width:7px;height:7px;border-radius:50%;background:var(--faint);transform:translate(-50%,-50%);transition:background-color .1s ease}
+  .scrubtrack .dot.cur{background:var(--coral);width:10px;height:10px}
+  .barrow{display:flex;align-items:center;gap:8px}
+  .seg{flex:1;display:flex;background:var(--ink3);border-radius:10px;padding:3px}
+  .seg button{flex:1;border:0;background:none;color:var(--muted);font-size:12px;padding:8px 4px;border-radius:8px;cursor:pointer}
+  .seg button.on{background:var(--ink4);color:var(--paper)}
+  .barbtn{
+    flex:none;width:42px;height:42px;border-radius:50%;border:0;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;font-size:17px;
+    background:var(--ink3);color:var(--muted);-webkit-touch-callout:none;
+  }
+  .barbtn:active{transform:scale(.93)}
+  .barbtn.exam{background:color-mix(in srgb,var(--coral) 18%,var(--ink3));color:var(--coral);width:auto;padding:0 14px;border-radius:21px;font-size:12.5px;gap:6px}
+  .barbtn.active{background:color-mix(in srgb,var(--coral) 30%,var(--ink3));color:var(--coral)}
+
+  /* ── 본문 드래그 선택 → 제목으로 변경 / 형광펜(문서 하단 JS 참조) ── */
+  .retitlePop{position:fixed;z-index:9;background:var(--coral);color:var(--ink);font-family:var(--sans);font-size:12.5px;font-weight:600;padding:9px 14px;border-radius:99px;box-shadow:0 4px 16px rgba(0,0,0,.4);cursor:pointer;-webkit-user-select:none;user-select:none}
+  .retitlePop[hidden]{display:none}
+
+  .toast{position:fixed;left:50%;bottom:170px;transform:translate(-50%,8px);z-index:8;font-family:var(--mono);font-size:12.5px;color:var(--paper);background:var(--ink3);padding:8px 14px;border-radius:8px;opacity:0;pointer-events:none;transition:opacity .18s ease,transform .18s ease;white-space:nowrap}
+  .toast.on{opacity:1;transform:translate(-50%,0)}
+
+  .loadbox{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:var(--ink)}
+  .loadbox[hidden]{display:none}
+  .loadbox h2{font-family:var(--serif);font-weight:300;font-size:22px;margin:0;color:var(--paper)}
+  .loadbox p{margin:0;color:var(--muted);font-size:13px}
+  .loadbox button{margin-top:6px;background:var(--ink3);color:var(--paper);border:0;border-radius:8px;padding:9px 16px;font-size:13px;cursor:pointer}
 
   /* ── 시험(exam) ── */
-  .examwrap{display:flex;flex-direction:column;height:100%;padding:0 22px}
-  .examprog{flex:none;font-family:var(--mono);font-size:11px;color:var(--muted);padding:10px 0 0;text-align:center}
+  #examView{display:flex;flex-direction:column}
+  .examtop{flex:none;display:flex;align-items:center;gap:10px;padding:calc(env(safe-area-inset-top) + 10px) 16px 6px}
+  .examtop button{width:34px;height:34px;border-radius:50%;border:0;background:var(--ink3);color:var(--muted);cursor:pointer;font-size:16px;flex:none}
+  .examtop .ttl{flex:1;text-align:center;font-family:var(--serif);font-size:15px;color:var(--paper)}
+  .examwrap{flex:1;min-height:0;display:flex;flex-direction:column;padding:0 22px}
+  .examprog{flex:none;font-family:var(--mono);font-size:11px;color:var(--muted);padding:6px 0 0;text-align:center}
   .examcard{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:18px;overflow-y:auto}
   .examtitle{font-family:var(--serif);font-size:clamp(24px,7vw,32px);line-height:1.25;color:var(--paper);text-align:center;text-wrap:balance}
   .examreveal{align-self:center;background:var(--ink3);color:var(--coral);border:0;border-radius:99px;padding:13px 26px;font-family:var(--sans);font-size:14px;cursor:pointer}
   .examreveal:active{background:var(--ink4)}
-  /* min-height:0으로 .content{min-height:100%}를 상쇄 — 안 그러면 시험 화면의 justify-content:center
-     플렉스가 이 블록을 부모 높이만큼 억지로 늘려서, 위로 넘친 제목이 위쪽으로 잘려 보인다. */
   .exambody{min-height:0;max-height:44vh;overflow-y:auto;-webkit-user-select:text;user-select:text}
   .examjudge{display:flex;gap:10px;padding:6px 0 22px;flex:none}
   .examjudge[hidden]{display:none}
@@ -144,31 +163,32 @@
   .examresult button{background:var(--ink3);color:var(--paper);border:0;border-radius:10px;padding:13px;font-family:var(--sans);font-size:13.5px;cursor:pointer}
   .examresult button.primary{background:color-mix(in srgb,var(--coral) 20%,var(--ink3));color:var(--coral)}
 
-  /* ── 본문 드래그 선택 → 제목으로 변경 ── */
-  .retitlePop{position:fixed;z-index:9;background:var(--coral);color:var(--ink);font-family:var(--sans);font-size:12.5px;font-weight:600;padding:9px 14px;border-radius:99px;box-shadow:0 4px 16px rgba(0,0,0,.4);cursor:pointer;-webkit-user-select:none;user-select:none}
-  .retitlePop[hidden]{display:none}
-
-  .toast{position:fixed;left:50%;bottom:36px;transform:translate(-50%,8px);z-index:8;font-family:var(--mono);font-size:12.5px;color:var(--paper);background:var(--ink3);padding:8px 14px;border-radius:8px;opacity:0;pointer-events:none;transition:opacity .18s ease,transform .18s ease;white-space:nowrap}
-  .toast.on{opacity:1;transform:translate(-50%,0)}
-
-  .loadbox{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:var(--ink)}
-  .loadbox[hidden]{display:none}
-  .loadbox h2{font-family:var(--serif);font-weight:300;font-size:22px;margin:0;color:var(--paper)}
-  .loadbox p{margin:0;color:var(--muted);font-size:13px}
-  .loadbox button{margin-top:6px;background:var(--ink3);color:var(--paper);border:0;border-radius:8px;padding:9px 16px;font-size:13px;cursor:pointer}
-
-  /* ── 설정 시트(글자 크기) ── */
-  .sheetback{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:6;opacity:0;pointer-events:none;transition:opacity .22s ease}
+  /* ── 하단 시트: 챕터 목록 + 설정 ── */
+  .sheetback{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:10;opacity:0;pointer-events:none;transition:opacity .22s ease}
   .sheetback.on{opacity:1;pointer-events:auto}
   .sheet{
-    position:fixed;left:0;right:0;bottom:0;max-width:520px;margin:0 auto;z-index:7;
-    background:var(--ink2);border-radius:18px 18px 0 0;padding:14px 18px calc(20px + env(safe-area-inset-bottom));
+    position:fixed;left:0;right:0;bottom:0;max-width:520px;margin:0 auto;z-index:11;
+    background:var(--ink2);border-radius:18px 18px 0 0;max-height:82dvh;display:flex;flex-direction:column;
     transform:translateY(100%);transition:transform .26s cubic-bezier(.2,.7,.3,1);
-    box-shadow:0 -8px 30px rgba(0,0,0,.4);
+    padding-bottom:env(safe-area-inset-bottom);box-shadow:0 -8px 30px rgba(0,0,0,.4);
   }
   .sheet.on{transform:translateY(0)}
-  .sheethandle{width:36px;height:4px;background:var(--ink4);border-radius:3px;margin:0 auto 14px}
-  .sliderow{display:flex;align-items:center;gap:10px;margin:8px 0}
+  .sheethandle{width:36px;height:4px;background:var(--ink4);border-radius:3px;margin:10px auto 4px;flex:none}
+  .sheetscroll{flex:1;min-height:0;overflow-y:auto;-webkit-user-select:text;user-select:text}
+  .chaplist{padding:6px 16px 10px;display:flex;flex-direction:column;gap:10px}
+  .chaprow{background:var(--ink3);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+  .chaprow-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .chaprow-label{font-family:var(--serif);font-size:15px;color:var(--paper)}
+  .chaprow-range{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-left:6px}
+  .chaprow-score{font-family:var(--mono);font-size:22px;font-weight:500;color:var(--paper);font-variant-numeric:tabular-nums;flex:none;text-align:right}
+  .chaprow-score .best{display:block;font-size:11px;font-weight:400;color:var(--coral);margin-top:1px}
+  .chaprow-bar{height:5px;border-radius:3px;background:var(--ink4);overflow:hidden}
+  .chaprow-bar i{display:block;height:100%;background:var(--coral);border-radius:3px}
+  .chaprow-actions{display:flex;gap:6px}
+  .chaprow-actions button{flex:1;background:var(--ink4);border:0;border-radius:9px;color:var(--body-text);font-family:var(--sans);font-size:12px;padding:9px 4px;cursor:pointer}
+  .chaprow-actions button.exam{color:var(--coral)}
+  .sheetsettings{padding:8px 18px 4px;display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--ink3);margin-top:2px}
+  .sliderow{display:flex;align-items:center;gap:10px}
   .sliderow label{flex:none;width:38px;font-family:var(--mono);font-size:11px;color:var(--muted)}
   .sliderow input[type="range"]{flex:1;-webkit-appearance:none;appearance:none;height:6px;border-radius:999px;outline:none;background:linear-gradient(to right,var(--coral) 0%,var(--coral) var(--fill,50%),var(--ink4) var(--fill,50%),var(--ink4) 100%)}
   .sliderow input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:16px;border-radius:50%;background:var(--coral);cursor:pointer;border:2px solid var(--ink)}
@@ -182,43 +202,60 @@
 </head>
 <body>
 <div id="app">
-  <div class="topbar2" id="topbar2">
-    <button class="navbtn" id="backBtn" hidden aria-label="뒤로">&#8592;</button>
-    <div class="topbar2-title" id="topbarTitle">Shorts Deck</div>
-    <button class="navbtn" id="hlBtn" hidden aria-label="형광펜 모드">&#128397;</button>
-    <button class="navbtn" id="gearBtn" aria-label="설정">&#9881;</button>
-  </div>
-
-  <div class="views" id="views">
-    <section class="view" id="viewChapters"></section>
-    <section class="view" id="viewChapter" hidden></section>
-
-    <section class="view" id="viewStudy" hidden>
-      <div class="stage" id="studyStage">
-        <div class="scroller" id="scroller">
-          <a class="cardtitle" id="cardTitle" href="#" target="_blank" rel="noopener"></a>
-          <div class="content" id="content"></div>
-        </div>
-        <div class="peek peek-prev" id="peekPrev"><div class="cardtitle" id="peekPrevTitle"></div><div class="content peekbody" id="peekPrevBody"></div></div>
-        <div class="peek peek-next" id="peekNext"><div class="cardtitle" id="peekNextTitle"></div><div class="content peekbody" id="peekNextBody"></div></div>
+  <div id="readRoot">
+    <div class="stage" id="stage">
+      <div class="scroller" id="scroller">
+        <a class="cardtitle" id="cardTitle" href="#" target="_blank" rel="noopener"></a>
+        <div class="content" id="content"></div>
       </div>
-      <div class="scrubber" id="scrubber"><div class="scrubtrack" id="scrubTrack"><div class="track"></div></div></div>
-      <div class="studyfoot" id="studyFoot"></div>
-    </section>
+      <div class="peek peek-prev" id="peekPrev"><div class="cardtitle" id="peekPrevTitle"></div><div class="content peekbody" id="peekPrevBody"></div></div>
+      <div class="peek peek-next" id="peekNext"><div class="cardtitle" id="peekNextTitle"></div><div class="content peekbody" id="peekNextBody"></div></div>
+      <div class="subpos"><span id="subPos">1-1</span></div>
+    </div>
 
-    <section class="view" id="viewExam" hidden></section>
+    <div class="chapnudge" id="chapNudge">
+      <p id="chapNudgeText"></p>
+      <div class="row"><button id="chapNudgeSkip">다음 챕터로 계속</button><button class="primary" id="chapNudgeGo">지금 전체시험 보기</button></div>
+    </div>
+
+    <div class="bottombar" id="bottombar">
+      <div class="scrubber" id="scrubber"><div class="scrubtrack" id="scrubTrack"><div class="track"></div></div></div>
+      <div class="barrow">
+        <div class="seg" id="filterSeg">
+          <button data-m="all" class="on">전체</button>
+          <button data-m="unknown">모르는 것만</button>
+        </div>
+        <button class="barbtn exam" id="examQuickBtn">📝 시험</button>
+        <button class="barbtn" id="hlBtn" aria-label="형광펜 모드">&#128397;</button>
+        <button class="barbtn" id="sheetBtn" aria-label="챕터 목록">&#9776;</button>
+      </div>
+    </div>
 
     <div class="loadbox" id="loading"><h2 id="loadTitle">불러오는 중</h2><p id="loadMsg">Notion에서 카드를 가져옴</p></div>
   </div>
+
+  <div id="examView" hidden>
+    <div class="examtop"><button id="examBack" aria-label="닫기">&#10005;</button><div class="ttl" id="examTitleBar">시험</div><button id="examHlBtn" aria-label="형광펜">&#128397;</button></div>
+    <div class="examwrap"><div class="examprog" id="examProg"></div>
+      <div class="examcard" id="examCard"></div>
+      <div class="examjudge" id="examJudge" hidden><button class="dontknow" data-k="0">몰랐음</button><button class="know" data-k="1">알고 있었음</button></div>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
   <div class="retitlePop" id="retitlePop" hidden>이 문장을 제목으로</div>
 </div>
 
 <div class="sheetback" id="sheetback"></div>
-<div class="sheet" id="settingsSheet">
+<div class="sheet" id="sheet">
   <div class="sheethandle"></div>
-  <div class="sliderow"><label for="titleScale">제목</label><input type="range" id="titleScale" min="0.7" max="1.4" step="0.02" value="1"><span class="val" id="titleScaleVal"></span></div>
-  <div class="sliderow"><label for="bodyScale">본문</label><input type="range" id="bodyScale" min="0.8" max="1.5" step="0.02" value="1"><span class="val" id="bodyScaleVal"></span></div>
+  <div class="sheetscroll">
+    <div class="chaplist" id="chapList"></div>
+    <div class="sheetsettings">
+      <div class="sliderow"><label for="titleScale">제목</label><input type="range" id="titleScale" min="0.7" max="1.4" step="0.02" value="1"><span class="val" id="titleScaleVal"></span></div>
+      <div class="sliderow"><label for="bodyScale">본문</label><input type="range" id="bodyScale" min="0.8" max="1.5" step="0.02" value="1"><span class="val" id="bodyScaleVal"></span></div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -227,6 +264,8 @@ const esc = (s) => String(s == null ? '' : s).replace(/[&<>]/g, (m) => ({ '&':'&
 const escBr = (s) => String(s == null ? '' : s).split(/<br\s*\/?>/i).map(esc).join('<br>');
 function lsGet(k){ try { return localStorage.getItem(k); } catch (e) { return null; } }
 function lsSet(k, v){ try { localStorage.setItem(k, v); } catch (e) {} }
+function lsGetJSON(k, d){ try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }
+function lsSetJSON(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
 
 /* ── 원본 블록 렌더링(서버가 압축해 보낸 Notion 블록을 표시 시점에 그린다) ── */
 function richHtml(rich){
@@ -248,8 +287,14 @@ function tableHtml(b){
     return '<tr>' + row.map((cell) => '<' + tag + '>' + richHtml(cell) + '</' + tag + '>').join('') + '</tr>';
   }).join('') + '</table>';
 }
-// data-blk=detail 배열 인덱스 — 형광펜이 DOM 선택을 다시 그 블록의 rich 배열로 매핑할 때 씀.
-// to_do(체크글자가 rich 앞에 붙어 오프셋이 어긋남)·code·divider·table은 형광펜 대상에서 뺀다.
+// 초창기(AI 도입 전) 메모는 스크린샷을 그대로 붙여넣은 카드가 있다 — Notion 자체 호스팅
+// 이미지는 URL이 만료되므로 /api/image로 매번 새로 받는다(external은 고정 URL 그대로).
+function imageHtml(b){
+  const src = b.external || ('/api/image?id=' + encodeURIComponent(b.id));
+  const cap = (b.caption || []).map((t) => t.t).join('');
+  return '<img class="shot" src="' + esc(src) + '" alt="' + esc(cap || '메모 스크린샷') + '" loading="lazy">'
+    + (cap ? '<p class="shotcap">' + esc(cap) + '</p>' : '');
+}
 function blockHtml(b, i){
   if (!b) return '';
   const blk = i == null ? '' : ' data-blk="' + i + '"';
@@ -265,6 +310,7 @@ function blockHtml(b, i){
     case 'code': return '<pre><code>' + richHtml(b.rich) + '</code></pre>';
     case 'divider': return '<hr>';
     case 'table': return tableHtml(b);
+    case 'image': return imageHtml(b);
     default: return b.rich ? '<p' + blk + '>' + richHtml(b.rich) + '</p>' : '';
   }
 }
@@ -284,6 +330,7 @@ function blocksHtml(blocks){
 function hintHtml(c){
   if (c.hint == null) return null;
   if (typeof c.hint === 'string') return escBr(c.hint);
+  if (c.hint.type === 'image') return null; // 힌트 자리엔 텍스트만(이미지면 detail 쪽에서 그림)
   return richHtml(c.hint.rich || []);
 }
 function detailHtml(c){
@@ -293,13 +340,15 @@ function detailHtml(c){
 }
 function cardBodyHtml(c){
   const h = hintHtml(c);
-  return (h ? '<p class="lhint" data-blk="hint">' + h + '</p>' : '') + detailHtml(c)
+  const hintIsImage = c.hint && c.hint.type === 'image';
+  return (hintIsImage ? imageHtml(c.hint) : '') + (h ? '<p class="lhint" data-blk="hint">' + h + '</p>' : '') + detailHtml(c)
     + (c.url ? '<a class="src" href="' + esc(c.url) + '" target="_blank" rel="noopener">원본 쇼츠 &#8599;</a>' : '');
 }
 function peekBodyHtml(c){
   if (!c) return '';
   const h = hintHtml(c);
-  return (h ? '<p class="lhint">' + h + '</p>' : '') + detailHtml(c);
+  const hintIsImage = c.hint && c.hint.type === 'image';
+  return (hintIsImage ? imageHtml(c.hint) : '') + (h ? '<p class="lhint">' + h + '</p>' : '') + detailHtml(c);
 }
 
 /* ── 토스트 ── */
@@ -308,13 +357,13 @@ function toast(msg){
   clearTimeout(toastT);
   const t = $('toast');
   t.textContent = msg; t.classList.add('on');
-  toastT = setTimeout(() => t.classList.remove('on'), 1200);
+  toastT = setTimeout(() => t.classList.remove('on'), 1300);
 }
 
 /* ── API ── */
 async function apiChapters(){ const r = await fetch('/api/chapters'); return r.json(); }
-async function apiChapter(id){ const r = await fetch('/api/chapter?id=' + encodeURIComponent(id)); return r.json(); }
 async function apiSubchapter(id, mode){ const r = await fetch('/api/subchapter?id=' + encodeURIComponent(id) + '&mode=' + mode); return r.json(); }
+async function apiChapterExam(id){ const r = await fetch('/api/chapterexam?id=' + encodeURIComponent(id)); return r.json(); }
 function apiAnswer(subId, key, know){
   return fetch('/api/answer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subId, key, know }) })
     .then((r) => r.json()).catch(() => null);
@@ -323,12 +372,15 @@ async function apiRetitle(pageId, oldKey, newTitle){
   const r = await fetch('/api/retitle', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pageId, oldKey, newTitle }) });
   return r.json();
 }
+async function apiHighlight(pageId, field, blockIndex, start, end){
+  const r = await fetch('/api/highlight', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pageId, field, blockIndex, start, end }) });
+  return r.json();
+}
 
 /* ── 본문 드래그 선택 → 제목으로 변경 ──
-   노션 DB가 AI 질의응답 기준이라 제목(이름)에 단어 하나·한글 질문이 그대로 들어간 행이
-   섞여 있음. 1,323건을 노션에서 손으로 고치는 대신, 학습/시험 중 본문에서 원하는 예문을
-   드래그해 그 자리에서 제목으로 바꾼다(2026-09-05). */
-let retitleCtx = null; // { getCard: () => 현재 카드 }
+   iOS 기본 선택 팝업(복사/찾아보기/번역)이 대개 선택 "위"에 뜨므로, 우리 팝업은 "아래"에
+   띄워 겹침을 줄인다(완전히 없애긴 iOS 특성상 어려움 — 2026-09-05 실기기 피드백). */
+let retitleCtx = null;
 function setRetitleContext(getCard){ retitleCtx = { getCard }; }
 function clearRetitleContext(){ retitleCtx = null; hideRetitlePop(); }
 function hideRetitlePop(){ $('retitlePop').hidden = true; }
@@ -338,10 +390,10 @@ function showRetitlePop(rect, text){
   pop.dataset.text = text;
   const w = pop.offsetWidth || 120;
   pop.style.left = Math.max(8, Math.min(window.innerWidth - 8 - w, rect.left + rect.width / 2 - w / 2)) + 'px';
-  pop.style.top = Math.max(8, rect.top - 44) + 'px';
+  pop.style.top = Math.min(window.innerHeight - 50, rect.bottom + 10) + 'px';
 }
 document.addEventListener('selectionchange', () => {
-  if (!retitleCtx || highlightMode) return; // 형광펜 모드 중엔 같은 선택으로 "제목으로" 팝업을 안 띄운다
+  if (!retitleCtx || highlightMode) return;
   const sel = document.getSelection();
   const text = sel && !sel.isCollapsed ? sel.toString().trim() : '';
   if (!text){ hideRetitlePop(); return; }
@@ -351,7 +403,7 @@ document.addEventListener('selectionchange', () => {
   showRetitlePop(rect, text);
 });
 $('retitlePop').addEventListener('pointerdown', async (e) => {
-  e.preventDefault(); // 선택 해제 방지
+  e.preventDefault();
   const text = $('retitlePop').dataset.text;
   const card = retitleCtx && retitleCtx.getCard();
   hideRetitlePop();
@@ -359,25 +411,33 @@ $('retitlePop').addEventListener('pointerdown', async (e) => {
   const res = await apiRetitle(card.id, card.key, text).catch(() => null);
   if (res && res.ok){
     card.front = res.front; card.key = res.key;
-    if (currentView === 'study') $('cardTitle').textContent = card.front;
-    if (currentView === 'exam') { const el = $('examTitle'); if (el) el.textContent = card.front; }
+    if (!examMode) $('cardTitle').textContent = card.front;
+    else { const el = $('examTitle'); if (el) el.textContent = card.front; }
     toast('제목 변경됨');
   } else toast('제목 변경 실패');
 });
 
-/* ── 형광펜 모드 ── (youtube_dual_subtitle 확장과 동일 정책)
-   버튼을 켜면 모드가 유지된다 — 이후 본문에서 드래그할 때마다(mouseup) 자동으로 그 구간의
-   code(=형광펜) 여부를 뒤집는다. 이미 형광펜된 구간을 클릭(드래그 아님)해도 그 구간 전체가
-   해제된다. 버튼을 다시 끄면 모드 해제(본문 선택은 평소처럼 아무 일도 안 함). */
+/* ── 형광펜 모드 ── 켜면 유지되고, 그 뒤 드래그마다 자동으로 그 구간의 code(형광펜)를
+   토글한다. 이미 형광펜된 구간을 클릭(드래그 아님)해도 해제된다. 모드를 켜는 순간 이미
+   선택돼 있던 텍스트가 있으면 그 자리에서 바로 적용한다(2026-09-05 실기기 피드백 —
+   "드래그 후 형광펜 눌러도 반응 없음" 버그 수정). */
 let highlightMode = false;
-function setHighlightMode(on){
+function setHighlightMode(on, btn){
   highlightMode = on;
   $('hlBtn').classList.toggle('active', on);
+  $('examHlBtn').classList.toggle('active', on);
+  if (on){
+    hideRetitlePop();
+    const t = getHighlightTarget();
+    if (t){ window.getSelection().removeAllRanges(); doHighlight(t.blk, t.start, t.end); }
+  }
 }
-$('hlBtn').addEventListener('click', () => setHighlightMode(!highlightMode));
+function toggleHighlightMode(){ setHighlightMode(!highlightMode); }
+$('hlBtn').addEventListener('click', toggleHighlightMode);
+$('examHlBtn').addEventListener('click', toggleHighlightMode);
 
 function currentCardForHighlight(){
-  return currentView === 'study' ? studyCards[studyIdx] : (currentView === 'exam' ? examCards[examIdx] : null);
+  return !examMode ? studyCards[studyIdx] : examCards[examIdx];
 }
 function plainOffsetInBlock(blockEl, node, offset){
   const walker = document.createTreeWalker(blockEl, NodeFilter.SHOW_TEXT);
@@ -408,13 +468,10 @@ async function doHighlight(blk, start, end){
   if (!card) return;
   const field = blk === 'hint' ? 'hint' : 'detail';
   const blockIndex = blk === 'hint' ? null : Number(blk);
-  const res = await fetch('/api/highlight', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ pageId: card.id, field, blockIndex, start, end }),
-  }).then((r) => r.json()).catch(() => null);
+  const res = await apiHighlight(card.id, field, blockIndex, start, end);
   if (res && res.ok){
     Object.assign(card, res.card);
-    if (currentView === 'study') renderStudyCard();
+    if (!examMode) renderStudyCard();
     else { const el = $('examBody'); if (el) el.innerHTML = cardBodyHtml(card); }
   } else toast('형광펜 실패');
 }
@@ -429,8 +486,6 @@ function onHighlightAreaClick(e){
   if (!highlightMode) return;
   const code = e.target.closest('code.hl');
   if (!code) return;
-  // selectNodeContents(code)는 텍스트 오프셋이 아니라 자식 노드 인덱스로 범위를 잡아
-  // plainOffsetInBlock의 텍스트노드 매칭과 안 맞는다 — 실제 첫/끝 텍스트노드로 범위를 잡는다.
   const walker = document.createTreeWalker(code, NodeFilter.SHOW_TEXT);
   let first = null, last = null;
   while (walker.nextNode()){ if (!first) first = walker.currentNode; last = walker.currentNode; }
@@ -442,7 +497,6 @@ function onHighlightAreaClick(e){
   sel.removeAllRanges(); sel.addRange(range);
   tryAutoHighlight();
 }
-// 학습(#content)·시험 리빌 본문(#examBody, 동적으로 생성됨)에 위임 방식으로 붙인다.
 document.addEventListener('mouseup', (e) => {
   if (!highlightMode) return;
   if (!e.target.closest('#content, #examBody')) return;
@@ -454,120 +508,57 @@ document.addEventListener('click', (e) => {
   onHighlightAreaClick(e);
 });
 
-/* ── 라우팅: 챕터개요 / 챕터상세 / 학습 / 시험 ── */
-let currentView = 'chapters';
-let currentChapterId = null;
-let backHandler = null;
-
-function showView(name, title, back){
-  currentView = name;
-  ['viewChapters', 'viewChapter', 'viewStudy', 'viewExam'].forEach((id) => { $(id).hidden = (id !== 'view' + name[0].toUpperCase() + name.slice(1)); });
-  $('topbarTitle').textContent = title;
-  backHandler = back || null;
-  $('backBtn').hidden = !backHandler;
-  const inCard = name === 'study' || name === 'exam';
-  $('hlBtn').hidden = !inCard;
-  if (!inCard){ clearRetitleContext(); setHighlightMode(false); }
-  $('loading').hidden = true;
+/* ── 위치(챕터/소챕터) 상태 — localStorage에 저장해 다음 접속에도 이어본다 ── */
+let chapIdx = 0, subIdx = 0;
+let chapSubCount = 10; // 지금 챕터의 소챕터 개수(마지막 챕터는 더 적을 수 있음) — /api/chapters에서 갱신
+let totalChapters = 1;
+let allChaptersData = null; // /api/chapters 결과 캐시(시트에서 씀)
+function loadPos(){
+  const p = lsGetJSON('sd_pos', null);
+  if (p && typeof p.chap === 'number' && typeof p.sub === 'number'){ chapIdx = p.chap; subIdx = p.sub; }
 }
-$('backBtn').addEventListener('click', () => { if (backHandler) backHandler(); });
-$('gearBtn').addEventListener('click', () => { $('settingsSheet').classList.add('on'); $('sheetback').classList.add('on'); });
-$('sheetback').addEventListener('click', () => { $('settingsSheet').classList.remove('on'); $('sheetback').classList.remove('on'); });
+function savePos(){ lsSetJSON('sd_pos', { chap: chapIdx, sub: subIdx }); }
+function subId(){ return 'c' + chapIdx + 's' + subIdx; }
+function chapId(){ return 'c' + chapIdx; }
+function updateSubPos(){ $('subPos').textContent = (chapIdx + 1) + '-' + (subIdx + 1); }
+
+async function refreshChapterMeta(){
+  allChaptersData = await apiChapters().catch(() => null);
+  if (allChaptersData && allChaptersData.chapters){
+    totalChapters = allChaptersData.chapters.length || 1;
+    const cur = allChaptersData.chapters[chapIdx];
+    // 소챕터 개수는 카드 총량/10 올림(마지막 소챕터만 짧을 수 있음) — 서버와 동일 규칙(SUB_SIZE=10).
+    if (cur) chapSubCount = Math.max(1, Math.ceil(cur.total / 10));
+  }
+}
+
+/* ── 학습(스와이프) — 소챕터 카드 로드/렌더 ── */
+let studyCards = [], studyIdx = 0, studyMode = 'all';
+let examMode = false;
 
 function showLoading(title, msg, retry){
-  $('loadTitle').textContent = title;
-  $('loadMsg').textContent = msg;
-  const box = $('loading');
-  box.hidden = false;
+  $('loadTitle').textContent = title; $('loadMsg').textContent = msg;
+  const box = $('loading'); box.hidden = false;
   let btn = box.querySelector('button');
-  if (retry){
-    if (!btn){ btn = document.createElement('button'); box.appendChild(btn); }
-    btn.textContent = '다시 시도';
-    btn.onclick = retry;
-  } else if (btn) btn.remove();
+  if (retry){ if (!btn){ btn = document.createElement('button'); box.appendChild(btn); } btn.textContent = '다시 시도'; btn.onclick = retry; }
+  else if (btn) btn.remove();
 }
+function hideLoading(){ $('loading').hidden = true; }
 
-/* ── 챕터 개요(홈) ── */
-async function loadChapters(){
-  showLoading('불러오는 중', '챕터 목록을 가져옴');
-  let data;
-  try { data = await apiChapters(); }
-  catch (e) { showLoading('불러오기 실패', String(e.message || e), loadChapters); return; }
-  if (data.syncing && !(data.chapters || []).length){
-    showLoading('동기화 중', 'Notion에서 카드를 가져오는 중 — 잠시 후 다시 시도', loadChapters);
-    return;
-  }
-  renderChapters(data);
-}
-function renderChapters(data){
-  showView('chapters', 'Shorts Deck', null);
-  const chapters = data.chapters || [];
-  if (!chapters.length){ $('viewChapters').innerHTML = '<div class="emptymsg">카드가 없음</div>'; return; }
-  $('viewChapters').innerHTML = '<div class="listwrap">' + chapters.map((c, i) => {
-    const pct = c.total ? Math.round(c.current / c.total * 100) : 0;
-    return '<button class="row" data-id="' + esc(c.id) + '">'
-      + '<div class="row-top"><span class="row-label">챕터 ' + (i + 1) + '<span class="row-range">' + c.start + '~' + c.end + '</span></span>'
-      + '<span class="row-score">' + c.current + '/' + c.total + '<span class="best">최고 ' + c.best + '</span></span></div>'
-      + '<div class="row-bar"><i style="width:' + pct + '%"></i></div>'
-      + '</button>';
-  }).join('') + '</div>';
-}
-$('viewChapters').addEventListener('click', (e) => {
-  const row = e.target.closest('.row'); if (!row) return;
-  loadChapter(row.dataset.id);
-});
-
-/* ── 챕터 상세(소챕터 10개) ── */
-async function loadChapter(id){
-  currentChapterId = id;
-  showLoading('불러오는 중', '소챕터 목록을 가져옴');
-  let data;
-  try { data = await apiChapter(id); }
-  catch (e) { showLoading('불러오기 실패', String(e.message || e), () => loadChapter(id)); return; }
-  if (data.error){ showLoading('불러오기 실패', data.error, () => loadChapter(id)); return; }
-  renderChapterDetail(data);
-}
-function renderChapterDetail(data){
-  showView('chapter', '챕터 ' + (Number(data.id.slice(1)) + 1), loadChapters);
-  const rows = data.subchapters.map((s, i) => {
-    return '<div class="subrow" data-id="' + esc(s.id) + '">'
-      + '<div class="subrow-top"><span class="subrow-label">소챕터 ' + (i + 1) + ' · ' + s.start + '~' + s.end + '</span>'
-      + '<span class="subrow-score">' + s.current + '/' + s.total + '<span class="best">최고 ' + s.best + '</span></span></div>'
-      + '<div class="subrow-actions">'
-      + '<button class="subbtn" data-act="all">전체보기</button>'
-      + '<button class="subbtn" data-act="unknown">모르는 것만</button>'
-      + '<button class="subbtn exam" data-act="exam">시험보기</button>'
-      + '</div></div>';
-  }).join('');
-  $('viewChapter').innerHTML = '<div class="chaphead"><div class="num">' + data.current + '/' + data.total + ' <b>최고 ' + data.best + '</b></div><div class="lbl">이 챕터에서 안다고 판정한 카드 수</div></div><div class="listwrap">' + rows + '</div>';
-}
-$('viewChapter').addEventListener('click', (e) => {
-  const btn = e.target.closest('[data-act]'); if (!btn) return;
-  const subId = btn.closest('.subrow').dataset.id;
-  const act = btn.dataset.act;
-  if (act === 'all') enterStudyFromServer(subId, 'all');
-  else if (act === 'unknown') enterStudyFromServer(subId, 'unknown');
-  else if (act === 'exam') enterExam(subId);
-});
-
-/* ── 학습(스와이프) ── */
-let studyCards = [], studyIdx = 0, studySubId = null;
-async function enterStudyFromServer(subId, mode){
+async function loadSubchapter(){
   showLoading('불러오는 중', '카드를 가져옴');
   let data;
-  try { data = await apiSubchapter(subId, mode); }
-  catch (e) { showLoading('불러오기 실패', String(e.message || e), () => enterStudyFromServer(subId, mode)); return; }
-  if (data.error){ showLoading('불러오기 실패', data.error, () => enterStudyFromServer(subId, mode)); return; }
-  if (!data.cards.length){
-    loadChapter(currentChapterId);
-    toast(mode === 'unknown' ? '이 소챕터는 모두 알고 있음' : '카드 없음');
+  try { data = await apiSubchapter(subId(), studyMode); }
+  catch (e) { showLoading('불러오기 실패', String(e.message || e), loadSubchapter); return; }
+  if (data.error){ showLoading('불러오기 실패', data.error, loadSubchapter); return; }
+  studyCards = data.cards; studyIdx = 0;
+  hideLoading();
+  if (!studyCards.length){
+    if (studyMode === 'unknown'){ toast('이 소챕터는 모두 알고 있음 — 전체보기로 전환'); setFilterMode('all'); return; }
+    toast('카드 없음');
     return;
   }
-  enterStudy(subId, data.cards);
-}
-function enterStudy(subId, cards){
-  studySubId = subId; studyCards = cards; studyIdx = 0;
-  showView('study', '학습', () => loadChapter(currentChapterId));
+  updateSubPos();
   setRetitleContext(() => studyCards[studyIdx]);
   renderStudyCard();
 }
@@ -578,14 +569,11 @@ function renderStudyCard(){
   $('cardTitle').href = c.url || '#';
   $('content').innerHTML = cardBodyHtml(c);
   $('scroller').scrollTop = 0;
-  $('studyFoot').textContent = (studyIdx + 1) + ' / ' + studyCards.length;
   renderStudyScrubber();
 }
 function renderStudyScrubber(){
   const n = studyCards.length;
-  const scrubber = $('scrubber'), track = $('scrubTrack');
-  if (n < 2){ scrubber.style.display = 'none'; return; }
-  scrubber.style.display = 'block';
+  const track = $('scrubTrack');
   let dots = track.querySelectorAll('.dot');
   while (dots.length < n){ const d = document.createElement('div'); d.className = 'dot'; track.appendChild(d); dots = track.querySelectorAll('.dot'); }
   while (dots.length > n){ dots[dots.length - 1].remove(); dots = track.querySelectorAll('.dot'); }
@@ -613,11 +601,68 @@ $('scrubber').addEventListener('pointermove', (e) => {
 $('scrubber').addEventListener('pointerup', () => { scrubbing = false; });
 $('scrubber').addEventListener('pointercancel', () => { scrubbing = false; });
 
-/* ── 좌우 스와이프=이전/다음(채점 없음, 소챕터 안에서 순환), 상하=스크롤(네이티브) ── */
+/* 전체/모르는 것만 필터 — 같은 화면 안에서 바로 전환 */
+function setFilterMode(m){
+  studyMode = m;
+  $('filterSeg').querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.m === m));
+  loadSubchapter();
+}
+$('filterSeg').addEventListener('click', (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  setFilterMode(b.dataset.m);
+});
+
+/* 소챕터/챕터 경계 — 자동으로 다음 소챕터, 챕터가 끝나면 전체시험 넛지 */
+async function advanceSubchapter(){
+  subIdx++;
+  if (subIdx >= chapSubCount){
+    const finishedChap = chapIdx;
+    subIdx = 0;
+    chapIdx = (chapIdx + 1) % totalChapters;
+    savePos();
+    await refreshChapterMeta();
+    await loadSubchapter();
+    showChapNudge(finishedChap);
+  } else {
+    savePos();
+    await loadSubchapter();
+    toast('소챕터 ' + (subIdx + 1) + '로 이동');
+  }
+}
+async function retreatSubchapter(){
+  subIdx--;
+  if (subIdx < 0){
+    chapIdx = (chapIdx - 1 + totalChapters) % totalChapters;
+    await refreshChapterMeta();
+    subIdx = chapSubCount - 1;
+  }
+  savePos();
+  await loadSubchapter();
+}
+function showChapNudge(finishedChapIdx){
+  $('chapNudgeText').textContent = '챕터 ' + (finishedChapIdx + 1) + ' 다 봤음 — 전체 시험 볼까요?';
+  $('chapNudge').classList.add('on');
+  $('chapNudge').dataset.chap = finishedChapIdx;
+}
+function hideChapNudge(){ $('chapNudge').classList.remove('on'); }
+$('chapNudgeSkip').addEventListener('click', hideChapNudge);
+$('chapNudgeGo').addEventListener('click', () => {
+  const ci = Number($('chapNudge').dataset.chap);
+  hideChapNudge();
+  enterChapterExam('c' + ci);
+});
+
+/* ── 좌우 스와이프=소챕터 안 이전/다음(경계에서 자동 다음 소챕터), 상하=스크롤.
+   긴 누르기(길게 눌러 안 움직이면)는 텍스트 선택으로 넘긴다 — 스와이프 트래킹 자체를
+   시작하지 않아서 iOS 네이티브 선택이 방해받지 않는다(2026-09-05 실기기 피드백:
+   "드래그하려 하면 스와이프가 됨" 수정). 짧게 스치면 그대로 스와이프. ── */
 const content = $('content'), scroller = $('scroller'), cardTitleEl = $('cardTitle');
 const peekPrev = $('peekPrev'), peekNext = $('peekNext');
 const COMMIT_RATIO = 0.5, FLICK_MS = 300, FLICK_RATIO = 0.18, TRANSITION_MS = 280, DRAG_SENS = 1.15;
+const SELECT_PRIME_MS = 450, MOVE_TOL = 10;
 let sx = 0, sy = 0, dx = 0, dy = 0, mode = null, dragging = false, dragW = 1, startT = 0;
+let pressTimer = null, selectPrimed = false;
+
 function studyPrev(){ return studyCards[(studyIdx - 1 + studyCards.length) % studyCards.length]; }
 function studyNext(){ return studyCards[(studyIdx + 1) % studyCards.length]; }
 function setDragX(px){
@@ -630,23 +675,40 @@ function dragCurve(rawDx, w){
   const amp = rawDx * DRAG_SENS, sign = amp < 0 ? -1 : 1, abs = Math.abs(amp);
   return abs <= w ? amp : sign * (w + (abs - w) * 0.3);
 }
-scroller.addEventListener('pointerdown', (e) => {
-  if (studyCards.length < 2) return;
-  dragging = true; mode = null; sx = e.clientX; sy = e.clientY; dx = 0; dy = 0;
-  dragW = scroller.offsetWidth || 1; startT = e.timeStamp;
+function beginSwipeTracking(e){
+  dragging = true; mode = null;
+  dragW = scroller.offsetWidth || 1;
   try { scroller.setPointerCapture(e.pointerId); } catch (err) {}
   setDragTransition('none');
   const pc = studyPrev(), nc = studyNext();
   $('peekPrevTitle').textContent = pc ? pc.front : ''; $('peekPrevBody').innerHTML = peekBodyHtml(pc);
   $('peekNextTitle').textContent = nc ? nc.front : ''; $('peekNextBody').innerHTML = peekBodyHtml(nc);
+}
+scroller.addEventListener('pointerdown', (e) => {
+  if (studyCards.length < 2 || examMode) return;
+  dragging = false; selectPrimed = false; mode = null;
+  sx = e.clientX; sy = e.clientY; dx = 0; dy = 0; startT = e.timeStamp;
+  clearTimeout(pressTimer);
+  pressTimer = setTimeout(() => { selectPrimed = true; }, SELECT_PRIME_MS);
 });
 scroller.addEventListener('pointermove', (e) => {
+  if (studyCards.length < 2 || examMode) return;
+  const mdx = e.clientX - sx, mdy = e.clientY - sy;
+  if (!dragging && !selectPrimed){
+    if (Math.abs(mdx) > MOVE_TOL || Math.abs(mdy) > MOVE_TOL){
+      clearTimeout(pressTimer);
+      beginSwipeTracking(e);
+    } else return;
+  }
+  if (selectPrimed) return; // 네이티브 선택에 맡긴다 — 우리는 아무것도 안 함
   if (!dragging) return;
-  dx = e.clientX - sx; dy = e.clientY - sy;
-  if (mode === null && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) mode = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v';
+  dx = mdx; dy = mdy;
+  if (mode === null && (Math.abs(dx) > MOVE_TOL || Math.abs(dy) > MOVE_TOL)) mode = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v';
   if (mode === 'h') setDragX(dragCurve(dx, dragW));
 });
 scroller.addEventListener('pointerup', (e) => {
+  clearTimeout(pressTimer);
+  if (selectPrimed){ selectPrimed = false; return; }
   if (!dragging) return;
   dragging = false;
   if (mode === 'h'){
@@ -656,48 +718,68 @@ scroller.addEventListener('pointerup', (e) => {
     setDragTransition('transform ' + TRANSITION_MS + 'ms cubic-bezier(.2,.7,.3,1)');
     if (commit && dx < 0){
       setDragX(-dragW);
-      content.addEventListener('transitionend', function onEnd(){ content.removeEventListener('transitionend', onEnd); setDragTransition('none'); resetDragX(); studyIdx = (studyIdx + 1) % studyCards.length; renderStudyCard(); }, { once: true });
+      content.addEventListener('transitionend', function onEnd(){
+        content.removeEventListener('transitionend', onEnd); setDragTransition('none'); resetDragX();
+        if (studyIdx + 1 >= studyCards.length) advanceSubchapter();
+        else { studyIdx++; renderStudyCard(); }
+      }, { once: true });
     } else if (commit && dx > 0){
       setDragX(dragW);
-      content.addEventListener('transitionend', function onEnd(){ content.removeEventListener('transitionend', onEnd); setDragTransition('none'); resetDragX(); studyIdx = (studyIdx - 1 + studyCards.length) % studyCards.length; renderStudyCard(); }, { once: true });
+      content.addEventListener('transitionend', function onEnd(){
+        content.removeEventListener('transitionend', onEnd); setDragTransition('none'); resetDragX();
+        if (studyIdx - 1 < 0) retreatSubchapter();
+        else { studyIdx--; renderStudyCard(); }
+      }, { once: true });
     } else resetDragX();
   }
   mode = null;
 });
-scroller.addEventListener('pointercancel', () => { dragging = false; mode = null; resetDragX(); });
+scroller.addEventListener('pointercancel', () => { clearTimeout(pressTimer); dragging = false; selectPrimed = false; mode = null; resetDragX(); });
 
-/* ── 시험 ──
-   제목만 → "정답 확인" 탭 → 본문 리빌 → "알고 있었음/몰랐음" 최종 확정(2단계 자기평가,
-   되돌리기 없음). 순서는 매번 섞는다. 통과 기준(소챕터 5/10, 대챕터 80/100)은 게이트가
-   아니라 순수 최고기록 현황판 — 통과 못해도 다음 챕터/소챕터는 그대로 열려 있다. */
+/* ── 시험(소챕터/챕터 공용) ──
+   제목만 → "정답 확인" 탭 → 본문 리빌 → "알고 있었음/몰랐음" 최종 확정(되돌리기 없음).
+   순서는 매번 섞는다. 5/10, 80/100 통과 기준은 게이트가 아니라 최고기록 현황판일 뿐. */
 function shuffle(arr){
   const a = arr.slice();
   for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
   return a;
 }
-let examSubId = null, examCards = [], examIdx = 0, examResults = {}, examLastSub = null, examLastChap = null;
-async function enterExam(subId){
+let examScope = 'sub', examCards = [], examIdx = 0, examResults = {}, examLastSub = null, examLastChap = null;
+
+function enterExamMode(){ examMode = true; $('readRoot').hidden = true; $('examView').hidden = false; }
+function exitExamMode(){ examMode = false; $('examView').hidden = true; $('readRoot').hidden = false; clearRetitleContext(); setRetitleContext(() => studyCards[studyIdx]); }
+$('examBack').addEventListener('click', exitExamMode);
+
+$('examQuickBtn').addEventListener('click', () => enterSubchapterExam());
+async function enterSubchapterExam(){
   showLoading('불러오는 중', '문제를 가져옴');
   let data;
-  try { data = await apiSubchapter(subId, 'all'); }
-  catch (e) { showLoading('불러오기 실패', String(e.message || e), () => enterExam(subId)); return; }
-  if (data.error || !data.cards.length){ showLoading('불러오기 실패', data.error || '카드 없음', () => enterExam(subId)); return; }
-  examSubId = subId; examCards = shuffle(data.cards); examIdx = 0; examResults = {};
-  showView('exam', '시험', () => loadChapter(currentChapterId));
-  setRetitleContext(() => examCards[examIdx]);
-  renderExamView();
+  try { data = await apiSubchapter(subId(), 'all'); }
+  catch (e) { showLoading('불러오기 실패', String(e.message || e)); return; }
+  hideLoading();
+  if (data.error || !data.cards.length){ toast(data.error || '카드 없음'); return; }
+  examScope = 'sub';
+  examCards = shuffle(data.cards.map((c) => ({ ...c, subId: subId() })));
+  startExam('소챕터 ' + (chapIdx + 1) + '-' + (subIdx + 1) + ' 시험');
 }
-function renderExamView(){
-  $('viewExam').innerHTML =
-    '<div class="examwrap"><div class="examprog" id="examProg"></div>' +
-    '<div class="examcard" id="examCard"></div>' +
-    '<div class="examjudge" id="examJudge" hidden><button class="dontknow" data-k="0">몰랐음</button><button class="know" data-k="1">알고 있었음</button></div>' +
-    '</div>';
+async function enterChapterExam(cId){
+  showLoading('불러오는 중', '챕터 전체 문제를 가져옴');
+  let data;
+  try { data = await apiChapterExam(cId); }
+  catch (e) { showLoading('불러오기 실패', String(e.message || e)); return; }
+  hideLoading();
+  if (data.error || !data.cards.length){ toast(data.error || '카드 없음'); return; }
+  examScope = 'chap';
+  examCards = shuffle(data.cards);
+  startExam('챕터 ' + (Number(cId.slice(1)) + 1) + ' 전체시험');
+}
+function startExam(title){
+  examIdx = 0; examResults = {}; examLastSub = null; examLastChap = null;
+  $('examTitleBar').textContent = title;
+  enterExamMode();
+  setRetitleContext(() => examCards[examIdx]);
   renderExamCard();
-  $('examJudge').addEventListener('click', (e) => {
-    const b = e.target.closest('button'); if (!b) return;
-    judgeCard(b.dataset.k === '1');
-  });
+  $('examJudge').onclick = (e) => { const b = e.target.closest('button'); if (b) judgeCard(b.dataset.k === '1'); };
 }
 function renderExamCard(){
   if (examIdx >= examCards.length){ renderExamResult(); return; }
@@ -715,9 +797,7 @@ function renderExamCard(){
 async function judgeCard(know){
   const c = examCards[examIdx];
   examResults[c.key] = know;
-  // 결과 화면의 "최고기록"이 마지막 카드 응답을 놓친 채(경쟁 상태) 그리는 걸 막기 위해
-  // 기다린다 — 카드당 한 번뿐인 탭이라 짧은 대기는 무마찰 원칙에 안 걸린다.
-  const res = await apiAnswer(examSubId, c.key, know);
+  const res = await apiAnswer(c.subId, c.key, know);
   if (res && res.ok){ examLastSub = res.sub; examLastChap = res.chap; }
   examIdx++;
   renderExamCard();
@@ -726,25 +806,96 @@ function renderExamResult(){
   const total = examCards.length;
   const score = examCards.filter((c) => examResults[c.key]).length;
   const wrong = examCards.filter((c) => !examResults[c.key]);
-  const bestLine = examLastSub ? '이 소챕터 최고기록 ' + examLastSub.best + '/' + examLastSub.total : '';
-  let actions = '<button class="primary" id="examExit">챕터로 돌아가기</button>';
+  const best = examScope === 'chap' ? examLastChap : examLastSub;
+  const bestLine = best ? (examScope === 'chap' ? '이 챕터 최고기록 ' : '이 소챕터 최고기록 ') + best.best + '/' + best.total : '';
+  let actions = '<button class="primary" id="examExit">닫기</button>';
   if (wrong.length){
     actions = '<button id="examRetryStudy">오답만 다시 복습(' + wrong.length + ')</button>'
       + '<button id="examRetryExam">오답만 바로 재시험</button>' + actions;
   }
-  $('viewExam').innerHTML = '<div class="examresult"><div class="score">' + score + ' / ' + total + '</div>'
+  $('examCard').innerHTML = '';
+  $('examJudge').hidden = true;
+  $('examProg').textContent = '';
+  $('examCard').innerHTML = '<div class="examresult"><div class="score">' + score + ' / ' + total + '</div>'
     + '<div class="best">' + esc(bestLine) + '</div>'
     + '<div class="actions">' + actions + '</div></div>';
   clearRetitleContext();
-  const exit = $('examExit'); if (exit) exit.addEventListener('click', () => loadChapter(currentChapterId));
-  const rs = $('examRetryStudy'); if (rs) rs.addEventListener('click', () => enterStudy(examSubId, wrong));
+  const exit = $('examExit'); if (exit) exit.addEventListener('click', exitExamMode);
+  const rs = $('examRetryStudy'); if (rs) rs.addEventListener('click', () => {
+    exitExamMode();
+    studyCards = wrong; studyIdx = 0;
+    setRetitleContext(() => studyCards[studyIdx]);
+    renderStudyCard();
+    toast('오답 ' + wrong.length + '개만 복습');
+  });
   const re = $('examRetryExam'); if (re) re.addEventListener('click', () => {
-    examCards = shuffle(wrong); examIdx = 0; examResults = {};
-    showView('exam', '시험', () => loadChapter(currentChapterId));
-    setRetitleContext(() => examCards[examIdx]);
-    renderExamView();
+    examCards = shuffle(wrong);
+    startExam($('examTitleBar').textContent);
   });
 }
+
+/* ── 챕터 목록(하단 시트) ── */
+$('sheetBtn').addEventListener('click', openSheet);
+$('sheetback').addEventListener('click', closeSheet);
+function openSheet(){
+  $('sheet').classList.add('on'); $('sheetback').classList.add('on');
+  renderChapList();
+}
+function closeSheet(){ $('sheet').classList.remove('on'); $('sheetback').classList.remove('on'); }
+async function renderChapList(){
+  $('chapList').innerHTML = '<div style="padding:20px;color:var(--muted);font-size:13px;text-align:center">불러오는 중…</div>';
+  const data = allChaptersData || await apiChapters().catch(() => null);
+  if (!data || !data.chapters){ $('chapList').innerHTML = '<div style="padding:20px;color:var(--muted);font-size:13px;text-align:center">불러오기 실패</div>'; return; }
+  allChaptersData = data; totalChapters = data.chapters.length || 1;
+  $('chapList').innerHTML = data.chapters.map((c, i) => {
+    const pct = c.total ? Math.round(c.current / c.total * 100) : 0;
+    return '<div class="chaprow" data-idx="' + i + '" data-id="' + esc(c.id) + '">'
+      + '<div class="chaprow-top"><span class="chaprow-label">챕터 ' + (i + 1) + '<span class="chaprow-range">' + c.start + '~' + c.end + '</span></span>'
+      + '<span class="chaprow-score">' + c.current + '/' + c.total + '<span class="best">최고 ' + c.best + '</span></span></div>'
+      + '<div class="chaprow-bar"><i style="width:' + pct + '%"></i></div>'
+      + '<div class="chaprow-actions"><button data-act="go">여기로 이동</button><button data-act="exam" class="exam">전체시험(' + c.total + '문제)</button></div>'
+      + '</div>';
+  }).join('');
+}
+$('chapList').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-act]'); if (!btn) return;
+  const row = btn.closest('.chaprow');
+  const idx = Number(row.dataset.idx), id = row.dataset.id;
+  if (btn.dataset.act === 'go'){
+    closeSheet();
+    chapIdx = idx; subIdx = 0; savePos();
+    refreshChapterMeta().then(loadSubchapter);
+  } else if (btn.dataset.act === 'exam'){
+    closeSheet();
+    enterChapterExam(id);
+  }
+});
+
+/* 시트를 아래로 스와이프하면 닫힌다 */
+const sheet = $('sheet');
+let sheetDragging = false, sheetMoved = false, ssy = 0, sdy = 0;
+const sheetScroll = sheet.querySelector('.sheetscroll');
+sheet.addEventListener('pointerdown', (e) => {
+  ssy = e.clientY; sdy = 0; sheetMoved = false;
+  sheetDragging = !!e.target.closest('.sheethandle') || sheetScroll.scrollTop <= 0;
+});
+sheet.addEventListener('pointermove', (e) => {
+  if (!sheetDragging) return;
+  sdy = e.clientY - ssy;
+  if (sdy <= 8) return;
+  if (!sheetMoved){ sheetMoved = true; sheet.style.transition = 'none'; try { sheet.setPointerCapture(e.pointerId); } catch (err) {} }
+  sheet.style.transform = 'translateY(' + sdy + 'px)';
+});
+sheet.addEventListener('pointerup', () => {
+  if (!sheetDragging || !sheetMoved) { sheetDragging = false; return; }
+  sheetDragging = false; sheetMoved = false;
+  sheet.style.transition = 'transform .22s cubic-bezier(.2,.7,.3,1)';
+  if (sdy > 90){
+    sheet.style.transform = 'translateY(100%)';
+    setTimeout(() => { closeSheet(); sheet.style.transition = ''; sheet.style.transform = ''; }, 200);
+  } else sheet.style.transform = '';
+});
+sheet.addEventListener('pointercancel', () => { sheetDragging = false; sheetMoved = false; sheet.style.transform = ''; });
 
 /* 글자크기 슬라이더 */
 function setSliderFill(el){ const pct = (el.value - el.min) / (el.max - el.min) * 100; el.style.setProperty('--fill', pct + '%'); }
@@ -754,12 +905,12 @@ const savedTScale = lsGet('sd_tscale'), savedBScale = lsGet('sd_bscale');
 if (savedTScale) titleScale.value = savedTScale;
 if (savedBScale) bodyScale.value = savedBScale;
 function applyTitleScale(){
-  document.documentElement.style.setProperty('--tscale', titleScale.value);
-  $('titleScaleVal').textContent = readPx($('cardTitle'));
+  cardTitleEl.style.fontSize = 'calc(clamp(22px,6vw,30px) * ' + titleScale.value + ')';
+  $('titleScaleVal').textContent = readPx(cardTitleEl);
   lsSet('sd_tscale', titleScale.value); setSliderFill(titleScale);
 }
 function applyBodyScale(){
-  document.documentElement.style.setProperty('--bscale', bodyScale.value);
+  content.style.fontSize = (15.5 * bodyScale.value) + 'px';
   $('bodyScaleVal').textContent = readPx(content);
   lsSet('sd_bscale', bodyScale.value); setSliderFill(bodyScale);
 }
@@ -767,8 +918,18 @@ titleScale.addEventListener('input', applyTitleScale);
 bodyScale.addEventListener('input', applyBodyScale);
 
 /* ── 시작 ── */
-applyTitleScale(); applyBodyScale();
-loadChapters();
+(async () => {
+  applyTitleScale(); applyBodyScale();
+  loadPos();
+  showLoading('불러오는 중', '챕터 정보를 가져옴');
+  await refreshChapterMeta();
+  if (!allChaptersData || !allChaptersData.chapters || !allChaptersData.chapters.length){
+    showLoading('동기화 중', 'Notion에서 카드를 가져오는 중 — 잠시 후 다시 시도', async () => { await refreshChapterMeta(); loadSubchapter(); });
+    return;
+  }
+  if (chapIdx >= totalChapters) chapIdx = 0;
+  await loadSubchapter();
+})();
 </script>
 </body>
 </html>

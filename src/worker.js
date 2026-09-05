@@ -13,8 +13,12 @@
  *   2. GET  /api/chapters         대챕터 전체 개요(현재/최고 점수)
  *   3. GET  /api/chapter?id=cN    대챕터 하나의 소챕터 10개 상세(현재/최고 점수 + 카드 제목·known)
  *   4. GET  /api/subchapter?id=cNsM&mode=all|unknown   소챕터 하나의 카드 전체 본문(학습·시험 공용)
- *   5. POST /api/answer           시험 정답 기록(안다/모른다) + 소챕터·대챕터 점수 갱신(최고기록 포함)
- *   6. GET  /api/sync             Notion → 카드 변환을 "예산만큼만" 진행하고 커서를 남김
+ *   5. GET  /api/chapterexam?id=cN  대챕터 전체(100장) 시험용 — 카드마다 원래 소속 subId를 붙여 반환
+ *   6. POST /api/answer           시험 정답 기록(안다/모른다) + 소챕터·대챕터 점수 갱신(최고기록 포함)
+ *   7. POST /api/retitle          본문에서 드래그 선택한 예문으로 카드 제목(Notion 이름 속성 원본)을 고침
+ *   8. POST /api/highlight        본문 인라인 코드(형광펜) annotation 토글 — KV+Notion 블록 원본 동시 반영
+ *   9. GET  /api/image?id=blockId  Notion 자체 호스팅 이미지의 프리사인드 URL을 매번 새로 받아 리다이렉트
+ *  10. GET  /api/sync             Notion → 카드 변환을 "예산만큼만" 진행하고 커서를 남김
  *
  * ⚠ 왜 Worker가 반드시 필요한가 — api.notion.com은 Access-Control-Allow-Origin을
  *   보내지 않는다(2026-09-03 실측). 크롬 확장은 host_permissions로 CORS를 면제받아
@@ -41,9 +45,10 @@ const K_KNOWN = 'known:v1';    // { [cardKey]: true } — 안다로 판정된 �
 const K_BEST = 'best:v1';      // { sub:{ [subId]: n }, chap:{ [chapId]: n } } — 최고기록(단조증가)
 
 const BUCKET_SIZE = 50;             // ⚠ 카드별 개별 KV 저장은 불가 — 무료 쓰기 1,000회/일에 걸린다
-const PARSER_VERSION = 3;           // 포맷을 바꾸면 올릴 것 — 증분 로직이 옛 포맷을 재사용하지 않게
+const PARSER_VERSION = 4;           // 포맷을 바꾸면 올릴 것 — 증분 로직이 옛 포맷을 재사용하지 않게
                                      // (v3, 2026-09-05: 블록에 원본 block.id 추가 — 형광펜 토글을
-                                     //  Notion에 되쓰려면 필요)
+                                     //  Notion에 되쓰려면 필요 / v4, 같은 날: image 블록 지원 추가 —
+                                     //  이전엔 이미지만 있는 카드가 조용히 빈 본문으로 캐시됐다)
 const SUB_BUDGET = 40;              // 50 상한에서 여유 10회를 남긴다
 const STALE_MS = 6 * 60 * 60 * 1000; // 캐시가 이보다 오래되면 cron이 새 동기화를 시작
 
@@ -128,6 +133,16 @@ function compactBlock(b) {
   const v = b[type];
   if (!v) return null;
   if (type === 'divider') return { type: 'divider' };
+  if (type === 'image') {
+    // 초창기(AI 도입 전) 메모는 텍스트가 아니라 스크린샷을 그대로 붙여넣은 경우가 있다
+    // (2026-09-05 실기기 피드백 — 소챕터1 1번 카드가 빈 화면으로 보임, 원인이 이거였음).
+    // ⚠ Notion이 자체 호스팅하는 file.url은 AWS 프리사인드 URL이라 약 1시간 뒤 만료된다 —
+    // 이걸 그대로 캐시(버킷)에 저장하면 나중에 깨진 이미지가 된다. external.url(고정 링크)만
+    // 영구 저장하고, file인 경우엔 id만 저장해 표시 시점에 /api/image로 매번 새로 발급받는다.
+    const external = v.external?.url || null;
+    if (!external && !v.file) return null;
+    return { type: 'image', id: b.id, external, caption: richText(v.caption) };
+  }
   if (type === 'table') return { type: 'table', width: v.table_width || 0, headerRow: !!v.has_column_header, rows: [] };
   if (Array.isArray(v.rich_text)) {
     const rich = richText(v.rich_text);
@@ -517,6 +532,40 @@ async function handleSubchapter(env, subId, mode) {
   return json({ id: subId, cards });
 }
 
+// 대챕터 전체 시험(100문제) — 소챕터 시험과 같은 화면/로직을 재사용하되, 카드가 10개
+// 소챕터에 걸쳐 섞이므로 각 카드에 원래 소속 subId를 붙여 보낸다. 클라이언트는 카드별로
+// 그 subId로 POST /api/answer를 호출해야 소챕터별 최고기록도 같이 갱신된다.
+async function handleChapterExam(env, chapId) {
+  const ci = parseChapId(chapId);
+  if (ci == null) return json({ error: 'bad id' }, 400);
+  const idxRaw = await env.KV.get(K_INDEX);
+  if (!idxRaw) return json({ error: '동기화 중' }, 202);
+  const idx = JSON.parse(idxRaw);
+  const chaps = buildChapters(idx.items);
+  const subsInChap = chaps[ci];
+  if (!subsInChap) return json({ error: 'not found' }, 404);
+
+  const byBucket = new Map();
+  const tagged = []; // { it, subId }
+  subsInChap.forEach((items, si) => {
+    const subId = chapId + 's' + si;
+    for (const it of items) {
+      tagged.push({ it, subId });
+      if (!byBucket.has(it.bucket)) byBucket.set(it.bucket, []);
+      byBucket.get(it.bucket).push(it.id);
+    }
+  });
+  const byId = new Map();
+  for (const [num, ids] of byBucket) {
+    const raw = await env.KV.get(K_BUCKET + num);
+    if (!raw) continue;
+    for (const c of JSON.parse(raw).cards) if (ids.includes(c.id)) byId.set(c.id, c);
+  }
+  const cards = tagged.map(({ it, subId }) => ({ ...(byId.get(it.id) || {}), id: it.id, key: it.key, front: it.front, url: it.url, created: it.created, subId }));
+
+  return json({ id: chapId, cards });
+}
+
 // 시험 정답 기록 — 소챕터·대챕터의 현재 점수를 다시 계산하고, 최고기록을 필요하면 올린다
 // (단조증가 — 나중에 다시 도전해서 점수가 낮아져도 최고기록은 안 내려간다).
 async function handleAnswer(env, body) {
@@ -636,14 +685,30 @@ async function handleHighlight(env, token, body) {
   return json({ ok: true, card, notionOk });
 }
 
+// Notion 자체 호스팅 이미지(file.url)는 프리사인드 URL이라 캐시해두면 만료된다 —
+// 표시 시점에 그 블록을 다시 조회해 방금 발급된 URL로 302 리다이렉트한다.
+async function handleImage(env, token, blockId) {
+  if (!blockId || !token) return json({ error: 'id 필요' }, 400);
+  try {
+    const data = await notion(token, `/blocks/${blockId}`);
+    const fresh = data.image?.file?.url || data.image?.external?.url;
+    if (!fresh) return json({ error: '이미지 없음' }, 404);
+    return Response.redirect(fresh, 302);
+  } catch (e) {
+    return json({ error: String(e.message || e) }, 502);
+  }
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const { NOTION_TOKEN: token, NOTION_DB_ID: dbId } = env;
 
     if (url.pathname === '/api/chapters') return handleChapters(env);
+    if (url.pathname === '/api/image') return handleImage(env, token, url.searchParams.get('id') || '');
     if (url.pathname === '/api/chapter') return handleChapterDetail(env, url.searchParams.get('id') || '');
     if (url.pathname === '/api/subchapter') return handleSubchapter(env, url.searchParams.get('id') || '', url.searchParams.get('mode') || 'all');
+    if (url.pathname === '/api/chapterexam') return handleChapterExam(env, url.searchParams.get('id') || '');
     if (url.pathname === '/api/answer' && request.method === 'POST') {
       try { return await handleAnswer(env, await request.json()); }
       catch (e) { return json({ error: String(e.message || e) }, 500); }
