@@ -615,7 +615,12 @@ $('cardTitle').addEventListener('pointerdown', () => {
 $('cardTitle').addEventListener('pointerup', () => clearTimeout(titlePressT));
 $('cardTitle').addEventListener('pointerleave', () => clearTimeout(titlePressT));
 $('cardTitle').addEventListener('click', (e) => {
-  if (titleLongPressed){ e.preventDefault(); titleLongPressed = false; }
+  if (titleLongPressed){ e.preventDefault(); titleLongPressed = false; return; }
+  // url 없는 카드는 href가 '#'로 채워져 있어(target=_blank라 탭하면 새 탭이 열리며
+  // 앱이 처음부터 부팅돼 소챕터 첫 카드로 떨어지는 버그가 있었다) — url 없으면 그냥
+  // 아무 일도 안 하게 막는다(2026-09-05 실기기 피드백).
+  const card = retitleCtx && retitleCtx.getCard();
+  if (!card || !card.url) e.preventDefault();
 });
 
 /* ── 형광펜 모드 ── 켜면 유지되고, 그 뒤 드래그마다 자동으로 그 구간의 code(형광펜)를
