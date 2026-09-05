@@ -540,7 +540,7 @@ function apiPostKey(path, key, pageId){
 }
 const apiArchive = (key, pageId) => apiPostKey('/api/archive', key, pageId);
 const apiTrash = (key, pageId) => apiPostKey('/api/trash', key, pageId);
-const apiTrashRestore = (key) => apiPostKey('/api/trash/restore', key);
+const apiTrashRestore = (key, pageId) => apiPostKey('/api/trash/restore', key, pageId);
 const apiTrashDelete = (key) => apiPostKey('/api/trash/delete', key);
 async function apiTrashList(){ const r = await fetch('/api/trash'); return r.json(); }
 async function apiRetitle(pageId, oldKey, newTitle){
@@ -1324,8 +1324,17 @@ function renderTrashList(items){
     + '</div>').join('');
   el.querySelectorAll('[data-act]').forEach((btn) => btn.addEventListener('click', async () => {
     const key = btn.closest('.trashrow').dataset.key;
-    if (btn.dataset.act === 'restore') await apiTrashRestore(key);
-    else await apiTrashDelete(key);
+    if (btn.dataset.act === 'restore'){
+      const item = items.find((it) => it.key === key);
+      await apiTrashRestore(key, item && item.id);
+      // 서버 KV는 이걸로 이미 반영됐지만, 클라이언트가 들고 있던 캐시(subchapterAll/subCache)엔
+      // 여전히 trashed:true가 남아있어 앱에서 안 보이는 문제가 있었다(2026-09-06 실기기
+      // 피드백) — 캐시를 지워 다음 로드가 서버에서 새로 받아오게 하고, 지금 보고 있는
+      // 소챕터에 이 카드가 있으면 바로 되살린다.
+      subCache.clear();
+      const entry = currentSubEntry(key);
+      if (entry){ entry.trashed = false; applyFilter(); }
+    } else await apiTrashDelete(key);
     renderTrashToggle();
   }));
 }

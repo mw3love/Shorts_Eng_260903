@@ -712,13 +712,16 @@ async function handleTrashList(env) {
   return json({ items });
 }
 
-async function handleTrashRestore(env, body) {
-  const { key } = body || {};
+async function handleTrashRestore(env, token, dbId, body) {
+  const { key, pageId } = body || {};
   if (!key) return json({ error: 'key 필요' }, 400);
   const trashed = JSON.parse((await env.KV.get(K_TRASHED)) || '{}');
   delete trashed[key];
   await env.KV.put(K_TRASHED, JSON.stringify(trashed));
-  return json({ ok: true });
+  // 휴지통 보낼 때 '휴지통'을 썼으니 되돌릴 때도 되돌려야 한다 — 2026-09-06 라운드12에서
+  // handleTrash()만 새로 쓰고 이 대칭을 놓쳤던 것을 실기기 피드백으로 발견·수정.
+  const notionOk = await writeReviewStatus(env, token, dbId, pageId, '미확인');
+  return json({ ok: true, notionOk });
 }
 
 // 휴지통에서 "진짜 삭제" — 이 순간에만 노션 페이지를 archived로 전환(노션 쪽 실제 삭제는
@@ -878,7 +881,7 @@ export default {
       if (request.method === 'POST') { try { return await handleTrash(env, token, dbId, await request.json()); } catch (e) { return json({ error: String(e.message || e) }, 500); } }
     }
     if (url.pathname === '/api/trash/restore' && request.method === 'POST') {
-      try { return await handleTrashRestore(env, await request.json()); }
+      try { return await handleTrashRestore(env, token, dbId, await request.json()); }
       catch (e) { return json({ error: String(e.message || e) }, 500); }
     }
     if (url.pathname === '/api/trash/delete' && request.method === 'POST') {
