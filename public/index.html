@@ -83,7 +83,10 @@
   .peek-prev{transform:translateX(-100%)}
   .peek-next{transform:translateX(100%)}
   .peek .cardtitle{padding:calc(env(safe-area-inset-top) + 62px) 22px 6px;color:var(--paper)}
-  .peekbody{flex:1;min-height:0;-webkit-mask-image:linear-gradient(to bottom, black 55%, transparent 90%);mask-image:linear-gradient(to bottom, black 55%, transparent 90%)}
+  /* 아래쪽을 흐리게 하던 마스크는 제거 — 커밋 후 마스크 없는 실제 카드로 바뀌는 순간
+     "가려져 있다가 나타나는" 것처럼 보인다는 실기기 피드백(2026-09-05). 처음부터 다
+     보이는 쪽이 낫다. */
+  .peekbody{flex:1;min-height:0}
   .content p{margin:0 0 12px}
   .content h3{font-family:var(--serif);font-weight:400;font-size:1.3em;color:var(--paper);margin:20px 0 8px}
   .content h4{font-family:var(--serif);font-weight:400;font-size:1.15em;color:var(--paper);margin:16px 0 6px}
@@ -587,18 +590,26 @@ $('titleMenuEdit').addEventListener('click', () => {
   $('titleEditInput').focus();
 });
 $('titleEditCancel').addEventListener('click', hideTitleEdit);
-$('titleEditSave').addEventListener('click', async () => {
+// 응답을 기다리지 않고 화면부터 바꾼다(markKnown()과 같은 패턴) — Notion PATCH + KV
+// 읽기/쓰기가 순차로 쌓여 2초 가까이 걸리는데, 그동안 화면이 안 바뀌어 "안 바뀐 줄"
+// 알았다는 게 실기기 피드백이었다. key는 서버가 정하는 정규화 규칙을 그대로 믿어야
+// 하므로 응답 오기 전까진 안 건드린다 — 그 사이 "안다" 등을 눌러도 옛 key로 정상 동작.
+$('titleEditSave').addEventListener('click', () => {
   const card = retitleCtx && retitleCtx.getCard(); if (!card) return;
   const text = $('titleEditInput').value.trim();
   hideTitleEdit();
   if (!text || text === card.front) return;
-  const res = await apiRetitle(card.id, card.key, text).catch(() => null);
-  if (res && res.ok){
-    card.front = res.front; card.key = res.key;
-    if (!examMode) $('cardTitle').textContent = card.front;
-    else { const el = $('examTitle'); if (el) el.textContent = card.front; }
-    toast('제목 변경됨');
-  } else toast('제목 변경 실패');
+  const oldFront = card.front, oldKey = card.key;
+  card.front = text;
+  if (!examMode) $('cardTitle').textContent = text;
+  else { const el = $('examTitle'); if (el) el.textContent = text; }
+  apiRetitle(card.id, oldKey, text).catch(() => null).then((res) => {
+    if (res && res.ok){ card.front = res.front; card.key = res.key; toast('제목 변경됨'); return; }
+    card.front = oldFront;
+    if (!examMode) $('cardTitle').textContent = oldFront;
+    else { const el = $('examTitle'); if (el) el.textContent = oldFront; }
+    toast('제목 변경 실패');
+  });
 });
 // 롱프레스 판정 뒤엔 그 손을 떼는 click이 링크 이동으로 이어지지 않게 막는다
 // (#cardTitle이 href를 가진 <a>라 평소 탭은 그대로 유튜브로 이동한다).
@@ -617,6 +628,15 @@ $('cardTitle').addEventListener('click', (e) => {
    토글한다. 이미 형광펜된 구간을 클릭(드래그 아님)해도 해제된다. 모드를 켜는 순간 이미
    선택돼 있던 텍스트가 있으면 그 자리에서 바로 적용한다(2026-09-05 실기기 피드백 —
    "드래그 후 형광펜 눌러도 반응 없음" 버그 수정). */
+// "선택 먼저, 형광펜 나중" 순서가 안 먹히던 이유 — 🖍 버튼은 선택 영역 바깥이라, 버튼을
+// 탭하는 순간 iOS가 그 탭 자체로 기존 선택을 먼저 지워버린다(일반적인 모바일 브라우저
+// 동작). 그래서 selectionchange로 "마지막으로 있었던 유효한 선택"을 따로 기억해뒀다가,
+// 모드를 켜는 시점에 라이브 선택이 비어 있으면 그걸로 되살린다(2026-09-05).
+let lastSelRange = null, lastSelAt = 0;
+document.addEventListener('selectionchange', () => {
+  const sel = document.getSelection();
+  if (sel && !sel.isCollapsed && sel.rangeCount){ lastSelRange = sel.getRangeAt(0).cloneRange(); lastSelAt = Date.now(); }
+});
 let highlightMode = false;
 function setHighlightMode(on, btn){
   highlightMode = on;
@@ -624,6 +644,10 @@ function setHighlightMode(on, btn){
   $('examHlBtn').classList.toggle('active', on);
   if (on){
     hideTitleMenu(); hideTitleEdit();
+    const sel = window.getSelection();
+    if (sel.isCollapsed && lastSelRange && Date.now() - lastSelAt < 2000 && document.contains(lastSelRange.startContainer)){
+      try { sel.removeAllRanges(); sel.addRange(lastSelRange); } catch (e) {}
+    }
     const t = getHighlightTarget();
     if (t){ window.getSelection().removeAllRanges(); doHighlight(t.blk, t.start, t.end); }
   }
@@ -659,23 +683,41 @@ function getHighlightTarget(){
   if (start == null || end == null || start >= end) return null;
   return { blk: startBlk.dataset.blk, start, end };
 }
-async function doHighlight(blk, start, end){
+// 응답을 기다리지 않고(fire-and-forget) 결과가 오면 그때 반영한다 — Notion PATCH +
+// KV 읽기/쓰기가 순차로 쌓여 2초 가까이 걸렸는데, 그 왕복을 기다리는 동안 화면이 그냥
+// 멈춰 있던 게 문제였다(2026-09-05 실기기 피드백). 성공 시 시험모드처럼 본문만 다시
+// 그린다 — 예전엔 renderStudyCard()를 썼는데, 그 안의 `scroller.scrollTop=0`이 카드
+// "이동" 전용 리셋이라 형광펜(카드 안 바뀜)에도 적용돼 화면이 최상단으로 튀었다.
+function doHighlight(blk, start, end){
   const card = currentCardForHighlight();
   if (!card) return;
   const field = blk === 'hint' ? 'hint' : 'detail';
   const blockIndex = blk === 'hint' ? null : Number(blk);
-  const res = await apiHighlight(card.id, field, blockIndex, start, end);
-  if (res && res.ok){
-    Object.assign(card, res.card);
-    if (!examMode) renderStudyCard();
-    else { const el = $('examBody'); if (el) el.innerHTML = cardBodyHtml(card); }
-  } else toast('형광펜 실패');
+  apiHighlight(card.id, field, blockIndex, start, end).catch(() => null).then((res) => {
+    if (res && res.ok){
+      Object.assign(card, res.card);
+      if (!examMode) $('content').innerHTML = cardBodyHtml(card);
+      else { const el = $('examBody'); if (el) el.innerHTML = cardBodyHtml(card); }
+    } else toast('형광펜 실패');
+  });
 }
 function tryAutoHighlight(){
   if (!highlightMode) return;
   const t = getHighlightTarget();
   if (!t) return;
-  window.getSelection().removeAllRanges();
+  const sel = window.getSelection();
+  const range = sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
+  sel.removeAllRanges();
+  // 낙관적 표시 — 서버 응답 전에 미리 코랄 배경을 씌워둔다. 이미 형광펜된 부분을 다시
+  // 칠하는 등 서버 판정과 다를 수 있는 드문 경우엔 실패해도(catch) 그냥 넘어간다 —
+  // 응답이 오면 위 doHighlight가 authoritative하게 다시 그려서 어차피 바로잡힌다.
+  if (range){
+    try {
+      const mark = document.createElement('code');
+      mark.className = 'hl';
+      range.surroundContents(mark);
+    } catch (e) {}
+  }
   doHighlight(t.blk, t.start, t.end);
 }
 function onHighlightAreaClick(e){
@@ -691,7 +733,13 @@ function onHighlightAreaClick(e){
   range.setEnd(last, last.nodeValue.length);
   const sel = window.getSelection();
   sel.removeAllRanges(); sel.addRange(range);
-  tryAutoHighlight();
+  // getHighlightTarget()이 DOM 오프셋을 먼저 읽어야 한다 — outerHTML로 code를 갈아끼우면
+  // range가 가리키던 텍스트노드가 그 자리에서 끊겨 이후엔 선택을 못 읽는다.
+  const t = getHighlightTarget();
+  sel.removeAllRanges();
+  if (!t) return;
+  code.outerHTML = code.innerHTML; // 낙관적 해제 표시 — 이 경우는 "해제"가 확실하므로 바로 벗긴다
+  doHighlight(t.blk, t.start, t.end);
 }
 // mouseup이 아니라 pointerup — iOS 터치 드래그선택은 합성 mouseup을 안정적으로
 // 안 쏴서 형광펜이 아예 안 먹혔다(2026-09-05 실기기 피드백으로 확인된 버그).
@@ -1104,6 +1152,23 @@ scroller.addEventListener('pointerup', (e) => {
   mode = null;
 });
 scroller.addEventListener('pointercancel', () => { clearTimeout(pressTimer); dragging = false; selectPrimed = false; mode = null; resetDragX(); });
+
+/* ── 최상단 풀다운 시 하단바까지 딸려 내려가던 증상 — CSS(html,body 잠금)로는 실기기에서
+   재현이 계속돼(2026-09-05), touchmove를 직접 가로채는 더 확실한 방식으로 바꿨다.
+   .scroller가 이미 맨 위(scrollTop 0)인 상태에서 아래로 당기는 제스처만 막는다 —
+   그 외(스크롤 중·위로 당김·가로 스와이프)는 그대로 둔다. 라이트박스·시트·시험모드는
+   각자 자기 제스처가 있어 건드리지 않는다. */
+let pullStartY = null;
+$('app').addEventListener('touchstart', (e) => {
+  pullStartY = e.touches[0] ? e.touches[0].clientY : null;
+}, { passive: true });
+$('app').addEventListener('touchmove', (e) => {
+  if (pullStartY == null || examMode) return;
+  if (!$('lightbox').hidden) return;
+  if ($('sheet').classList.contains('on')) return;
+  const t = e.touches[0]; if (!t) return;
+  if (scroller.scrollTop <= 0 && t.clientY - pullStartY > 0) e.preventDefault();
+}, { passive: false });
 
 /* ── 시험(소챕터/챕터 공용) ──
    제목만 → "정답 확인" 탭 → 본문 리빌 → "알고 있었음/몰랐음" 최종 확정(되돌리기 없음).
