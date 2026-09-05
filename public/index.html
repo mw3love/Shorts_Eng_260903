@@ -44,17 +44,17 @@
     display:block;font-family:var(--serif);font-weight:400;
     font-size:clamp(22px,6vw,30px);line-height:1.18;letter-spacing:-.01em;
     color:var(--paper);text-decoration:none;text-wrap:balance;
-    padding:calc(env(safe-area-inset-top) + 44px) 22px 6px;
+    padding:calc(env(safe-area-inset-top) + 62px) 22px 6px;
   }
   .content{
-    padding:6px 20px calc(150px + env(safe-area-inset-bottom)) 20px;min-height:100%;
+    padding:6px 20px calc(112px + env(safe-area-inset-bottom)) 20px;min-height:100%;
     font-size:15.5px;line-height:1.7;color:var(--body-text);
     will-change:transform;
   }
   .peek{position:absolute;inset:0;pointer-events:none;will-change:transform;display:flex;flex-direction:column;overflow:hidden;z-index:1}
   .peek-prev{transform:translateX(-100%)}
   .peek-next{transform:translateX(100%)}
-  .peek .cardtitle{padding:calc(env(safe-area-inset-top) + 44px) 22px 6px;color:var(--paper)}
+  .peek .cardtitle{padding:calc(env(safe-area-inset-top) + 62px) 22px 6px;color:var(--paper)}
   .peekbody{flex:1;min-height:0;-webkit-mask-image:linear-gradient(to bottom, black 55%, transparent 90%);mask-image:linear-gradient(to bottom, black 55%, transparent 90%)}
   .content p{margin:0 0 12px}
   .content h3{font-family:var(--serif);font-weight:400;font-size:1.3em;color:var(--paper);margin:20px 0 8px}
@@ -76,20 +76,29 @@
   .content .shot{max-width:100%;border-radius:10px;display:block;margin:6px 0 12px}
   .content .shotcap{font-family:var(--mono);font-size:11px;color:var(--muted);margin:-6px 0 12px}
 
-  /* ── 상단: 챕터-소챕터 주소("1-1") — 카드와 무관, 본문 위에 떠 있는 얇은 라벨 ── */
+  /* ── 상단: 챕터-소챕터 주소("1-1") — 탭하면 이 소챕터 시험. 테두리 링이 이 소챕터
+     10장 중 몇 장을 "안다"로 판정했는지 진행률을 보여준다(2026-09-05 실기기 피드백 —
+     시험은 자주 안 쓰니 엄지 영역(하단)이 아니라 여기로, 진행률도 한눈에). ── */
   .subpos{
     position:absolute;top:env(safe-area-inset-top);left:0;right:0;z-index:2;
-    display:flex;justify-content:center;padding:8px 0 0;pointer-events:none;
+    display:flex;justify-content:center;padding:8px 0 0;
   }
-  .subpos span{
-    font-family:var(--mono);font-size:11px;color:var(--muted);
-    background:color-mix(in srgb,var(--ink3) 80%,transparent);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
-    padding:5px 11px;border-radius:99px;
+  .subpos-chip{
+    --pct:0;position:relative;width:46px;height:46px;border-radius:50%;border:0;cursor:pointer;
+    background:var(--ink3);display:flex;align-items:center;justify-content:center;-webkit-touch-callout:none;
   }
+  .subpos-chip::before{
+    content:'';position:absolute;inset:-3px;border-radius:50%;
+    background:conic-gradient(var(--coral) calc(var(--pct)*1%), var(--ink4) 0);
+    -webkit-mask:radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+    mask:radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+  }
+  .subpos-chip span{position:relative;font-family:var(--mono);font-size:11px;color:var(--paper)}
+  .subpos-chip:active{transform:scale(.95)}
 
   /* ── 챕터 완주 넛지 배너 ── */
   .chapnudge{
-    position:absolute;left:16px;right:16px;bottom:calc(158px + env(safe-area-inset-bottom));z-index:3;
+    position:absolute;left:16px;right:16px;bottom:calc(122px + env(safe-area-inset-bottom));z-index:3;
     background:color-mix(in srgb,var(--ink2) 94%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
     border-radius:14px;padding:12px 14px;box-shadow:0 8px 24px rgba(0,0,0,.4);
     display:flex;flex-direction:column;gap:8px;
@@ -101,35 +110,37 @@
   .chapnudge button{flex:1;border:0;border-radius:9px;padding:9px;font-size:12.5px;cursor:pointer;background:var(--ink4);color:var(--body-text)}
   .chapnudge button.primary{background:color-mix(in srgb,var(--coral) 22%,var(--ink4));color:var(--coral)}
 
-  /* ── 하단 플로팅 바: 스크러버 + 필터/시험/형광펜/시트 ── 본문 위에 떠서 엄지 반경을 채운다 ── */
+  /* ── 하단 플로팅 바: 스크러버 + 필터/형광펜/시트 ── 본문 위에 떠서 엄지 반경을 채운다.
+     시험 버튼은 자주 안 쓰는 액션이라 상단 "1-1" 칩으로 옮겼다 — 엄지 영역은 자주 쓰는
+     것만(2026-09-05 실기기 피드백: "하단은 오른손 엄지 영역이 비싼 부동산"). ── */
   .bottombar{
     position:absolute;left:0;right:0;bottom:0;z-index:2;
-    padding:10px 16px calc(10px + env(safe-area-inset-bottom));
+    padding:6px 16px calc(6px + env(safe-area-inset-bottom));
     background:linear-gradient(to top, rgba(11,13,16,.92) 40%, rgba(11,13,16,0));
   }
-  .scrubber{padding:2px 4px 10px;touch-action:none}
+  .scrubber{padding:2px 4px 6px;touch-action:none}
   .scrubtrack{position:relative;height:18px}
   .scrubtrack .track{position:absolute;left:0;right:0;top:50%;height:2px;background:var(--ink4);transform:translateY(-50%);border-radius:2px}
   .scrubtrack .dot{position:absolute;top:50%;width:7px;height:7px;border-radius:50%;background:var(--faint);transform:translate(-50%,-50%);transition:background-color .1s ease}
   .scrubtrack .dot.cur{background:var(--coral);width:10px;height:10px}
   .barrow{display:flex;align-items:center;gap:8px}
   .seg{flex:1;display:flex;background:var(--ink3);border-radius:10px;padding:3px}
-  .seg button{flex:1;border:0;background:none;color:var(--muted);font-size:12px;padding:8px 4px;border-radius:8px;cursor:pointer}
+  .seg button{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;border:0;background:none;color:var(--muted);font-size:12px;padding:8px 4px;border-radius:8px;cursor:pointer}
   .seg button.on{background:var(--ink4);color:var(--paper)}
+  .seg button .ico{font-size:10px}
   .barbtn{
     flex:none;width:42px;height:42px;border-radius:50%;border:0;cursor:pointer;
     display:flex;align-items:center;justify-content:center;font-size:17px;
     background:var(--ink3);color:var(--muted);-webkit-touch-callout:none;
   }
   .barbtn:active{transform:scale(.93)}
-  .barbtn.exam{background:color-mix(in srgb,var(--coral) 18%,var(--ink3));color:var(--coral);width:auto;padding:0 14px;border-radius:21px;font-size:12.5px;gap:6px}
   .barbtn.active{background:color-mix(in srgb,var(--coral) 30%,var(--ink3));color:var(--coral)}
 
   /* ── 본문 드래그 선택 → 제목으로 변경 / 형광펜(문서 하단 JS 참조) ── */
   .retitlePop{position:fixed;z-index:9;background:var(--coral);color:var(--ink);font-family:var(--sans);font-size:12.5px;font-weight:600;padding:9px 14px;border-radius:99px;box-shadow:0 4px 16px rgba(0,0,0,.4);cursor:pointer;-webkit-user-select:none;user-select:none}
   .retitlePop[hidden]{display:none}
 
-  .toast{position:fixed;left:50%;bottom:170px;transform:translate(-50%,8px);z-index:8;font-family:var(--mono);font-size:12.5px;color:var(--paper);background:var(--ink3);padding:8px 14px;border-radius:8px;opacity:0;pointer-events:none;transition:opacity .18s ease,transform .18s ease;white-space:nowrap}
+  .toast{position:fixed;left:50%;bottom:130px;transform:translate(-50%,8px);z-index:8;font-family:var(--mono);font-size:12.5px;color:var(--paper);background:var(--ink3);padding:8px 14px;border-radius:8px;opacity:0;pointer-events:none;transition:opacity .18s ease,transform .18s ease;white-space:nowrap}
   .toast.on{opacity:1;transform:translate(-50%,0)}
 
   .loadbox{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:var(--ink)}
@@ -173,7 +184,10 @@
     padding-bottom:env(safe-area-inset-bottom);box-shadow:0 -8px 30px rgba(0,0,0,.4);
   }
   .sheet.on{transform:translateY(0)}
-  .sheethandle{width:36px;height:4px;background:var(--ink4);border-radius:3px;margin:10px auto 4px;flex:none}
+  /* 시각적으로는 얇은 막대지만, 실제 드래그 히트박스는 훨씬 넓다(2026-09-05 실기기
+     피드백 — 정확히 막대 위를 눌러야만 드래그로 닫혔던 것을 완화). */
+  .sheethandle{width:72px;height:26px;margin:0 auto;flex:none;position:relative;cursor:grab}
+  .sheethandle::after{content:'';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:36px;height:4px;background:var(--ink4);border-radius:3px}
   .sheetscroll{flex:1;min-height:0;overflow-y:auto;-webkit-user-select:text;user-select:text}
   .chaplist{padding:6px 16px 10px;display:flex;flex-direction:column;gap:10px}
   .chaprow{background:var(--ink3);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
@@ -210,7 +224,7 @@
       </div>
       <div class="peek peek-prev" id="peekPrev"><div class="cardtitle" id="peekPrevTitle"></div><div class="content peekbody" id="peekPrevBody"></div></div>
       <div class="peek peek-next" id="peekNext"><div class="cardtitle" id="peekNextTitle"></div><div class="content peekbody" id="peekNextBody"></div></div>
-      <div class="subpos"><span id="subPos">1-1</span></div>
+      <div class="subpos"><button class="subpos-chip" id="subPosChip" aria-label="이 소챕터 시험보기"><span id="subPos">1-1</span></button></div>
     </div>
 
     <div class="chapnudge" id="chapNudge">
@@ -222,10 +236,9 @@
       <div class="scrubber" id="scrubber"><div class="scrubtrack" id="scrubTrack"><div class="track"></div></div></div>
       <div class="barrow">
         <div class="seg" id="filterSeg">
-          <button data-m="all" class="on">전체</button>
-          <button data-m="unknown">모르는 것만</button>
+          <button data-m="all" class="on"><span class="ico">●</span>전체</button>
+          <button data-m="unknown"><span class="ico">○</span>모르는것만</button>
         </div>
-        <button class="barbtn exam" id="examQuickBtn">📝 시험</button>
         <button class="barbtn" id="hlBtn" aria-label="형광펜 모드">&#128397;</button>
         <button class="barbtn" id="sheetBtn" aria-label="챕터 목록">&#9776;</button>
       </div>
@@ -250,11 +263,11 @@
 <div class="sheet" id="sheet">
   <div class="sheethandle"></div>
   <div class="sheetscroll">
-    <div class="chaplist" id="chapList"></div>
     <div class="sheetsettings">
       <div class="sliderow"><label for="titleScale">제목</label><input type="range" id="titleScale" min="0.7" max="1.4" step="0.02" value="1"><span class="val" id="titleScaleVal"></span></div>
       <div class="sliderow"><label for="bodyScale">본문</label><input type="range" id="bodyScale" min="0.8" max="1.5" step="0.02" value="1"><span class="val" id="bodyScaleVal"></span></div>
     </div>
+    <div class="chaplist" id="chapList"></div>
   </div>
 </div>
 
@@ -520,7 +533,12 @@ function loadPos(){
 function savePos(){ lsSetJSON('sd_pos', { chap: chapIdx, sub: subIdx }); }
 function subId(){ return 'c' + chapIdx + 's' + subIdx; }
 function chapId(){ return 'c' + chapIdx; }
-function updateSubPos(){ $('subPos').textContent = (chapIdx + 1) + '-' + (subIdx + 1); }
+function updateSubPos(){
+  $('subPos').textContent = (chapIdx + 1) + '-' + (subIdx + 1);
+  const known = subchapterAll.filter((c) => c.known).length;
+  const pct = subchapterAll.length ? Math.round(known / subchapterAll.length * 100) : 0;
+  $('subPosChip').style.setProperty('--pct', pct);
+}
 
 async function refreshChapterMeta(){
   allChaptersData = await apiChapters().catch(() => null);
@@ -545,20 +563,27 @@ function showLoading(title, msg, retry){
 }
 function hideLoading(){ $('loading').hidden = true; }
 
+// 소챕터 진입 시 전체 카드를 한 번만 받아온다 — 전체/모르는것만 전환은 이미 있는
+// 데이터를 다시 거르기만 하면 되므로 네트워크 왕복이 없다(2026-09-05 실기기 피드백:
+// 토글할 때마다 로딩화면이 떠서 깜빡였던 것 — 그 자체를 없앴다).
+let subchapterAll = [];
 async function loadSubchapter(){
   showLoading('불러오는 중', '카드를 가져옴');
   let data;
-  try { data = await apiSubchapter(subId(), studyMode); }
+  try { data = await apiSubchapter(subId(), 'all'); }
   catch (e) { showLoading('불러오기 실패', String(e.message || e), loadSubchapter); return; }
   if (data.error){ showLoading('불러오기 실패', data.error, loadSubchapter); return; }
-  studyCards = data.cards; studyIdx = 0;
+  subchapterAll = data.cards;
   hideLoading();
-  if (!studyCards.length){
-    if (studyMode === 'unknown'){ toast('이 소챕터는 모두 알고 있음 — 전체보기로 전환'); setFilterMode('all'); return; }
-    toast('카드 없음');
-    return;
-  }
+  if (!subchapterAll.length){ toast('카드 없음'); return; }
   updateSubPos();
+  applyFilter();
+}
+// 이미 받아둔 subchapterAll을 거르기만 한다 — 로딩화면·제목 깜빡임 없이 즉시 반영.
+function applyFilter(){
+  studyCards = studyMode === 'unknown' ? subchapterAll.filter((c) => !c.known) : subchapterAll;
+  studyIdx = 0;
+  if (!studyCards.length){ toast('이 소챕터는 모두 알고 있음 — 전체보기로 전환'); studyMode = 'all'; syncFilterButtons(); studyCards = subchapterAll; }
   setRetitleContext(() => studyCards[studyIdx]);
   renderStudyCard();
 }
@@ -601,11 +626,14 @@ $('scrubber').addEventListener('pointermove', (e) => {
 $('scrubber').addEventListener('pointerup', () => { scrubbing = false; });
 $('scrubber').addEventListener('pointercancel', () => { scrubbing = false; });
 
-/* 전체/모르는 것만 필터 — 같은 화면 안에서 바로 전환 */
+/* 전체/모르는 것만 필터 — 이미 받아둔 데이터를 다시 거르기만 함(네트워크 없음) */
+function syncFilterButtons(){
+  $('filterSeg').querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.m === studyMode));
+}
 function setFilterMode(m){
   studyMode = m;
-  $('filterSeg').querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.m === m));
-  loadSubchapter();
+  syncFilterButtons();
+  applyFilter();
 }
 $('filterSeg').addEventListener('click', (e) => {
   const b = e.target.closest('button'); if (!b) return;
@@ -750,7 +778,7 @@ function enterExamMode(){ examMode = true; $('readRoot').hidden = true; $('examV
 function exitExamMode(){ examMode = false; $('examView').hidden = true; $('readRoot').hidden = false; clearRetitleContext(); setRetitleContext(() => studyCards[studyIdx]); }
 $('examBack').addEventListener('click', exitExamMode);
 
-$('examQuickBtn').addEventListener('click', () => enterSubchapterExam());
+$('subPosChip').addEventListener('click', () => enterSubchapterExam());
 async function enterSubchapterExam(){
   showLoading('불러오는 중', '문제를 가져옴');
   let data;
