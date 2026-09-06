@@ -44,7 +44,11 @@
     margin:0;background:var(--ink);color:var(--paper);font-family:var(--sans);
     overscroll-behavior:none;-webkit-tap-highlight-color:transparent;
   }
-  button{font:inherit;color:inherit}
+  /* touch-action:manipulation — maximum-scale=1만으론 iOS Safari의 더블탭-확대 제스처가
+     완전히 안 막힌다(최신 iOS가 접근성 이유로 user-scalable=no류 제약을 일부 무시함,
+     2026-09-06 실기기 피드백: n/전체 칩을 빠르게 연속 탭하니 더블탭으로 인식돼 그 자리가
+     확대됨). 버튼 자체에 지정하면 그 요소에서 더블탭-확대만 확실히 꺼진다. */
+  button{font:inherit;color:inherit;touch-action:manipulation}
   a{color:inherit}
   a:focus-visible,button:focus-visible{outline:2px solid var(--know);outline-offset:2px}
 
@@ -1558,29 +1562,34 @@ $('resetCancelBtn').addEventListener('click', hideResetPop);
 document.addEventListener('pointerdown', (e) => {
   if (!$('resetPop').hidden && !e.target.closest('#resetPop') && e.target !== $('filterToggle')) hideResetPop();
 });
-$('resetConfirmBtn').addEventListener('click', async () => {
+// 낙관적 업데이트(2026-09-06 실기기 피드백 — "리셋 누르자마자 순식간에 돼야 할 것
+// 같은데 몇 초 걸린다") — 예전엔 카드마다 Notion 응답을 기다린 뒤에야 화면을 갱신해서,
+// 이미 손댄 카드가 몇 장만 있어도 그 수만큼 350ms(Notion 3req/s 배려)가 쌓여 체감
+// 지연이 났다. 로컬 상태는 즉시 지우고 화면을 바로 갱신한 뒤, Notion 반영은 백그라운드
+// 순차 처리로 넘긴다 — 다른 상태변경 함수들과 같은 패턴. 상태(known/archive/trash)는
+// 초기화하기 「전에」 미리 기억해둬야 한다 — 지운 뒤엔 무엇을 되돌릴지 알 수 없다.
+$('resetConfirmBtn').addEventListener('click', () => {
   hideResetPop();
   const sub = subId();
   const cards = subchapterAll.slice();
-  showLoading('Resetting', '0/' + cards.length);
-  let done = 0;
-  for (const c of cards) {
-    const st = cardStatus(c);
-    try {
-      if (st === 'known') await apiAnswer(sub, c.key, false, c.id);
-      else if (st === 'archive') await apiArchiveRestore(c.key, c.id);
-      else if (st === 'trash') await apiTrashRestore(c.key, c.id);
-    } catch (e) { /* 로컬 플래그는 그대로 지운다 — Notion 실패해도 판정 자체는 막지 않음(기존 정책) */ }
-    c.known = false; c.archived = false; c.trashed = false;
-    done++;
-    $('loadMsg').textContent = done + '/' + cards.length;
-    if (st !== 'unknown') await new Promise((r) => setTimeout(r, 350)); // Notion 3req/s 배려(gap()과 같은 간격)
-  }
-  hideLoading();
+  const statuses = cards.map((c) => cardStatus(c));
+  cards.forEach((c) => { c.known = false; c.archived = false; c.trashed = false; });
   subCache.clear();
   applyFilter();
   updateSubPos();
   toast('Reset done');
+  (async () => {
+    for (let i = 0; i < cards.length; i++) {
+      const c = cards[i], st = statuses[i];
+      if (st === 'unknown') continue;
+      try {
+        if (st === 'known') await apiAnswer(sub, c.key, false, c.id);
+        else if (st === 'archive') await apiArchiveRestore(c.key, c.id);
+        else if (st === 'trash') await apiTrashRestore(c.key, c.id);
+      } catch (e) { /* 로컬은 이미 리셋됨 — Notion 실패해도 판정 자체는 막지 않음(기존 정책) */ }
+      await new Promise((r) => setTimeout(r, 350)); // Notion 3req/s 배려(gap()과 같은 간격)
+    }
+  })();
 });
 
 /* 소챕터/챕터 경계 — 자동으로 다음 소챕터, 챕터가 끝나면 전체시험 넛지 */
@@ -1863,7 +1872,21 @@ function renderExamResult(){
 }
 
 /* ── 챕터 목록(하단 시트) ── */
-$('sheetBtn').addEventListener('click', openSheet);
+// 짧게 탭 = 챕터 시트(전체 챕터 접힌 목록), 길게 누르면 지금 챕터의 소챕터 목록을
+// 펼친 채로 바로 연다(시트 한 번 열고 그 챕터를 또 찾아 들어가는 단계를 건너뜀,
+// 2026-09-06 사용자 요청). openChapterList()가 이미 "지금 챕터면 그 소챕터를 펼쳐서
+// 보여준다"는 로직을 갖고 있어(ci === chapIdx 체크) 그대로 재사용한다.
+let sheetBtnPressT = null, sheetBtnLongPressed = false;
+$('sheetBtn').addEventListener('pointerdown', () => {
+  sheetBtnLongPressed = false;
+  sheetBtnPressT = setTimeout(() => { sheetBtnLongPressed = true; openChapterList('c' + chapIdx); }, 450);
+});
+$('sheetBtn').addEventListener('pointerup', () => {
+  clearTimeout(sheetBtnPressT);
+  if (sheetBtnLongPressed) return;
+  openSheet();
+});
+$('sheetBtn').addEventListener('pointerleave', () => clearTimeout(sheetBtnPressT));
 $('sheetback').addEventListener('click', closeSheet);
 $('sheetClose').addEventListener('click', closeSheet);
 function openSheet(){
@@ -2202,12 +2225,18 @@ document.addEventListener('pointerdown', (e) => {
 // 발목을 잡았다. 핀치 도중엔 CSS 변수만 rAF로 갱신하고, px 라벨·저장은 손을 뗄 때
 // (pinchEnd) 딱 한 번만 한다.
 let pinchRaf = null;
+// 손가락 거리 변화를 1:1로 배율에 매핑하면(ratio 그대로) 손을 조금만 벌려도 0.7~1.5
+// 범위 전체를 훌쩍 넘어버려 "확확 튄다"는 느낌을 준다(2026-09-06 실기기 피드백 —
+// 세밀한 조정이 필요한 좁은 범위인데 너무 민감함). PINCH_SENSITIVITY로 반응을
+// 절반 정도로 눅여 같은 손가락 움직임에도 더 작은 배율 변화만 나게 한다.
+const PINCH_SENSITIVITY = 0.45;
 document.addEventListener('pointermove', (e) => {
   if (!pinchPointers.has(e.pointerId)) return;
   pinchPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (!pinchInput || pinchPointers.size !== 2 || pinchStartDist <= 0) return;
   const ratio = pinchDist() / pinchStartDist;
-  const next = Math.min(parseFloat(pinchInput.max), Math.max(parseFloat(pinchInput.min), pinchStartScale * ratio));
+  const damped = 1 + (ratio - 1) * PINCH_SENSITIVITY;
+  const next = Math.min(parseFloat(pinchInput.max), Math.max(parseFloat(pinchInput.min), pinchStartScale * damped));
   pinchInput.value = next.toFixed(2);
   if (pinchRaf) return;
   pinchRaf = requestAnimationFrame(() => {
