@@ -346,10 +346,14 @@
   /* 챕터 행 — 칩 전체를 탭하면 "그 챕터 카드 제목 리스트"가 먼저 뜨고, 거기서 고른
      제목으로 이동한다(2026-09-06 라운드14 — 예전엔 칩 탭이 곧장 이동이었다). "전체시험"만
      별도 미니 버튼으로 즉시 실행. */
-  /* 2026-09-06 라운드14: "최고 N"을 점수 옆 인라인(라운드13)에서 다시 별도 줄로 뺐다 —
-     실제로 써보니 전체시험 버튼이 점수 옆에 붙는 게 더 자연스럽다는 사용자 판단(라운드13의
-     "점수 옆 이동은 기각" 결정을 뒤집음). 행 높이는 다시 살짝 늘어남(트레이드오프로 감수). */
-  .chaprow{background:var(--ink3);border-radius:12px;padding:9px 12px;display:flex;flex-direction:column;gap:5px;cursor:pointer}
+  /* 2026-09-06 라운드15(베이크오프 R4 채택): "최고 N"을 별도 줄(라운드14)에서 점수 옆
+     작은 트로피 배지로 합쳐 2줄 구조로 압축했다. "최고 N"은 실시간 안다 개수의 역대
+     최고치라 평소엔 현재 점수와 거의 항상 같은 값이지만(안다 표시는 늘어나기만 함),
+     시험에서 "몰랐음"으로 정직하게 답하면 현재 점수만 내려가고 최고는 그대로 남는
+     유일한 경우가 있어 — 그 정직한 하향이 "손해"처럼 안 보이게 지키는 값이라 상시
+     표시를 유지한다(CLAUDE.md 참조). 전체시험 버튼은 폭이 최고 자릿수에 안 흔들리게
+     라벨을 그대로 "전체시험"으로 고정 — 상태 표시(점수+트로피)와 액션(버튼)을 분리한다. */
+  .chaprow{background:var(--ink3);border-radius:12px;padding:9px 12px;display:flex;flex-direction:column;gap:7px;cursor:pointer}
   .chaprow:active{background:var(--ink4)}
   .chaprow-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
   .chaprow-label{display:flex;flex-direction:column;gap:1px}
@@ -357,7 +361,8 @@
   .chaprow-range{font-family:var(--mono);font-size:10.5px;color:var(--muted)}
   .chaprow-scorewrap{display:flex;align-items:center;gap:8px;flex:none}
   .chaprow-score{font-family:var(--mono);font-size:22px;font-weight:500;color:var(--paper);font-variant-numeric:tabular-nums;flex:none;text-align:right;white-space:nowrap}
-  .chaprow-sub{text-align:right;font-size:11px;color:var(--coral);font-family:var(--mono)}
+  .chaprow-best{display:flex;align-items:center;gap:3px;flex:none;font-family:var(--mono);font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .chaprow-best svg{width:11px;height:11px;stroke:currentColor;flex:none}
   .chaprow-bar{height:4px;border-radius:2px;background:var(--ink4);overflow:hidden}
   .chaprow-bar i{display:block;height:100%;background:var(--coral);border-radius:2px}
   .chaprow-exam{flex:none;white-space:nowrap;background:var(--ink4);border:0;border-radius:9px;color:var(--coral);font-family:var(--sans);font-size:11px;padding:6px 9px;cursor:pointer}
@@ -1511,8 +1516,8 @@ async function renderChapList(){
     return '<div class="chaprow" data-idx="' + i + '" data-id="' + esc(c.id) + '" data-act="go">'
       + '<div class="chaprow-top"><span class="chaprow-label"><b>챕터 ' + (i + 1) + '</b><span class="chaprow-range">' + c.start + '~' + c.end + '</span></span>'
       + '<span class="chaprow-scorewrap"><span class="chaprow-score">' + c.current + '/' + c.total + '</span>'
+      + '<span class="chaprow-best" title="최고 기록"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0Z"/><path d="M7 5H4a3 3 0 0 0 3 5"/><path d="M17 5h3a3 3 0 0 1-3 5"/></svg>' + c.best + '</span>'
       + '<button class="chaprow-exam" data-act="exam">전체시험</button></span></div>'
-      + '<div class="chaprow-sub">최고 ' + c.best + '</div>'
       + '<div class="chaprow-bar"><i style="width:' + pct + '%"></i></div>'
       + '</div>';
   }).join('');
