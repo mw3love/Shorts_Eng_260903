@@ -629,9 +629,13 @@ async function handleChapterExam(env, chapId) {
     for (const c of JSON.parse(raw).cards) if (ids.includes(c.id)) byId.set(c.id, c);
   }
   const { archived, trashed } = await loadFlags(env);
+  // known도 포함(2026-09-06 라운드14) — 챕터 목록 화면(신상 페이지)에서 카드별 상태
+  // 배지("확인함" 등)를 보여주려면 필요하다. 시험 풀 계산은 이 필드를 안 봐서 기존 동작엔
+  // 영향 없음.
+  const known = JSON.parse((await env.KV.get(K_KNOWN)) || '{}');
   const cards = tagged.map(({ it, subId }) => ({
     ...(byId.get(it.id) || {}), id: it.id, key: it.key, front: it.front, url: it.url, created: it.created, subId,
-    archived: !!archived[it.key], trashed: !!trashed[it.key],
+    known: !!known[it.key], archived: !!archived[it.key], trashed: !!trashed[it.key],
   }));
 
   return json({ id: chapId, cards });
@@ -762,6 +766,23 @@ async function handleArchiveRestore(env, token, dbId, body) {
   const { key, pageId } = body || {};
   if (!key) return json({ error: 'key 필요' }, 400);
   const notionOk = await unflagAndReset(env, token, dbId, K_ARCHIVED, key, pageId);
+  return json({ ok: true, notionOk });
+}
+
+// 보관("완전히 앎") 카드뷰 롱프레스 → 바로 휴지통으로(2026-09-06, 사용자 요청 — "완전히
+// 앎"으로 잘못 보냈거나 마음이 바뀐 카드를 복구 한 단계 없이 바로 정리). archived 플래그를
+// 지우고 trashed를 세워 "이동"으로 만든다(둘 다 켜진 채로 남지 않게).
+async function handleArchiveToTrash(env, token, dbId, body) {
+  const { key, pageId } = body || {};
+  if (!key) return json({ error: 'key 필요' }, 400);
+  const [archived, trashed] = await Promise.all([
+    env.KV.get(K_ARCHIVED).then((v) => JSON.parse(v || '{}')),
+    env.KV.get(K_TRASHED).then((v) => JSON.parse(v || '{}')),
+  ]);
+  delete archived[key];
+  trashed[key] = true;
+  await Promise.all([env.KV.put(K_ARCHIVED, JSON.stringify(archived)), env.KV.put(K_TRASHED, JSON.stringify(trashed))]);
+  const notionOk = await writeReviewStatus(env, token, dbId, pageId, '휴지통');
   return json({ ok: true, notionOk });
 }
 
@@ -947,6 +968,10 @@ export default {
     }
     if (url.pathname === '/api/archive/restore' && request.method === 'POST') {
       try { return await handleArchiveRestore(env, token, dbId, await request.json()); }
+      catch (e) { return json({ error: String(e.message || e) }, 500); }
+    }
+    if (url.pathname === '/api/archive/totrash' && request.method === 'POST') {
+      try { return await handleArchiveToTrash(env, token, dbId, await request.json()); }
       catch (e) { return json({ error: String(e.message || e) }, 500); }
     }
     if (url.pathname === '/api/trash') {
