@@ -726,13 +726,17 @@ async function handleMegaExam(env, gId) {
     picked = keep.flatMap(([, arr]) => arr);
   }
 
+  // ⚠ 버킷은 병렬로 읽는다 — 표본이 20개 버킷에 흩어지는데 순차로 읽으면 실측 5.9초가
+  // 걸렸다(2026-09-06 프로덕션 g0). 서브요청 「횟수」는 그대로라 50회 예산과 무관하고,
+  // 줄어드는 건 왕복 지연뿐이다(무마찰이 이 앱의 최상위 제약).
   const byId = new Map();
-  for (const [num, arr] of byBucket) {
-    const raw = await env.KV.get(K_BUCKET + num);
-    if (!raw) continue;
-    const ids = arr.map((p) => p.it.id);
-    for (const c of JSON.parse(raw).cards) if (ids.includes(c.id)) byId.set(c.id, c);
-  }
+  const raws = await Promise.all([...byBucket.keys()].map((num) => env.KV.get(K_BUCKET + num)));
+  [...byBucket.entries()].forEach(([, arr], i) => {
+    const raw = raws[i];
+    if (!raw) return;
+    const ids = new Set(arr.map((p) => p.it.id));
+    for (const c of JSON.parse(raw).cards) if (ids.has(c.id)) byId.set(c.id, c);
+  });
   const known = JSON.parse((await env.KV.get(K_KNOWN)) || '{}');
   const cards = picked.map(({ it, subId }) => ({
     ...(byId.get(it.id) || {}), id: it.id, key: it.key, front: it.front, url: it.url, created: it.created, subId,
