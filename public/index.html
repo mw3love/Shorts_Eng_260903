@@ -363,7 +363,8 @@
   .chaprow-exam{flex:none;white-space:nowrap;background:var(--ink4);border:0;border-radius:9px;color:var(--coral);font-family:var(--sans);font-size:11px;padding:6px 9px;cursor:pointer}
   .trashsec{padding:4px 16px 18px}
   .trashrow{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--ink3);border-radius:10px;padding:10px 12px;margin-top:6px}
-  .trashrow .tf{font-family:var(--serif);font-size:14px;color:var(--paper);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .trashrow .tn{font-family:var(--mono);font-size:11px;color:var(--muted);flex:none;width:20px;text-align:right;font-variant-numeric:tabular-nums}
+  .trashrow .tf{flex:1;font-family:var(--serif);font-size:14px;color:var(--paper);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .trashrow .ta{display:flex;gap:6px;flex:none;align-items:center}
   .trashrow .ta button{background:var(--ink4);border:0;border-radius:7px;color:var(--body-text);font-size:11px;padding:6px 8px;cursor:pointer}
   .trashrow .ta button.del{color:var(--coral)}
@@ -1384,6 +1385,7 @@ $('app').addEventListener('touchmove', (e) => {
   if (pullStartY == null || examMode) return;
   if (!$('lightbox').hidden) return;
   if ($('sheet').classList.contains('on')) return;
+  if (!$('fontPop').hidden) return;
   const t = e.touches[0]; if (!t) return;
   if (scroller.scrollTop <= 0 && t.clientY - pullStartY > 0) e.preventDefault();
 }, { passive: false });
@@ -1778,9 +1780,10 @@ function parseSubIdClient(id){
 }
 const SEARCH_BADGE = { unknown: '미확인', known: '확인함', archive: '완전히 앎', trash: '휴지통' };
 // 검색·소챕터목록·챕터목록 셋 다 "제목+상태배지 목록 → 탭해서 이동" 모양이 같아 공유한다.
-function renderPickList(el, items, emptyMsg, onPick){
+function renderPickList(el, items, emptyMsg, onPick, showIndex){
   if (!items.length){ el.innerHTML = '<div style="padding:16px 4px;color:var(--muted);font-size:12.5px;text-align:center">' + emptyMsg + '</div>'; return; }
   el.innerHTML = items.map((it, i) => '<div class="trashrow" data-i="' + i + '">'
+    + (showIndex ? '<span class="tn">' + (i + 1) + '</span>' : '')
     + '<span class="tf">' + esc(it.front) + '</span>'
     + '<div class="ta"><span class="searchbadge s-' + it.status + '">' + SEARCH_BADGE[it.status] + '</span></div>'
     + '</div>').join('');
@@ -1820,7 +1823,7 @@ $('listCloseBtn').addEventListener('click', closeListOv);
 function openSubchapterList(){
   const items = subchapterAll.map((c) => ({ key: c.key, front: c.front, subId: subId(), status: cardStatus(c) }));
   openListOv((chapIdx + 1) + '-' + (subIdx + 1) + ' 목록');
-  renderPickList($('listResults'), items, '카드 없음', (it) => { closeListOv(); navigateToCard(it); });
+  renderPickList($('listResults'), items, '카드 없음', (it) => { closeListOv(); navigateToCard(it); }, true);
 }
 async function openChapterList(cId){
   showLoading('불러오는 중', '챕터 목록을 가져옴');
@@ -1830,7 +1833,7 @@ async function openChapterList(cId){
   if (data.error || !data.cards.length){ toast(data.error || '카드 없음'); return; }
   const items = data.cards.map((c) => ({ key: c.key, front: c.front, subId: c.subId, status: cardStatus(c) }));
   openListOv('챕터 ' + (Number(cId.slice(1)) + 1) + ' 목록');
-  renderPickList($('listResults'), items, '카드 없음', (it) => { closeListOv(); navigateToCard(it); });
+  renderPickList($('listResults'), items, '카드 없음', (it) => { closeListOv(); navigateToCard(it); }, true);
 }
 $('searchInput').addEventListener('input', () => {
   clearTimeout(searchT);
