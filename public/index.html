@@ -1053,7 +1053,18 @@ function updateSubPos(){
   const pos = subId();
   if (lastShownPos && lastShownPos !== pos) flashSubPos();
   lastShownPos = pos;
-  $('subPos').textContent = (chapIdx + 1) + '-' + (subIdx + 1);
+  // 2026-09-06 라운드19 — "1-1"(챕터-소챕터)에 세 번째 숫자(소챕터 안에서 지금 카드의
+  // 고정 순번, 1~10)를 더한다. 소거 여부와 무관한 고정값 — subchapterAll(원본 순서)에서
+  // key로 찾은 인덱스라, "안다"로 표시해도 번호가 안 흔들린다(재계산 방식은 검토 후 기각 —
+  // 처리할 때마다 이웃 번호가 바뀌어 위치 감각을 해쳐서). reviewMode(완전히앎/휴지통
+  // 카드뷰)는 subchapterAll과 무관한 별도 목록이라 대상에서 제외(찾아도 -1이라 자동으로 빠짐).
+  let posText = (chapIdx + 1) + '-' + (subIdx + 1);
+  if (!reviewMode) {
+    const cur = studyCards[studyIdx];
+    const ord = cur ? subchapterAll.findIndex((x) => x.key === cur.key) : -1;
+    if (ord >= 0) posText += '-' + (ord + 1);
+  }
+  $('subPos').textContent = posText;
   const known = subchapterAll.filter((c) => c.known).length;
   const total = subchapterAll.length || 1;
   const filled = known / total * 5;
@@ -1201,6 +1212,7 @@ function renderStudyCard(){
   $('scroller').scrollTop = 0;
   renderStudyScrubber();
   syncCardStateButtons();
+  updateSubPos(); // 라운드19 — "1-1-N"의 N(고정 순번)은 카드마다 바뀌므로 매 렌더 갱신
   warmImages(studyPrev()); warmImages(studyNext());
   if (reviewMode) updateReviewBar();
 }
