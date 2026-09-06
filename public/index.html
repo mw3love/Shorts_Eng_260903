@@ -16,7 +16,7 @@
   :root{
     --ink:#0B0D10; --ink2:#151A20; --ink3:#1E252D; --ink4:#262E38;
     --paper:#EFF2F6; --body-text:#C9D1DC; --muted:#8B95A3; --faint:#5A6472;
-    --know:#3DD68C; --coral:#FF8F6B; --mastered:#5B9DFF;
+    --know:#3DD68C; --coral:#FF8F6B; --mastered:#5B9DFF; --trash:#B98FFF;
     /* 글자 크기 배율 — 인라인 스타일이 아니라 변수로 둔다. #content 하나에만 인라인으로
        걸면 스와이프로 들어오는 peek(.content 클래스만 있고 인라인은 없음)이 기본 크기로
        그려졌다가 커밋 후 설정 크기로 튄다(2026-09-05 실기기 피드백). 변수면 같은 CSS
@@ -179,7 +179,7 @@
   .titlebadge svg{width:12px;height:12px;stroke:currentColor}
   .titlebadge[data-restore]{cursor:pointer}
   .titlebadge[data-restore]:active{transform:scale(.85)}
-  .titlebadge.trashed{background:color-mix(in srgb,var(--muted) 20%,var(--ink3));color:var(--muted)}
+  .titlebadge.trashed{background:color-mix(in srgb,var(--trash) 20%,var(--ink3));color:var(--trash)}
   .titlebadge.archived{background:color-mix(in srgb,var(--mastered) 20%,var(--ink3));color:var(--mastered)}
   .titlebadge.known{background:color-mix(in srgb,var(--know) 20%,var(--ink3));color:var(--know)}
   .searchov{
@@ -235,7 +235,7 @@
      않기 위해). */
   .scrubtrack .dot.s-known{background:var(--know)}
   .scrubtrack .dot.s-archive{background:var(--mastered)}
-  .scrubtrack .dot.s-trash{background:var(--muted)}
+  .scrubtrack .dot.s-trash{background:var(--trash)}
   .scrubtrack .dot.cur{width:9px;height:9px;box-shadow:0 0 0 2px var(--paper)}
   .scrubtrack .dot.cur:not(.s-known):not(.s-archive):not(.s-trash){background:var(--coral)}
   /* 스크러버 위치는 그대로 두고 버튼 행만 더 아래로 밀기 위해, 줄어든 바깥 여백(위)만큼
@@ -274,7 +274,7 @@
   .barbtn:active{transform:scale(.93)}
   .barbtn.on,.barbtn.active{border-color:currentColor}
   .barbtn svg{width:18px;height:18px;stroke:currentColor}
-  #trashQuickBtn.on{color:var(--muted)}
+  #trashQuickBtn.on{color:var(--trash)}
   #archiveQuickBtn.on{color:var(--mastered)}
   #hlBtn.active{color:var(--coral)}
   /* "안다" 퀵버튼 — 원형 아이콘 전용으로 교체(2026-09-05 베이크오프 라운드4 — "초록 체크에
@@ -438,19 +438,18 @@
   .searchbadge{font-family:var(--sans);font-size:10.5px;color:var(--muted);background:var(--ink4);border-radius:6px;padding:4px 7px;white-space:nowrap}
   .searchbadge.s-known{color:var(--know)}
   .searchbadge.s-archive{color:var(--mastered)}
-  .searchbadge.s-trash{color:var(--muted)}
+  .searchbadge.s-trash{color:var(--trash)}
   /* 폰트 종류 선택 — 미리보기 카드형(2026-09-06 라운드15 후속, 베이크오프 F2 채택: "글자
      자체가 그 폰트로 렌더돼 고르기 전에 모양을 볼 수 있음"). 크기 슬라이더와 라벨이
      겹치지 않게 별도 role 라벨(모노, 대문자)을 그 위에 둔다. */
   .fontrole{font-family:var(--mono);font-size:10.5px;color:var(--faint);letter-spacing:.06em;text-transform:uppercase;margin:0 0 7px}
   .chiprow{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}
-  .swatch{flex:none;width:74px;background:var(--ink3);border:1px solid var(--ink4);border-radius:10px;padding:8px 4px;text-align:center;cursor:pointer;-webkit-touch-callout:none}
+  /* 2026-09-06 실기기 피드백 — Aa/가나 미리보기 글자를 없애고 폰트명 한 줄만 그 폰트로
+     렌더한다. 카드 높이가 줄어든 만큼 팝업(#fontPop) 뒤로 카드 본문이 더 보여서, 폰트를
+     고르면서 바로 적용된 모습을 확인하기 좋다(팝업이 화면을 다 안 덮고 중앙에만 뜸). */
+  .swatch{flex:none;background:var(--ink3);border:1px solid var(--ink4);border-radius:10px;padding:10px 14px;text-align:center;cursor:pointer;-webkit-touch-callout:none}
   .swatch.on{border-color:var(--coral);background:color-mix(in srgb,var(--coral) 12%,var(--ink3))}
-  .swatch .aa{font-size:18px;color:var(--paper);display:block;line-height:1.25}
-  /* 2026-09-06 라운드19 — 한글 "가나"는 라틴 "Aa"와 같은 18px에서도 잉크 면적이 작아
-     체감상 더 작아 보인다는 지적(실측 스크린샷으로 확인) — 본문 행만 22px로 보정. */
-  #bodyFontPicks .swatch .aa{font-size:22px}
-  .swatch .nm{font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:3px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .swatch .nm{font-size:15px;color:var(--paper);display:block;white-space:nowrap}
   .fontpicks{display:flex;flex-direction:column;gap:12px}
   .sliderow{display:flex;align-items:center;gap:10px}
   .sliderow label{flex:none;width:38px;font-family:var(--mono);font-size:11px;color:var(--muted)}
@@ -537,23 +536,23 @@
         <div>
           <p class="fontrole">제목</p>
           <div class="chiprow" id="titleFontPicks">
-            <div class="swatch" data-font="Newsreader"><span class="aa" style="font-family:'Newsreader',serif">Aa</span><span class="nm">Newsreader</span></div>
-            <div class="swatch" data-font="Lora"><span class="aa" style="font-family:'Lora',serif">Aa</span><span class="nm">Lora</span></div>
-            <div class="swatch" data-font="Source Serif 4"><span class="aa" style="font-family:'Source Serif 4',serif">Aa</span><span class="nm">Source Serif</span></div>
-            <div class="swatch" data-font="Playfair Display"><span class="aa" style="font-family:'Playfair Display',serif">Aa</span><span class="nm">Playfair</span></div>
-            <div class="swatch" data-font="EB Garamond"><span class="aa" style="font-family:'EB Garamond',serif">Aa</span><span class="nm">EB Garamond</span></div>
-            <div class="swatch" data-font="Crimson Text"><span class="aa" style="font-family:'Crimson Text',serif">Aa</span><span class="nm">Crimson Text</span></div>
+            <div class="swatch" data-font="Newsreader"><span class="nm" style="font-family:'Newsreader',serif">Newsreader</span></div>
+            <div class="swatch" data-font="Lora"><span class="nm" style="font-family:'Lora',serif">Lora</span></div>
+            <div class="swatch" data-font="Source Serif 4"><span class="nm" style="font-family:'Source Serif 4',serif">Source Serif</span></div>
+            <div class="swatch" data-font="Playfair Display"><span class="nm" style="font-family:'Playfair Display',serif">Playfair</span></div>
+            <div class="swatch" data-font="EB Garamond"><span class="nm" style="font-family:'EB Garamond',serif">EB Garamond</span></div>
+            <div class="swatch" data-font="Crimson Text"><span class="nm" style="font-family:'Crimson Text',serif">Crimson Text</span></div>
           </div>
         </div>
         <div>
           <p class="fontrole">본문</p>
           <div class="chiprow" id="bodyFontPicks">
-            <div class="swatch" data-font="IBM Plex Sans KR"><span class="aa" style="font-family:'IBM Plex Sans KR',sans-serif">가나</span><span class="nm">Plex Sans</span></div>
-            <div class="swatch" data-font="Noto Serif KR"><span class="aa" style="font-family:'Noto Serif KR',serif">가나</span><span class="nm">Noto Serif</span></div>
-            <div class="swatch" data-font="Gowun Dodum"><span class="aa" style="font-family:'Gowun Dodum',sans-serif">가나</span><span class="nm">고운돋움</span></div>
-            <div class="swatch" data-font="Pretendard"><span class="aa" style="font-family:'Pretendard',sans-serif">가나</span><span class="nm">Pretendard</span></div>
-            <div class="swatch" data-font="Gowun Batang"><span class="aa" style="font-family:'Gowun Batang',serif">가나</span><span class="nm">고운바탕</span></div>
-            <div class="swatch" data-font="Nanum Myeongjo"><span class="aa" style="font-family:'Nanum Myeongjo',serif">가나</span><span class="nm">나눔명조</span></div>
+            <div class="swatch" data-font="IBM Plex Sans KR"><span class="nm" style="font-family:'IBM Plex Sans KR',sans-serif">Plex Sans</span></div>
+            <div class="swatch" data-font="Noto Serif KR"><span class="nm" style="font-family:'Noto Serif KR',serif">Noto Serif</span></div>
+            <div class="swatch" data-font="Gowun Dodum"><span class="nm" style="font-family:'Gowun Dodum',sans-serif">고운돋움</span></div>
+            <div class="swatch" data-font="Pretendard"><span class="nm" style="font-family:'Pretendard',sans-serif">Pretendard</span></div>
+            <div class="swatch" data-font="Gowun Batang"><span class="nm" style="font-family:'Gowun Batang',serif">고운바탕</span></div>
+            <div class="swatch" data-font="Nanum Myeongjo"><span class="nm" style="font-family:'Nanum Myeongjo',serif">나눔명조</span></div>
           </div>
         </div>
       </div>
