@@ -796,7 +796,7 @@ function toast(msg){
 /* ── API ── */
 async function apiChapters(){ const r = await fetch('/api/chapters'); return r.json(); }
 async function apiSubchapter(id, mode){ const r = await fetch('/api/subchapter?id=' + encodeURIComponent(id) + '&mode=' + mode); return r.json(); }
-async function apiChapterExam(id){ const r = await fetch('/api/chapterexam?id=' + encodeURIComponent(id)); return r.json(); }
+async function apiChapterExam(id, light){ const r = await fetch('/api/chapterexam?id=' + encodeURIComponent(id) + (light ? '&light=1' : '')); return r.json(); }
 async function apiMegaExam(id){ const r = await fetch('/api/megaexam?id=' + encodeURIComponent(id)); return r.json(); }
 function apiAnswer(subId, key, know, pageId){
   return fetch('/api/answer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subId, key, know, pageId }) })
@@ -1415,10 +1415,10 @@ knowBtn.addEventListener('pointerleave', () => clearTimeout(knowPressT));
 let reviewMode = null; // null | 'archive' | 'trash'
 async function enterReviewMode(kind){
   const path = (kind === 'archive' ? '/api/archive' : '/api/trash') + '?full=1';
-  showLoading('Loading', 'Fetching cards');
+  const t = setTimeout(() => showLoading('Loading', 'Fetching cards'), 250);
   let data;
   try { data = await (await fetch(path)).json(); } catch (e) { data = null; }
-  hideLoading();
+  clearTimeout(t); hideLoading();
   if (!data || !Array.isArray(data.items) || !data.items.length){ toast('Empty'); return; }
   reviewMode = kind;
   knowLongPressed = false;
@@ -1794,11 +1794,11 @@ async function enterSubchapterExam(){
   startExam('Subchapter ' + (chapIdx + 1) + '-' + (subIdx + 1) + ' Quiz');
 }
 async function enterChapterExam(cId){
-  showLoading('Loading', 'Fetching all chapter questions');
+  const t = setTimeout(() => showLoading('Loading', 'Fetching all chapter questions'), 250);
   let data;
   try { data = await apiChapterExam(cId); }
-  catch (e) { showLoading('Load failed', String(e.message || e)); return; }
-  hideLoading();
+  catch (e) { clearTimeout(t); showLoading('Load failed', String(e.message || e)); return; }
+  clearTimeout(t); hideLoading();
   if (data.error || !data.cards.length){ toast(data.error || 'No cards'); return; }
   const pool = visibleCards(data.cards);
   if (!pool.length){ toast('No cards to test (all archived/trashed)'); return; }
@@ -1809,11 +1809,11 @@ async function enterChapterExam(cId){
 /* 종합시험(2026-09-06 라운드18) — 챕터 10개 범위. 서버가 이미 보관·휴지통을 걸러 무작위
    100장을 뽑아 주므로(전량 1,000장은 응답 약 1.5MB라 기각, 사용자 확인) 여기선 순서만 섞는다. */
 async function enterMegaExam(gId, label){
-  showLoading('Loading', 'Fetching combined quiz questions');
+  const t = setTimeout(() => showLoading('Loading', 'Fetching combined quiz questions'), 250);
   let data;
   try { data = await apiMegaExam(gId); }
-  catch (e) { showLoading('Load failed', String(e.message || e)); return; }
-  hideLoading();
+  catch (e) { clearTimeout(t); showLoading('Load failed', String(e.message || e)); return; }
+  clearTimeout(t); hideLoading();
   if (data.error || !data.cards || !data.cards.length){ toast(data.error || 'No cards to test'); return; }
   examScope = 'mega';
   examCards = shuffle(data.cards);
@@ -1909,7 +1909,9 @@ function openSheet(){
 }
 function closeSheet(){ $('sheet').classList.remove('on'); $('sheetback').classList.remove('on'); }
 async function renderChapList(){
-  $('chapList').innerHTML = '<div style="padding:20px;color:var(--muted);font-size:13px;text-align:center">Loading…</div>';
+  // allChaptersData가 이미 있으면(거의 항상) 네트워크 없이 즉시 그려지므로 "Loading…"
+  // 문구조차 안 보여준다 — 캐시 미스일 때만 표시(2026-09-06 라운드22).
+  if (!allChaptersData) $('chapList').innerHTML = '<div style="padding:20px;color:var(--muted);font-size:13px;text-align:center">Loading…</div>';
   const data = allChaptersData || await apiChapters().catch(() => null);
   if (!data || !data.chapters){ $('chapList').innerHTML = '<div style="padding:20px;color:var(--muted);font-size:13px;text-align:center">Load failed</div>'; return; }
   allChaptersData = data; totalChapters = data.chapters.length || 1;
@@ -2410,10 +2412,12 @@ function renderGroupedPickList(el, groups, openId){
   });
 }
 async function openChapterList(cId){
-  showLoading('Loading', 'Fetching chapter list');
+  // 목록 화면은 front·상태 배지만 필요해 light=1(전체 카드 본문 생략)로 받는다 —
+  // 시험 진입(enterChapterExam)은 본문이 실제로 필요해 그대로 둠(2026-09-06 라운드22).
+  const t = setTimeout(() => showLoading('Loading', 'Fetching chapter list'), 250);
   let data;
-  try { data = await apiChapterExam(cId); } catch (e) { hideLoading(); toast('Load failed'); return; }
-  hideLoading();
+  try { data = await apiChapterExam(cId, true); } catch (e) { clearTimeout(t); hideLoading(); toast('Load failed'); return; }
+  clearTimeout(t); hideLoading();
   if (data.error || !data.cards.length){ toast(data.error || 'No cards'); return; }
   const ci = Number(cId.slice(1));
   const bySub = new Map();
@@ -2441,8 +2445,12 @@ $('searchInput').addEventListener('input', () => {
 (async () => {
   applyTitleScale(); applyBodyScale();
   loadPos();
-  showLoading('Loading', 'Fetching chapter info');
+  // 250ms 안에 끝나면 로딩화면 자체를 안 보여준다(loadSubchapter의 기존 패턴과 동일 —
+  // 2026-09-06 라운드22, 새로고침마다 찰나로 스치던 로딩화면 제거). 두 번째 단계
+  // (loadSubchapter)는 자체 250ms 가드 + hideLoading()을 이미 갖고 있어 그대로 둔다.
+  const t = setTimeout(() => showLoading('Loading', 'Fetching chapter info'), 250);
   await refreshChapterMeta();
+  clearTimeout(t);
   if (!allChaptersData || !allChaptersData.chapters || !allChaptersData.chapters.length){
     showLoading('Syncing', 'Fetching cards from Notion — try again shortly', async () => { await refreshChapterMeta(); loadSubchapter(); });
     return;

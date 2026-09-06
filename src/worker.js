@@ -13,7 +13,9 @@
  *   2. GET  /api/chapters         대챕터 전체 개요(현재/최고 점수)
  *   3. GET  /api/chapter?id=cN    대챕터 하나의 소챕터 10개 상세(현재/최고 점수 + 카드 제목·known)
  *   4. GET  /api/subchapter?id=cNsM&mode=all|unknown   소챕터 하나의 카드 전체 본문(학습·시험 공용)
- *   5. GET  /api/chapterexam?id=cN  대챕터 전체(100장) 시험용 — 카드마다 원래 소속 subId를 붙여 반환
+ *   5. GET  /api/chapterexam?id=cN[&light=1]  대챕터 전체(100장) — 카드마다 원래 소속 subId를 붙여
+ *          반환. light=1이면 본문(context/hint/detail)을 빼고 목록 렌더에 필요한 필드만 보낸다
+ *          (챕터 목록 시트 전용, 2026-09-06 라운드22 — 시험 진입은 light 없이 그대로 본문 포함)
  *   5-b. GET /api/megaexam?id=gN  종합시험(대챕터 10개 범위)용 — 그 범위에서 무작위 100장 표본
  *   6. POST /api/answer           시험 정답 기록(안다/모른다) + 소챕터·대챕터 점수 갱신(최고기록 포함)
  *   7. GET/POST /api/archive      "완전히 안다" 보관 목록 조회(?full=1이면 본문까지) / 보관 등록
@@ -646,7 +648,7 @@ async function handleSubchapter(env, subId, mode) {
 // 대챕터 전체 시험(100문제) — 소챕터 시험과 같은 화면/로직을 재사용하되, 카드가 10개
 // 소챕터에 걸쳐 섞이므로 각 카드에 원래 소속 subId를 붙여 보낸다. 클라이언트는 카드별로
 // 그 subId로 POST /api/answer를 호출해야 소챕터별 최고기록도 같이 갱신된다.
-async function handleChapterExam(env, chapId) {
+async function handleChapterExam(env, chapId, light) {
   const ci = parseChapId(chapId);
   if (ci == null) return json({ error: 'bad id' }, 400);
   const idxRaw = await env.KV.get(K_INDEX);
@@ -666,11 +668,15 @@ async function handleChapterExam(env, chapId) {
       byBucket.get(it.bucket).push(it.id);
     }
   });
+  // light 모드(목록 렌더 전용)는 본문 버킷을 아예 안 읽는다 — 476KB짜리 100장 응답이
+  // front·상태 배지만 쓰는 화면에 전부 낭비였다(2026-09-06 라운드22 실측).
   const byId = new Map();
-  for (const [num, ids] of byBucket) {
-    const raw = await env.KV.get(K_BUCKET + num);
-    if (!raw) continue;
-    for (const c of JSON.parse(raw).cards) if (ids.includes(c.id)) byId.set(c.id, c);
+  if (!light) {
+    for (const [num, ids] of byBucket) {
+      const raw = await env.KV.get(K_BUCKET + num);
+      if (!raw) continue;
+      for (const c of JSON.parse(raw).cards) if (ids.includes(c.id)) byId.set(c.id, c);
+    }
   }
   const { archived, trashed } = await loadFlags(env);
   // known도 포함(2026-09-06 라운드14) — 챕터 목록 화면(신상 페이지)에서 카드별 상태
@@ -678,7 +684,7 @@ async function handleChapterExam(env, chapId) {
   // 영향 없음.
   const known = JSON.parse((await env.KV.get(K_KNOWN)) || '{}');
   const cards = tagged.map(({ it, subId }) => ({
-    ...(byId.get(it.id) || {}), id: it.id, key: it.key, front: it.front, url: it.url, created: it.created, subId,
+    ...(light ? {} : (byId.get(it.id) || {})), id: it.id, key: it.key, front: it.front, url: it.url, created: it.created, subId,
     known: !!known[it.key], archived: !!archived[it.key], trashed: !!trashed[it.key],
   }));
 
@@ -1081,7 +1087,7 @@ export default {
     if (url.pathname === '/api/image') return handleImage(env, token, url.searchParams.get('id') || '');
     if (url.pathname === '/api/chapter') return handleChapterDetail(env, url.searchParams.get('id') || '');
     if (url.pathname === '/api/subchapter') return handleSubchapter(env, url.searchParams.get('id') || '', url.searchParams.get('mode') || 'all');
-    if (url.pathname === '/api/chapterexam') return handleChapterExam(env, url.searchParams.get('id') || '');
+    if (url.pathname === '/api/chapterexam') return handleChapterExam(env, url.searchParams.get('id') || '', url.searchParams.get('light') === '1');
     if (url.pathname === '/api/megaexam') return handleMegaExam(env, url.searchParams.get('id') || '');
     if (url.pathname === '/api/answer' && request.method === 'POST') {
       try { return await handleAnswer(env, token, dbId, await request.json(), ctx); }
