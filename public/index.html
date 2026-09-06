@@ -8,7 +8,8 @@
 <meta name="theme-color" content="#0B0D10">
 <title>Shorts Deck</title>
 <link rel="manifest" href="/manifest.json">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;1,6..72,300&family=IBM+Plex+Sans+KR:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<!-- 2026-09-06 라운드15 후속(베이크오프 F2 채택) — 제목/본문 서체 선택지 추가로 폰트 3종 더 로드 -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;1,6..72,300&family=Lora:ital@0;1&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=IBM+Plex+Sans+KR:wght@300;400;500;600&family=Noto+Serif+KR:wght@400;600&family=Gowun+Dodum&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
   :root{
     --ink:#0B0D10; --ink2:#151A20; --ink3:#1E252D; --ink4:#262E38;
@@ -25,6 +26,11 @@
     --serif:"Newsreader",Georgia,"Times New Roman",serif;
     --sans:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo",sans-serif;
     --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+    /* 카드 제목·본문만 바꿀 수 있는 별도 변수(2026-09-06 라운드15 후속, 베이크오프 F2
+       채택) — 기본값은 기존 --serif/--sans 그대로라 아직 안 고른 사용자는 그대로 유지.
+       나머지 UI 크롬(로딩화면·시험 상단바 등)은 여전히 --serif/--sans 고정이라 이 변수를
+       바꿔도 영향받지 않는다 — "제목/본문" 스코프를 카드 콘텐츠로 한정. */
+    --title-font:var(--serif); --content-font:var(--sans);
   }
   *{box-sizing:border-box}
   /* overflow:hidden;position:fixed로 문서 자체를 스크롤 불가능하게 완전히 잠근다 —
@@ -66,7 +72,7 @@
     clip-path:inset(env(safe-area-inset-top) 0 0 0);
   }
   .cardtitle{
-    display:block;font-family:var(--serif);font-weight:400;
+    display:block;font-family:var(--title-font);font-weight:400;
     font-size:calc(clamp(22px,6vw,30px) * var(--tscale));line-height:1.18;letter-spacing:-.01em;
     color:var(--paper);text-decoration:none;text-wrap:balance;
     padding:calc(env(safe-area-inset-top) + 62px) 22px 6px;
@@ -76,6 +82,7 @@
      않을 만큼만 있으면 된다 — 예전 92px는 바를 피하려던 값이라 이제 불필요하다. */
   .content{
     padding:6px 20px 18px 20px;min-height:100%;
+    font-family:var(--content-font);
     font-size:calc(15.5px * var(--bscale));line-height:1.7;color:var(--body-text);
     will-change:transform;
   }
@@ -88,8 +95,8 @@
      보이는 쪽이 낫다. */
   .peekbody{flex:1;min-height:0}
   .content p{margin:0 0 12px}
-  .content h3{font-family:var(--serif);font-weight:400;font-size:1.3em;color:var(--paper);margin:20px 0 8px}
-  .content h4{font-family:var(--serif);font-weight:400;font-size:1.15em;color:var(--paper);margin:16px 0 6px}
+  .content h3{font-family:var(--title-font);font-weight:400;font-size:1.3em;color:var(--paper);margin:20px 0 8px}
+  .content h4{font-family:var(--title-font);font-weight:400;font-size:1.15em;color:var(--paper);margin:16px 0 6px}
   .content h5{font-size:1em;margin:12px 0 4px;color:var(--paper);font-weight:600}
   .content ul,.content ol{margin:2px 0 12px;padding-left:20px}
   .content li{margin:3px 0}
@@ -204,12 +211,19 @@
   .barrow{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:14px}
   /* 필터 — 예전엔 전체/미완료 2버튼 세그먼트였으나 결국 이진 토글이라 하나로 단순화
      (2026-09-05 디자인 베이크오프 라운드4, 콘셉트 3안 전부 "애매" 판정 후 대안 채택). */
+  /* n/전체 형식(2026-09-06 라운드15 후속, 베이크오프 O2 채택) — border를 기본에도 투명하게
+     깔아 둬서 on 상태 진입 시 테두리가 생겨도 버튼 크기가 안 흔들린다(box-sizing:border-box). */
   .filtertoggle{
-    flex:none;height:34px;padding:0 14px;border:0;border-radius:17px;cursor:pointer;
-    background:var(--ink3);color:var(--muted);font-family:var(--sans);font-size:12.5px;font-weight:500;
-    -webkit-touch-callout:none;
+    flex:none;height:34px;padding:0 14px;border:1px solid transparent;border-radius:17px;cursor:pointer;
+    background:var(--ink3);color:var(--muted);font-family:var(--mono);font-size:12.5px;font-weight:500;
+    font-variant-numeric:tabular-nums;-webkit-touch-callout:none;
   }
-  .filtertoggle.on{background:var(--ink4);color:var(--paper)}
+  .filtertoggle.on{border-color:var(--coral)}
+  .filtertoggle .fn,.filtertoggle .ft{color:var(--muted);font-weight:500}
+  /* 꺼짐 = "전체" 쪽이 진하게, 켜짐 = "남은" 쪽이 코랄+굵게(사용자 피드백: 굵기뿐 아니라
+     색도 부분 강조). */
+  .filtertoggle:not(.on) .ft{color:var(--paper);font-weight:600}
+  .filtertoggle.on .fn{color:var(--coral);font-weight:700}
   .barr-icons{display:flex;align-items:center;gap:8px}
   .barbtn{
     flex:none;width:42px;height:42px;border-radius:50%;border:0;cursor:pointer;
@@ -298,7 +312,7 @@
   .examwrap{flex:1;min-height:0;display:flex;flex-direction:column;padding:0 22px}
   .examprog{flex:none;font-family:var(--mono);font-size:11px;color:var(--muted);padding:6px 0 0;text-align:center}
   .examcard{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:18px;overflow-y:auto}
-  .examtitle{font-family:var(--serif);font-size:clamp(24px,7vw,32px);line-height:1.25;color:var(--paper);text-align:center;text-wrap:balance}
+  .examtitle{font-family:var(--title-font);font-size:clamp(24px,7vw,32px);line-height:1.25;color:var(--paper);text-align:center;text-wrap:balance}
   .examreveal{align-self:center;background:var(--ink3);color:var(--coral);border:0;border-radius:99px;padding:13px 26px;font-family:var(--sans);font-size:14px;cursor:pointer}
   .examreveal:active{background:var(--ink4)}
   .exambody{min-height:0;max-height:44vh;overflow-y:auto;-webkit-user-select:text;user-select:text}
@@ -378,6 +392,16 @@
   .searchbadge.s-known{color:var(--know)}
   .searchbadge.s-archive{color:var(--coral)}
   .searchbadge.s-trash{color:var(--muted)}
+  /* 폰트 종류 선택 — 미리보기 카드형(2026-09-06 라운드15 후속, 베이크오프 F2 채택: "글자
+     자체가 그 폰트로 렌더돼 고르기 전에 모양을 볼 수 있음"). 크기 슬라이더와 라벨이
+     겹치지 않게 별도 role 라벨(모노, 대문자)을 그 위에 둔다. */
+  .fontrole{font-family:var(--mono);font-size:10.5px;color:var(--faint);letter-spacing:.06em;text-transform:uppercase;margin:0 0 7px}
+  .chiprow{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}
+  .swatch{flex:none;width:74px;background:var(--ink3);border:1px solid var(--ink4);border-radius:10px;padding:8px 4px;text-align:center;cursor:pointer;-webkit-touch-callout:none}
+  .swatch.on{border-color:var(--coral);background:color-mix(in srgb,var(--coral) 12%,var(--ink3))}
+  .swatch .aa{font-size:18px;color:var(--paper);display:block;line-height:1.25}
+  .swatch .nm{font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:3px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .fontpicks{display:flex;flex-direction:column;gap:12px}
   .sliderow{display:flex;align-items:center;gap:10px}
   .sliderow label{flex:none;width:38px;font-family:var(--mono);font-size:11px;color:var(--muted)}
   .sliderow input[type="range"]{flex:1;-webkit-appearance:none;appearance:none;height:6px;border-radius:999px;outline:none;background:linear-gradient(to right,var(--coral) 0%,var(--coral) var(--fill,50%),var(--ink4) var(--fill,50%),var(--ink4) 100%)}
@@ -427,7 +451,10 @@
       <div class="subpos"><button class="subpos-chip" id="subPosChip" aria-label="이 소챕터 카드 목록"><span id="subPos">1-1</span><span class="subpos-dots" id="subPosDots"><i></i><i></i><i></i><i></i><i></i></span></button></div>
       <!-- 2026-09-06 라운드14: "1-1" 칩 탭이 시험에서 "목록 보기"로 바뀌면서, 시험 진입은
            좌상단 전용 아이콘으로 옮겼다. 우상단은 검색+폰트(둘 다 "화면 보조" 성격이라 묶음). -->
-      <button class="examtopbtn" id="subExamBtn" aria-label="이 소챕터 시험보기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></button>
+      <!-- 2026-09-06 라운드15 후속(베이크오프 E2 채택 — 타겟/과녁) — 체크박스+체크마크가
+           하단 "안다" 버튼과 같은 체크 모티프라 겹쳐 보이던 문제를 해결. 가운데 점만
+           코랄로 고정해 "적중" 느낌을 살림(사용자 피드백 반영). -->
+      <button class="examtopbtn" id="subExamBtn" aria-label="이 소챕터 시험보기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.6" stroke="none" style="fill:var(--coral)"/></svg></button>
       <button class="fontbtn-top" id="fontBtn" aria-label="글자 크기">Aa</button>
       <button class="searchbtn" id="searchOpenBtn" aria-label="검색"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></button>
     </div>
@@ -446,6 +473,27 @@
     <!-- 제목/본문 글자크기 — 2026-09-06부터 챕터 시트에서 분리(무관한 기능이 같이 묶여
          있다는 지적). 챕터 목록을 열 필요 없이 이 버튼 하나로 바로 조절. -->
     <div class="knowpop" id="fontPop" hidden>
+      <!-- 서체 선택 — 미리보기 카드형(2026-09-06 라운드15 후속, 베이크오프 F2 채택:
+           "글자 자체가 그 폰트로 렌더돼 고르기 전에 모양을 볼 수 있음"). 크기 슬라이더와는
+           별개 기능이라 위쪽에 배치. -->
+      <div class="fontpicks">
+        <div>
+          <p class="fontrole">제목</p>
+          <div class="chiprow" id="titleFontPicks">
+            <div class="swatch" data-font="Newsreader"><span class="aa" style="font-family:'Newsreader',serif">Aa</span><span class="nm">Newsreader</span></div>
+            <div class="swatch" data-font="Lora"><span class="aa" style="font-family:'Lora',serif">Aa</span><span class="nm">Lora</span></div>
+            <div class="swatch" data-font="Source Serif 4"><span class="aa" style="font-family:'Source Serif 4',serif">Aa</span><span class="nm">Source Serif</span></div>
+          </div>
+        </div>
+        <div>
+          <p class="fontrole">본문</p>
+          <div class="chiprow" id="bodyFontPicks">
+            <div class="swatch" data-font="IBM Plex Sans KR"><span class="aa" style="font-family:'IBM Plex Sans KR',sans-serif">가나</span><span class="nm">Plex Sans</span></div>
+            <div class="swatch" data-font="Noto Serif KR"><span class="aa" style="font-family:'Noto Serif KR',serif">가나</span><span class="nm">Noto Serif</span></div>
+            <div class="swatch" data-font="Gowun Dodum"><span class="aa" style="font-family:'Gowun Dodum',sans-serif">가나</span><span class="nm">고운돋움</span></div>
+          </div>
+        </div>
+      </div>
       <div class="sliderow"><label for="titleScale">제목</label><input type="range" id="titleScale" min="0.7" max="1.4" step="0.02" value="1"><span class="val" id="titleScaleVal"></span></div>
       <div class="sliderow"><label for="bodyScale">본문</label><input type="range" id="bodyScale" min="0.8" max="1.5" step="0.02" value="1"><span class="val" id="bodyScaleVal"></span></div>
     </div>
@@ -453,7 +501,10 @@
     <div class="bottombar" id="bottombar">
       <div class="scrubber" id="scrubber"><div class="scrubtrack" id="scrubTrack"><div class="track"></div></div></div>
       <div class="barrow">
-        <button class="filtertoggle" id="filterToggle" aria-pressed="false" aria-label="미완료만 보기">미완료만</button>
+        <!-- 2026-09-06 라운드15 후속(베이크오프 O2 채택 — 테두리 글로우) — n/전체 형식으로
+             남은 개수를 항상 보여줌. 사용자 피드백대로 맥박 애니메이션은 빼고, 강조되는
+             쪽(꺼짐=전체·켜짐=남은)에 굵기＋코랄 색을 같이 준다. -->
+        <button class="filtertoggle" id="filterToggle" aria-pressed="false" aria-label="미완료만 보기"><span class="fn" id="filterN">0</span>/<span class="ft" id="filterT">0</span></button>
         <div class="barr-icons">
           <!-- 2026-09-06 라운드14: 롱프레스 메뉴 폐기, 휴지통·완전히앎을 상시 작은 버튼으로
                분리(왼쪽부터 휴지통→완전히앎→안다 — 자주 쓰는 안다가 엄지에 가장 가까움). -->
@@ -900,6 +951,7 @@ function updateSubPos(){
     if (filled >= i + 1) d.classList.add('on');
     else if (filled > i) d.classList.add('half');
   });
+  syncFilterButtons();
 }
 
 // 소챕터 개수는 카드 총량/10 올림(마지막 소챕터만 짧을 수 있음) — 서버와 동일 규칙(SUB_SIZE=10).
@@ -1216,12 +1268,16 @@ $('scrubber').addEventListener('pointerup', () => { scrubbing = false; });
 $('scrubber').addEventListener('pointercancel', () => { scrubbing = false; });
 
 /* 미완료만 토글 — 이미 받아둔 데이터를 다시 거르기만 함(네트워크 없음). 2026-09-05
-   베이크오프 라운드4: 전체/미완료 2버튼 세그먼트가 결국 이진 선택이라 토글 하나로 단순화. */
+   베이크오프 라운드4: 전체/미완료 2버튼 세그먼트가 결국 이진 선택이라 토글 하나로 단순화.
+   2026-09-06 라운드15 후속(베이크오프 O2): 스크러버로 셀 필요 없이 남은 개수를 n/전체로
+   상시 표시 — updateSubPos()가 known/total을 다시 셀 때마다 이것도 같이 갱신한다. */
 function syncFilterButtons(){
   const on = studyMode === 'unknown';
+  const visible = visibleCards(subchapterAll);
+  $('filterN').textContent = visible.filter((c) => !c.known).length;
+  $('filterT').textContent = visible.length;
   $('filterToggle').classList.toggle('on', on);
   $('filterToggle').setAttribute('aria-pressed', String(on));
-  $('filterToggle').textContent = on ? '✓ 미완료만' : '미완료만';
 }
 function setFilterMode(m){
   studyMode = m;
@@ -1769,6 +1825,43 @@ function applyBodyScale(){
 }
 titleScale.addEventListener('input', applyTitleScale);
 bodyScale.addEventListener('input', applyBodyScale);
+
+/* 서체 선택(2026-09-06 라운드15 후속) — data-font 키는 각 swatch의 aa 미리보기에 쓴
+   font-family와 이름이 같아, 실제 적용 시에도 그 이름 그대로 --title-font/--content-font에
+   fallback 스택과 함께 넣는다. */
+const TITLE_FONTS = {
+  'Newsreader': '"Newsreader",Georgia,"Times New Roman",serif',
+  'Lora': '"Lora",Georgia,"Times New Roman",serif',
+  'Source Serif 4': '"Source Serif 4",Georgia,"Times New Roman",serif',
+};
+const BODY_FONTS = {
+  'IBM Plex Sans KR': '"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo",sans-serif',
+  'Noto Serif KR': '"Noto Serif KR",Georgia,"Times New Roman",serif',
+  'Gowun Dodum': '"Gowun Dodum",system-ui,-apple-system,"Apple SD Gothic Neo",sans-serif',
+};
+function paintFontPicks(container, selected){
+  container.querySelectorAll('.swatch').forEach((s) => s.classList.toggle('on', s.dataset.font === selected));
+}
+function applyTitleFont(name){
+  rootEl.style.setProperty('--title-font', TITLE_FONTS[name] || TITLE_FONTS['Newsreader']);
+  lsSet('sd_titlefont', name);
+  paintFontPicks($('titleFontPicks'), name);
+}
+function applyBodyFont(name){
+  rootEl.style.setProperty('--content-font', BODY_FONTS[name] || BODY_FONTS['IBM Plex Sans KR']);
+  lsSet('sd_bodyfont', name);
+  paintFontPicks($('bodyFontPicks'), name);
+}
+applyTitleFont(lsGet('sd_titlefont') || 'Newsreader');
+applyBodyFont(lsGet('sd_bodyfont') || 'IBM Plex Sans KR');
+$('titleFontPicks').addEventListener('click', (e) => {
+  const el = e.target.closest('.swatch'); if (!el) return;
+  applyTitleFont(el.dataset.font);
+});
+$('bodyFontPicks').addEventListener('click', (e) => {
+  const el = e.target.closest('.swatch'); if (!el) return;
+  applyBodyFont(el.dataset.font);
+});
 
 /* 글자크기 팝오버 — 2026-09-06부터 챕터 시트에서 분리된 별도 버튼(챕터 이동과 무관한
    기능이 같이 묶여 있다는 지적). knowPop과 같은 위치·모양을 그대로 재사용. */
