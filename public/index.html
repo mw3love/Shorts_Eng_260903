@@ -25,6 +25,8 @@
     /* 하단 바의 실제 높이. JS가 ResizeObserver로 실측해 덮어쓴다(아래는 첫 페인트용 근사값).
        본문 영역이 이 값만큼 위에서 끝나므로, 계산식이 실제와 어긋나면 바로 티가 난다. */
     --barh:92px;
+    /* 상단 바(주소칩·시험·검색·폰트 버튼)도 같은 방식(2026-09-06 축3) — 아래는 첫 페인트용 근사값 */
+    --topbarh:50px;
     --serif:"Newsreader",Georgia,"Times New Roman",serif;
     --sans:"IBM Plex Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo",sans-serif;
     --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
@@ -60,14 +62,17 @@
   #readRoot,#examView{position:absolute;inset:0}
   #readRoot[hidden],#examView[hidden]{display:none}
 
-  /* ── 학습(읽기) 화면 — 홈 화면 자체. 본문과 컨트롤을 「두 그룹으로 분리」한다:
-     본문은 스크러버 바로 위에서 끝나고, 그 아래는 컨트롤 전용 구역이다.
+  /* ── 학습(읽기) 화면 — 홈 화면 자체. 본문과 컨트롤을 「세 구역으로 분리」한다:
+     본문은 위로는 상단 바 아래에서 시작하고 아래로는 스크러버 바로 위에서 끝나며,
+     위아래 바는 컨트롤 전용 구역이다.
      예전엔 본문이 화면 전체를 쓰고 컨트롤이 반투명 오버레이로 그 위에 떠 있었는데,
      바 배경 그라데이션(하단 40%가 92% 불투명)이 그 뒤 텍스트를 어차피 못 읽게 만들어
      「죽은 공간」이었고, 반쯤 비치는 글자가 스크러버·버튼과 섞여 오히려 헷갈렸다.
      클립으로 잃는 실질 가독 영역은 거의 없고(≈750px로 동일), 대신 바를 안전 하한까지
-     내려 실제로는 넓어진다(2026-09-05 라운드6 사용자 판단). ── */
-  .stage{position:absolute;top:0;left:0;right:0;bottom:var(--barh)}
+     내려 실제로는 넓어진다(2026-09-05 라운드6 사용자 판단). 상단도 같은 이유로
+     2026-09-06(축3)에 오버레이 → 고정 구역으로 전환 — 하단이 먼저였던 건 라운드6
+     당시 스크롤 시 겹침이 상단보다 하단에서 먼저 지적됐을 뿐, 원리는 같다. ── */
+  .stage{position:absolute;top:var(--topbarh);left:0;right:0;bottom:var(--barh)}
   /* clip-path로 상태바 안전영역 위쪽을 물리적으로 잘라낸다 — apple-mobile-web-app-status-bar-style
      메타태그는 viewport-fit=cover가 걸린 최신 iOS에서 아이콘 색만 바꿀 뿐 레이아웃 공간을
      예약하지 않아서(실기기 스샷으로 확인, 2026-09-05), 긴 제목·본문이 스크롤로 상태바
@@ -81,7 +86,7 @@
     display:block;font-family:var(--title-font);font-weight:400;
     font-size:calc(clamp(22px,6vw,30px) * var(--tscale));line-height:1.18;letter-spacing:-.01em;
     color:var(--paper);text-decoration:none;text-wrap:balance;
-    padding:calc(env(safe-area-inset-top) + 62px) 22px 6px;
+    padding:14px 22px 6px;
     -webkit-touch-callout:none;-webkit-user-select:none;user-select:none;
   }
   /* 본문 영역 자체가 바 위에서 끝나므로(.stage) 하단 패딩은 마지막 줄이 경계선에 닿지
@@ -95,7 +100,7 @@
   .peek{position:absolute;inset:0;pointer-events:none;will-change:transform;display:flex;flex-direction:column;overflow:hidden;z-index:1}
   .peek-prev{transform:translateX(-100%)}
   .peek-next{transform:translateX(100%)}
-  .peek .cardtitle{padding:calc(env(safe-area-inset-top) + 62px) 22px 6px;color:var(--paper)}
+  .peek .cardtitle{padding:14px 22px 6px;color:var(--paper)}
   /* 아래쪽을 흐리게 하던 마스크는 제거 — 커밋 후 마스크 없는 실제 카드로 바뀌는 순간
      "가려져 있다가 나타나는" 것처럼 보인다는 실기기 피드백(2026-09-05). 처음부터 다
      보이는 쪽이 낫다. */
@@ -120,13 +125,26 @@
   .content .shot{max-width:100%;border-radius:10px;display:block;margin:6px 0 12px;cursor:zoom-in;-webkit-touch-callout:none}
   .content .shotcap{font-family:var(--mono);font-size:11px;color:var(--muted);margin:-6px 0 12px}
 
-  /* ── 상단: 챕터-소챕터 주소("1-1") — 탭하면 이 소챕터 시험. 점 5개(소챕터 10장 기준
+  /* ── 상단 바(2026-09-06 축3) — 하단 바와 같은 이유로 오버레이에서 고정 구역으로.
+     예전엔 이 4개(시험·주소칩·폰트·검색)가 전부 `.stage` 위에 뜬 절대좌표 오버레이라
+     스크롤하면 본문 텍스트가 그 뒤로 지나가며 겹쳤다(라운드6부터 알려진 문제). 이제
+     `.topbar`가 실제 배경을 가진 고정 구역이고, `.stage`는 그 아래(`top:var(--topbarh)`)
+     에서 시작한다 — 하단 바가 `--barh`로 하는 것과 동일한 방식(아래 syncTopBarHeight 참조).
+     3열 그리드(`1fr auto 1fr`)로 가운데 칩을 진짜 중앙에 고정 — 시험모드 진입 시 왼쪽
+     버튼이 `hidden`으로 사라져도(reviewMode) 그 칸이 여전히 1fr을 차지하므로 칩이
+     오른쪽으로 쏠리지 않는다(flex space-between이었다면 쏠렸을 것). ── */
+  .topbar{
+    position:absolute;top:0;left:0;right:0;z-index:2;
+    display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;
+    padding:calc(env(safe-area-inset-top) + 5px) 8px 5px;
+    background:var(--ink);
+  }
+  .topbar-left{justify-self:start}
+  .topbar-right{justify-self:end;display:flex;align-items:center;gap:8px}
+  /* ── 챕터-소챕터 주소("1-1") — 탭하면 이 소챕터 시험. 점 5개(소챕터 10장 기준
      2장당 1점)가 이 소챕터에서 몇 장을 "안다"로 판정했는지 보여준다. 원형 진행률 링에서
      캡슐형으로 교체(2026-09-05 디자인 베이크오프 라운드4 — "원그래프보다 공간 덜 차지"). ── */
-  .subpos{
-    position:absolute;top:env(safe-area-inset-top);left:0;right:0;z-index:2;
-    display:flex;justify-content:center;padding:8px 0 0;
-  }
+  .subpos{justify-self:center}
   .subpos-chip{
     height:26px;padding:0 12px;border-radius:13px;border:0;cursor:pointer;
     background:var(--ink3);display:flex;align-items:center;gap:7px;-webkit-touch-callout:none;
@@ -143,30 +161,15 @@
   @keyframes subposflash{0%{transform:scale(1)}35%{transform:scale(1.16)}100%{transform:scale(1)}}
   .subpos-chip.flash{animation:subposflash .42s ease}
 
-  /* ── 검색(2026-09-06) — 상단 주소 칩이 가운데 정렬이라 좌우 코너가 비어 있음(사용자 제안:
-     우상단). 오버레이는 시트와 별개(같은 z 레이어 뒤섞이지 않게 상단만 덮는 형태). ── */
-  .searchbtn{
-    position:absolute;top:env(safe-area-inset-top);right:0;z-index:3;margin:5px 8px 0 0;
-    width:32px;height:32px;border-radius:50%;border:0;cursor:pointer;
+  .searchbtn,.fontbtn-top,.examtopbtn{
+    width:32px;height:32px;border-radius:50%;border:0;cursor:pointer;flex:none;
     background:var(--ink3);color:var(--muted);display:flex;align-items:center;justify-content:center;
     -webkit-touch-callout:none;
   }
-  /* ── 2026-09-06 라운드14: 하단바에 있던 폰트 버튼을 상단으로(본문 보며 조절하려는데
-     버튼이 하단에 있으면 손이 멀다는 지적) — 검색 아이콘 옆에 배치. 시험 버튼은 좌상단
-     (상단 "1-1" 칩은 이제 목록 보기 전용으로 바뀌어 시험 진입이 별도 자리가 필요해짐). ── */
-  .fontbtn-top{
-    position:absolute;top:env(safe-area-inset-top);right:44px;z-index:3;margin:5px 0 0;
-    width:32px;height:32px;border-radius:50%;border:0;cursor:pointer;
-    background:var(--ink3);color:var(--muted);display:flex;align-items:center;justify-content:center;
-    -webkit-touch-callout:none;font-family:var(--serif);font-size:13px;
-  }
-  .examtopbtn{
-    position:absolute;top:env(safe-area-inset-top);left:0;z-index:3;margin:5px 0 0 8px;
-    width:32px;height:32px;border-radius:50%;border:0;cursor:pointer;
-    background:var(--ink3);color:var(--muted);display:flex;align-items:center;justify-content:center;
-    -webkit-touch-callout:none;
-  }
+  .fontbtn-top{font-family:var(--serif);font-size:13px}
   .examtopbtn svg,.fontbtn-top svg{width:16px;height:16px;stroke:currentColor}
+  /* [hidden]이 author display:flex(위)를 못 이긴다 — 이 프로젝트에서 5번째로 반복되는
+     함정(라운드2·5 등), 매번 새로 발견하는 중이라 새 요소를 만들 때마다 확인할 것. */
   .examtopbtn[hidden]{display:none}
   /* 2026-09-06 라운드16 후속: 소챕터 집계 칩(statuschip) 폐기 — 사용자 피드백대로 "전체
      요약"이 아니라 "지금 보는 카드가 휴지통/완전앎인지"를 바로 캐치하는 게 목적이라
@@ -497,6 +500,24 @@
 <body>
 <div id="app">
   <div id="readRoot">
+    <!-- 2026-09-06 축3: 하단바(.bottombar)와 대칭되는 상단 고정 구역. 예전엔 이 4개가
+         `.stage` 안에 절대좌표로 떠 있어 스크롤한 본문이 뒤로 지나가며 겹쳤다 — 이제
+         `.stage` 밖(형제)으로 옮겨 실제 배경을 가진 바가 됐다. -->
+    <div class="topbar" id="topbar">
+      <div class="topbar-left">
+        <!-- 2026-09-06 라운드14: "1-1" 칩 탭이 시험에서 "목록 보기"로 바뀌면서, 시험 진입은
+             좌상단 전용 아이콘으로 옮겼다. -->
+        <!-- 2026-09-06 라운드15 후속(베이크오프 E2 채택 — 타겟/과녁) — 체크박스+체크마크가
+             하단 "안다" 버튼과 같은 체크 모티프라 겹쳐 보이던 문제를 해결. 가운데 점만
+             코랄로 고정해 "적중" 느낌을 살림(사용자 피드백 반영). -->
+        <button class="examtopbtn" id="subExamBtn" aria-label="Quiz this subchapter"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.6" stroke="none" style="fill:var(--coral)"/></svg></button>
+      </div>
+      <div class="subpos"><button class="subpos-chip" id="subPosChip" aria-label="This subchapter's card list"><span id="subPos">1-1</span><span class="subpos-dots" id="subPosDots"><i></i><i></i><i></i><i></i><i></i></span></button></div>
+      <div class="topbar-right">
+        <button class="fontbtn-top" id="fontBtn" aria-label="Font size">Aa</button>
+        <button class="searchbtn" id="searchOpenBtn" aria-label="Search"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></button>
+      </div>
+    </div>
     <div class="stage" id="stage">
       <div class="scroller" id="scroller">
         <a class="cardtitle" id="cardTitle" href="#" target="_blank" rel="noopener"></a>
@@ -505,15 +526,6 @@
       </div>
       <div class="peek peek-prev" id="peekPrev"><div class="cardtitle" id="peekPrevTitle"></div><div class="content peekbody" id="peekPrevBody"></div></div>
       <div class="peek peek-next" id="peekNext"><div class="cardtitle" id="peekNextTitle"></div><div class="content peekbody" id="peekNextBody"></div></div>
-      <div class="subpos"><button class="subpos-chip" id="subPosChip" aria-label="This subchapter's card list"><span id="subPos">1-1</span><span class="subpos-dots" id="subPosDots"><i></i><i></i><i></i><i></i><i></i></span></button></div>
-      <!-- 2026-09-06 라운드14: "1-1" 칩 탭이 시험에서 "목록 보기"로 바뀌면서, 시험 진입은
-           좌상단 전용 아이콘으로 옮겼다. 우상단은 검색+폰트(둘 다 "화면 보조" 성격이라 묶음). -->
-      <!-- 2026-09-06 라운드15 후속(베이크오프 E2 채택 — 타겟/과녁) — 체크박스+체크마크가
-           하단 "안다" 버튼과 같은 체크 모티프라 겹쳐 보이던 문제를 해결. 가운데 점만
-           코랄로 고정해 "적중" 느낌을 살림(사용자 피드백 반영). -->
-      <button class="examtopbtn" id="subExamBtn" aria-label="Quiz this subchapter"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.6" stroke="none" style="fill:var(--coral)"/></svg></button>
-      <button class="fontbtn-top" id="fontBtn" aria-label="Font size">Aa</button>
-      <button class="searchbtn" id="searchOpenBtn" aria-label="Search"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></button>
     </div>
 
     <!-- 트래시 카드뷰 롱프레스 전용 "완전삭제" 확인 하나만 남았다(2026-09-06 라운드14 —
@@ -2009,6 +2021,16 @@ function syncBarHeight(){
 if (window.ResizeObserver) new ResizeObserver(syncBarHeight).observe($('bottombar'));
 window.addEventListener('orientationchange', () => setTimeout(syncBarHeight, 120));
 syncBarHeight();
+
+/* ── 상단 바 높이 실측 → --topbarh (2026-09-06 축3, 하단과 동일 패턴) ──
+   `.stage`가 이 값만큼 아래에서 시작하므로 계산식으로 어림하지 않고 실제 렌더 높이를 쓴다. */
+function syncTopBarHeight(){
+  const h = $('topbar').getBoundingClientRect().height;
+  if (h > 0) document.documentElement.style.setProperty('--topbarh', Math.round(h) + 'px');
+}
+if (window.ResizeObserver) new ResizeObserver(syncTopBarHeight).observe($('topbar'));
+window.addEventListener('orientationchange', () => setTimeout(syncTopBarHeight, 120));
+syncTopBarHeight();
 
 /* ── 이미지 확대(라이트박스) ──
    초창기 수동 메모는 스크린샷을 붙여넣은 카드가 있어 본문 폭에 맞추면 글씨가 안 읽힌다.
