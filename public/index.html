@@ -162,6 +162,15 @@
   }
   .examtopbtn svg,.fontbtn-top svg{width:16px;height:16px;stroke:currentColor}
   .examtopbtn[hidden]{display:none}
+  .statuschip{
+    position:absolute;top:env(safe-area-inset-top);left:48px;z-index:3;margin:10px 0 0;
+    height:22px;padding:0 8px;border-radius:11px;background:var(--ink3);color:var(--muted);
+    display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:10.5px;
+    font-variant-numeric:tabular-nums;-webkit-touch-callout:none;
+  }
+  .statuschip[hidden]{display:none}
+  .sc-item{display:flex;align-items:center;gap:3px}
+  .statuschip svg{width:12px;height:12px;stroke:currentColor}
   .searchov{
     position:fixed;inset:0;z-index:12;background:var(--ink);display:flex;flex-direction:column;
     padding-top:env(safe-area-inset-top);
@@ -220,9 +229,10 @@
   }
   .filtertoggle.on{border-color:var(--coral)}
   .filtertoggle .fn,.filtertoggle .ft{color:var(--muted);font-weight:500}
-  /* 꺼짐 = "전체" 쪽이 진하게, 켜짐 = "남은" 쪽이 코랄+굵게(사용자 피드백: 굵기뿐 아니라
-     색도 부분 강조). */
-  .filtertoggle:not(.on) .ft{color:var(--paper);font-weight:600}
+  /* 꺼짐 = "전체" 쪽, 켜짐 = "남은" 쪽 — 선택된 쪽이 코랄+굵게로 교대한다(2026-09-06
+     라운드16: 예전엔 n만 코랄이 될 수 있어 nn은 항상 흰색이었는데, 사용자가 "선택된
+     쪽끼리 통일"을 요청). */
+  .filtertoggle:not(.on) .ft{color:var(--coral);font-weight:700}
   .filtertoggle.on .fn{color:var(--coral);font-weight:700}
   .barr-icons{display:flex;align-items:center;gap:8px}
   .barbtn{
@@ -459,6 +469,13 @@
            하단 "안다" 버튼과 같은 체크 모티프라 겹쳐 보이던 문제를 해결. 가운데 점만
            코랄로 고정해 "적중" 느낌을 살림(사용자 피드백 반영). -->
       <button class="examtopbtn" id="subExamBtn" aria-label="이 소챕터 시험보기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.6" stroke="none" style="fill:var(--coral)"/></svg></button>
+      <!-- 2026-09-06 라운드16: n/전체(하단바)가 "지금 넘겨볼 카드 수"를 그대로 유지하는
+           대신(사용자 결정 — 로테이션 크기=화면 숫자 일치를 깨지 않음), 소챕터 원본 상태
+           (휴지통·완전히 앎으로 빠진 개수)는 이 칩으로 따로 보여준다. 시험 아이콘 옆. -->
+      <div class="statuschip" id="statusChip" aria-label="휴지통·완전히 앎 개수">
+        <span class="sc-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg><span id="scTrash">0</span></span>
+        <span class="sc-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><span id="scArchive">0</span></span>
+      </div>
       <button class="fontbtn-top" id="fontBtn" aria-label="글자 크기">Aa</button>
       <button class="searchbtn" id="searchOpenBtn" aria-label="검색"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></button>
     </div>
@@ -628,6 +645,14 @@ function warmImages(c){
     img.src = src;
   });
 }
+// "예시:" 불릿 아래 중첩된 진짜 예문 불릿처럼, 블록에 딸린 자식(b.children, 2026-09-06
+// 서버 PARSER_VERSION 6부터 채워짐)을 그 블록 안에 이어 그린다 — blocksHtml이 재귀적으로
+// li들을 ul/ol로 다시 묶어주므로 중첩 목록도 그대로 들여쓰기된다.
+// 중첩 자식은 항상 data-blk="nested"로 찍는다(고유 인덱스 아님) — 형광펜 오프셋 매핑은
+// 서버의 flat detail[index] 기준이라 중첩 블록까지 그 체계에 안전하게 끼워 넣을 방법이
+// 없다. getHighlightTarget()이 이 마커를 보고 형광펜 대상에서 걸러낸다(표시는 되지만
+// 이번 라운드에선 형광펜 미지원 — 범위를 "보이게"까지로 좁힌 것).
+function childrenHtml(b){ return (b.children && b.children.length) ? blocksHtml(b.children, 'nested') : ''; }
 function blockHtml(b, i){
   if (!b) return '';
   const blk = i == null ? '' : ' data-blk="' + i + '"';
@@ -635,19 +660,19 @@ function blockHtml(b, i){
     case 'heading_1': return '<h3' + blk + '>' + richHtml(b.rich) + '</h3>';
     case 'heading_2': return '<h4' + blk + '>' + richHtml(b.rich) + '</h4>';
     case 'heading_3': return '<h5' + blk + '>' + richHtml(b.rich) + '</h5>';
-    case 'bulleted_list_item': return '<li' + blk + '>' + richHtml(b.rich) + '</li>';
-    case 'numbered_list_item': return '<li' + blk + '>' + richHtml(b.rich) + '</li>';
-    case 'quote': return '<blockquote' + blk + '>' + richHtml(b.rich) + '</blockquote>';
-    case 'callout': return '<div class="callout"' + blk + '>' + richHtml(b.rich) + '</div>';
-    case 'to_do': return '<div>' + (b.checked ? '&#9745; ' : '&#9744; ') + richHtml(b.rich) + '</div>';
+    case 'bulleted_list_item': return '<li' + blk + '>' + richHtml(b.rich) + childrenHtml(b) + '</li>';
+    case 'numbered_list_item': return '<li' + blk + '>' + richHtml(b.rich) + childrenHtml(b) + '</li>';
+    case 'quote': return '<blockquote' + blk + '>' + richHtml(b.rich) + childrenHtml(b) + '</blockquote>';
+    case 'callout': return '<div class="callout"' + blk + '>' + richHtml(b.rich) + childrenHtml(b) + '</div>';
+    case 'to_do': return '<div>' + (b.checked ? '&#9745; ' : '&#9744; ') + richHtml(b.rich) + childrenHtml(b) + '</div>';
     case 'code': return '<pre><code>' + richHtml(b.rich) + '</code></pre>';
     case 'divider': return '<hr>';
     case 'table': return tableHtml(b);
     case 'image': return imageHtml(b);
-    default: return b.rich ? '<p' + blk + '>' + richHtml(b.rich) + '</p>' : '';
+    default: return b.rich ? '<p' + blk + '>' + richHtml(b.rich) + childrenHtml(b) + '</p>' : '';
   }
 }
-function blocksHtml(blocks){
+function blocksHtml(blocks, blkOverride){
   let html = '', open = null;
   (blocks || []).forEach((b, i) => {
     const isLi = b.type === 'bulleted_list_item' || b.type === 'numbered_list_item';
@@ -655,7 +680,7 @@ function blocksHtml(blocks){
     if (isLi){
       if (open !== tag){ if (open) html += '</' + open + '>'; html += '<' + tag + '>'; open = tag; }
     } else if (open){ html += '</' + open + '>'; open = null; }
-    html += blockHtml(b, i);
+    html += blockHtml(b, blkOverride === undefined ? i : blkOverride);
   });
   if (open) html += '</' + open + '>';
   return html;
@@ -779,6 +804,9 @@ $('cardTitleInput').addEventListener('blur', commitTitleEdit);
 // (#cardTitle이 href를 가진 <a>라 평소 짧은 탭은 그대로 유튜브로 이동한다).
 let titlePressT = null, titleLongPressed = false;
 $('cardTitle').addEventListener('pointerdown', () => {
+  // 두 손가락째(핀치 시작 후보)면 롱프레스 타이머를 걸지 않는다 — 안 그러면 제목을
+  // 핀치로 확대하는 도중 450ms 뒤에 편집 입력창이 끼어든다(2026-09-06 테스트로 발견).
+  if (pinchPointers.size >= 1) return;
   titleLongPressed = false;
   titlePressT = setTimeout(() => { titleLongPressed = true; beginTitleEdit(); }, 450);
 });
@@ -847,10 +875,12 @@ function getHighlightTarget(){
   const range = sel.getRangeAt(0);
   const startBlk = findBlockEl(range.startContainer), endBlk = findBlockEl(range.endContainer);
   if (!startBlk || !endBlk || startBlk !== endBlk) return null;
+  const blk = startBlk.dataset.blk;
+  if (blk !== 'hint' && !/^\d+$/.test(blk)) return null; // 중첩 예문 블록 — 형광펜 미지원(위 childrenHtml 주석 참조)
   const start = plainOffsetInBlock(startBlk, range.startContainer, range.startOffset);
   const end = plainOffsetInBlock(startBlk, range.endContainer, range.endOffset);
   if (start == null || end == null || start >= end) return null;
-  return { blk: startBlk.dataset.blk, start, end };
+  return { blk, start, end };
 }
 // 응답을 기다리지 않고(fire-and-forget) 결과가 오면 그때 반영한다 — Notion PATCH +
 // KV 읽기/쓰기가 순차로 쌓여 2초 가까이 걸렸는데, 그 왕복을 기다리는 동안 화면이 그냥
@@ -947,6 +977,8 @@ function updateSubPos(){
   if (lastShownPos && lastShownPos !== pos) flashSubPos();
   lastShownPos = pos;
   $('subPos').textContent = (chapIdx + 1) + '-' + (subIdx + 1);
+  $('scTrash').textContent = subchapterAll.filter((c) => c.trashed).length;
+  $('scArchive').textContent = subchapterAll.filter((c) => c.archived).length;
   const known = subchapterAll.filter((c) => c.known).length;
   const total = subchapterAll.length || 1;
   const filled = known / total * 5;
@@ -983,7 +1015,9 @@ async function refreshChapterMeta(){
 }
 
 /* ── 학습(스와이프) — 소챕터 카드 로드/렌더 ── */
-let studyCards = [], studyIdx = 0, studyMode = 'all';
+// 2026-09-06 라운드16: 기본 모드를 "미완료만"으로 — 정제된 값(n)을 먼저 보여주고,
+// "전체 보기"는 사용자가 필요할 때 토글해서 꺼내 보는 쪽으로 바꿨다(사용자 요청).
+let studyCards = [], studyIdx = 0, studyMode = 'unknown';
 let examMode = false;
 
 function showLoading(title, msg, retry){
@@ -1179,6 +1213,7 @@ async function enterReviewMode(kind){
   $('trashQuickBtn').hidden = true;
   $('archiveQuickBtn').hidden = true;
   $('subExamBtn').hidden = true;
+  $('statusChip').hidden = true;
   $('bottombar').classList.add('reviewbar');
   knowBtn.classList.add('reviewing');
   setRetitleContext(() => studyCards[studyIdx]);
@@ -1193,6 +1228,7 @@ function exitReviewModeUi(){
   $('trashQuickBtn').hidden = false;
   $('archiveQuickBtn').hidden = false;
   $('subExamBtn').hidden = false;
+  $('statusChip').hidden = false;
   $('bottombar').classList.remove('reviewbar');
   knowBtn.classList.remove('reviewing');
 }
@@ -1376,6 +1412,10 @@ function beginSwipeTracking(e){
 }
 scroller.addEventListener('pointerdown', (e) => {
   if (studyCards.length < 2 || examMode || highlightMode || titleEditing) return;
+  // 2번째 손가락이 닿는 순간(핀치 시작 후보) — document의 pinch 핸들러가 이 이벤트를
+  // 먼저 pinchPointers에 기록하지는 않지만(버블 순서상 여기가 먼저 실행됨), 그 시점에
+  // 이미 손가락 1개는 기록돼 있으므로 이 체크로 잡힌다. 스와이프 프라이밍을 건너뛴다.
+  if (pinchPointers.size >= 1) return;
   // 이미 선택된 텍스트가 있으면(선택 핸들을 드래그하는 중) 스와이프 트래킹 자체를
   // 시작하지 않는다 — 여기서 캡처를 걸면 핸들 드래그가 그 자리에서 끊긴다.
   if (!window.getSelection().isCollapsed) return;
@@ -1389,6 +1429,7 @@ scroller.addEventListener('pointerdown', (e) => {
 // 판정"류 휴리스틱보다 이쪽이 확실하다(2026-09-05 실기기 피드백).
 scroller.addEventListener('pointermove', (e) => {
   if (studyCards.length < 2 || examMode || highlightMode || titleEditing) return;
+  if (pinchPointers.size >= 2) return; // 핀치 진행 중엔 스와이프 계산 자체를 건너뛴다
   const mdx = e.clientX - sx, mdy = e.clientY - sy;
   if (!dragging && !selectPrimed){
     // 가로 이동이 세로보다 뚜렷할 때만 스와이프로 캡처한다 — 길게 누르는 동안의 세로
@@ -1829,6 +1870,69 @@ function applyBodyScale(){
 }
 titleScale.addEventListener('input', applyTitleScale);
 bodyScale.addEventListener('input', applyBodyScale);
+
+/* 두 손가락 핀치로 본문/제목 글자 크기 조절(2026-09-06 라운드16) — 라이트박스 이미지
+   확대(위 lb* 코드)와 같은 포인터 기반 2점 거리 계산을 재사용하되, 팬은 없이 스케일만
+   조절한다. 검토한 대안: 제목 영역은 "좌우로만" 방향 제한 — 기각(거리 기반 핀치는
+   좁은 영역에서도 자연스럽게 동작해, 방향 판정을 넣으면 복잡도만 늘어남).
+   .scroller가 touch-action:pan-y라 브라우저 자체 핀치줌과 안 겹치고(뷰포트 메타도
+   maximum-scale=1), document 레벨이라 읽기화면(#content/#cardTitle)·시험화면
+   (#examBody/#examTitle) 둘 다 같은 코드로 커버한다. */
+const pinchPointers = new Map();
+let pinchInput = null, pinchStartDist = 0, pinchStartScale = 1;
+function pinchDist(){
+  const pts = [...pinchPointers.values()];
+  return Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+}
+function pinchScaleInput(el){
+  if (el.closest('#cardTitle, #examTitle')) return titleScale;
+  if (el.closest('#content, #examBody')) return bodyScale;
+  return null;
+}
+document.addEventListener('pointerdown', (e) => {
+  if (e.pointerType !== 'touch') return;
+  pinchPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pinchPointers.size === 2){
+    pinchInput = pinchScaleInput(e.target);
+    if (!pinchInput) return;
+    pinchStartDist = pinchDist();
+    pinchStartScale = parseFloat(pinchInput.value);
+    // 진행 중이던 스와이프/드래그가 핀치와 겹치면 카드가 옆으로 밀려 보인다 — 정리한다.
+    dragging = false; selectPrimed = false; mode = null; clearTimeout(pressTimer); resetDragX();
+    // 제목 위에서 핀치를 시작했다면 첫 손가락이 이미 걸어둔 롱프레스(제목편집) 타이머도
+    // 같이 취소한다 — 안 그러면 핀치 도중 450ms 뒤에 편집 입력창이 끼어든다.
+    clearTimeout(titlePressT); titleLongPressed = false;
+  } else if (pinchPointers.size > 2){
+    pinchInput = null; // 세 손가락 이상은 무시
+  }
+});
+document.addEventListener('pointermove', (e) => {
+  if (!pinchPointers.has(e.pointerId)) return;
+  pinchPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (!pinchInput || pinchPointers.size !== 2 || pinchStartDist <= 0) return;
+  const ratio = pinchDist() / pinchStartDist;
+  const next = Math.min(parseFloat(pinchInput.max), Math.max(parseFloat(pinchInput.min), pinchStartScale * ratio));
+  pinchInput.value = next.toFixed(2);
+  if (pinchInput === titleScale) applyTitleScale(); else applyBodyScale();
+});
+function pinchEnd(e){
+  pinchPointers.delete(e.pointerId);
+  if (pinchPointers.size < 2){
+    pinchInput = null; pinchStartDist = 0;
+    // 두 손가락 중 하나만 먼저 떼고 나머지 하나가 화면에 남아 있으면, 핀치 이전(다른
+    // 손가락)의 오래된 sx/sy로 스와이프 델타를 계산해 카드가 엉뚱하게 튀는 걸 막기
+    // 위해 그 손가락 기준으로 스와이프 프라이밍을 다시 건다(방금 새로 짚은 것처럼).
+    if (pinchPointers.size === 1 && !examMode && !highlightMode && !titleEditing){
+      const p = [...pinchPointers.values()][0];
+      dragging = false; selectPrimed = false; mode = null;
+      sx = p.x; sy = p.y; dx = 0; dy = 0; startT = e.timeStamp;
+      clearTimeout(pressTimer);
+      pressTimer = setTimeout(() => { selectPrimed = true; }, SELECT_PRIME_MS);
+    }
+  }
+}
+document.addEventListener('pointerup', pinchEnd);
+document.addEventListener('pointercancel', pinchEnd);
 
 /* 서체 선택(2026-09-06 라운드15 후속) — data-font 키는 각 swatch의 aa 미리보기에 쓴
    font-family와 이름이 같아, 실제 적용 시에도 그 이름 그대로 --title-font/--content-font에

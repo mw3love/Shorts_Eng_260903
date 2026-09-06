@@ -60,12 +60,16 @@ const K_REVIEW_SCHEMA = 'reviewSchema:v1'; // { prop: string|null } — '복습 
                                    // 실패해도 notionOk:false로 드러날 뿐 로컬 판정은 안 막힌다).
 
 const BUCKET_SIZE = 50;             // ⚠ 카드별 개별 KV 저장은 불가 — 무료 쓰기 1,000회/일에 걸린다
-const PARSER_VERSION = 5;           // 포맷을 바꾸면 올릴 것 — 증분 로직이 옛 포맷을 재사용하지 않게
+const PARSER_VERSION = 6;           // 포맷을 바꾸면 올릴 것 — 증분 로직이 옛 포맷을 재사용하지 않게
                                      // (v3, 2026-09-05: 블록에 원본 block.id 추가 — 형광펜 토글을
                                      //  Notion에 되쓰려면 필요 / v4, 같은 날: image 블록 지원 추가 —
                                      //  v5, 같은 날: splitBody()가 image 블록을 "텍스트 없음"으로
                                      //  오판해 통째로 버리던 버그 수정(v4는 compactBlock만 고치고
-                                     //  이 필터 버그를 놓쳐서 사진 카드가 여전히 비어 있었다)
+                                     //  이 필터 버그를 놓쳐서 사진 카드가 여전히 비어 있었다) /
+                                     //  v6, 2026-09-06: pageBlocks()가 표만 재귀하던 걸 일반 블록
+                                     //  전체로 확장 — "예시:" 불릿 아래 중첩된 진짜 예문 불릿이
+                                     //  이전엔 서버가 아예 가져온 적이 없어서 안 보였다(라운드10부터
+                                     //  승인 대기하던 이슈, CLAUDE.md 참조)
 const SUB_BUDGET = 40;              // 50 상한에서 여유 10회를 남긴다
 const STALE_MS = 6 * 60 * 60 * 1000; // 캐시가 이보다 오래되면 cron이 새 동기화를 시작
 
@@ -219,7 +223,7 @@ function plainOf(blk) {
   return (blk.rich || []).map((x) => x.t).join('');
 }
 
-async function pageBlocks(token, pageId, budget) {
+async function pageBlocks(token, pageId, budget, depth = 0) {
   const blocks = [];
   const data = await notion(token, `/blocks/${pageId}/children?page_size=100`, {}, budget);
   for (const b of data.results || []) {
@@ -231,6 +235,12 @@ async function pageBlocks(token, pageId, budget) {
       for (const k of kids.results || []) {
         if (k.type === 'table_row') cb.rows.push((k.table_row?.cells || []).map((cell) => richText(cell)));
       }
+    } else if (b.has_children && depth < 3) {
+      // 일반 블록(불릿·번호목록·토글·인용 등)의 중첩 자식 — "예시:" 불릿 아래 진짜 예문
+      // 불릿이 여기 걸린다(v5까지는 표만 재귀해 이 자식들을 아예 가져온 적이 없었다).
+      // 깊이 3으로 제한 — 실사용 카드에 그 이상 중첩은 없고, 서브요청 예산 폭주를 막는다.
+      await gap();
+      cb.children = await pageBlocks(token, b.id, budget, depth + 1);
     }
     blocks.push(cb);
   }
