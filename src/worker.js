@@ -653,7 +653,7 @@ async function handleChapterExam(env, chapId) {
 
 // 시험 정답 기록 — 소챕터·대챕터의 현재 점수를 다시 계산하고, 최고기록을 필요하면 올린다
 // (단조증가 — 나중에 다시 도전해서 점수가 낮아져도 최고기록은 안 내려간다).
-async function handleAnswer(env, token, dbId, body) {
+async function handleAnswer(env, token, dbId, body, ctx) {
   const { subId, key, know, pageId } = body || {};
   if (!subId || !key || typeof know !== 'boolean') return json({ error: 'subId/key/know 필요' }, 400);
   const parsed = parseSubId(subId);
@@ -678,8 +678,19 @@ async function handleAnswer(env, token, dbId, body) {
   best.chap[chapId] = Math.max(best.chap[chapId] || 0, chapScore);
   await env.KV.put(K_BEST, JSON.stringify(best));
 
-  // "몰랐음" 판정엔 쓸 게 없다 — '미확인'은 기본값이라 코드가 명시적으로 되돌릴 일이 없다.
-  const notionOk = know ? await writeReviewStatus(env, token, dbId, pageId, '확인함') : true;
+  // know:false(시험에서 "몰랐음" / 안다 버튼 취소)도 Notion을 '미확인'으로 되돌린다 —
+  // 위에서 known KV는 이미 지우고 있었는데(671줄) Notion만 '확인함'으로 남아 두 곳이
+  // 어긋나 있었다(2026-09-06 라운드17에 안다 취소 기능을 붙이면서 발견·수정. 예전 주석은
+  // "'미확인'은 기본값이라 되돌릴 일이 없다"였지만, 한 번 '확인함'을 쓴 뒤엔 기본값이
+  // 아니라 명시적으로 되돌려야 한다).
+  // ⚠ 단 know:false는 응답을 기다리지 않고 ctx.waitUntil로 넘긴다 — 시험 채점은 카드마다
+  // 이 응답을 await하므로(judgeCard) 여기서 PATCH를 기다리면 "몰랐음" 탭마다 1~2초가
+  // 새로 붙는다(무마찰이 이 앱의 최상위 제약). know:true는 예전 그대로 기다려 notionOk를
+  // 정직하게 싣는다 — 동작을 안 바꾸는 쪽이 안전하고, 그 지연은 라운드12부터 있던 것.
+  let notionOk = true;
+  if (know) notionOk = await writeReviewStatus(env, token, dbId, pageId, '확인함');
+  else if (ctx) ctx.waitUntil(writeReviewStatus(env, token, dbId, pageId, '미확인'));
+  else notionOk = await writeReviewStatus(env, token, dbId, pageId, '미확인');
 
   return json({
     ok: true, notionOk,
@@ -959,7 +970,7 @@ async function handleSearch(env, q) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const { NOTION_TOKEN: token, NOTION_DB_ID: dbId } = env;
 
@@ -969,7 +980,7 @@ export default {
     if (url.pathname === '/api/subchapter') return handleSubchapter(env, url.searchParams.get('id') || '', url.searchParams.get('mode') || 'all');
     if (url.pathname === '/api/chapterexam') return handleChapterExam(env, url.searchParams.get('id') || '');
     if (url.pathname === '/api/answer' && request.method === 'POST') {
-      try { return await handleAnswer(env, token, dbId, await request.json()); }
+      try { return await handleAnswer(env, token, dbId, await request.json(), ctx); }
       catch (e) { return json({ error: String(e.message || e) }, 500); }
     }
     if (url.pathname === '/api/archive') {
