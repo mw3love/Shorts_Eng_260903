@@ -162,15 +162,16 @@
   }
   .examtopbtn svg,.fontbtn-top svg{width:16px;height:16px;stroke:currentColor}
   .examtopbtn[hidden]{display:none}
-  .statuschip{
-    position:absolute;top:env(safe-area-inset-top);left:48px;z-index:3;margin:10px 0 0;
-    height:22px;padding:0 8px;border-radius:11px;background:var(--ink3);color:var(--muted);
-    display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:10.5px;
-    font-variant-numeric:tabular-nums;-webkit-touch-callout:none;
+  /* 2026-09-06 라운드16 후속: 소챕터 집계 칩(statuschip) 폐기 — 사용자 피드백대로 "전체
+     요약"이 아니라 "지금 보는 카드가 휴지통/완전앎인지"를 바로 캐치하는 게 목적이라
+     제목 옆 배지(.titlebadge)로 대체했다. */
+  .titlebadge{
+    display:inline-flex;align-items:center;gap:3px;margin-left:8px;padding:2px 8px 2px 6px;
+    border-radius:10px;font-family:var(--mono);font-size:11px;font-weight:600;vertical-align:middle;
   }
-  .statuschip[hidden]{display:none}
-  .sc-item{display:flex;align-items:center;gap:3px}
-  .statuschip svg{width:12px;height:12px;stroke:currentColor}
+  .titlebadge svg{width:12px;height:12px;stroke:currentColor}
+  .titlebadge.trashed{background:color-mix(in srgb,var(--coral) 20%,var(--ink3));color:var(--coral)}
+  .titlebadge.archived{background:color-mix(in srgb,var(--know) 20%,var(--ink3));color:var(--know)}
   .searchov{
     position:fixed;inset:0;z-index:12;background:var(--ink);display:flex;flex-direction:column;
     padding-top:env(safe-area-inset-top);
@@ -227,7 +228,6 @@
     background:var(--ink3);color:var(--muted);font-family:var(--mono);font-size:12.5px;font-weight:500;
     font-variant-numeric:tabular-nums;-webkit-touch-callout:none;
   }
-  .filtertoggle.on{border-color:var(--coral)}
   .filtertoggle .fn,.filtertoggle .ft{color:var(--muted);font-weight:500}
   /* 꺼짐 = "전체" 쪽, 켜짐 = "남은" 쪽 — 선택된 쪽이 코랄+굵게로 교대한다(2026-09-06
      라운드16: 예전엔 n만 코랄이 될 수 있어 nn은 항상 흰색이었는데, 사용자가 "선택된
@@ -469,13 +469,6 @@
            하단 "안다" 버튼과 같은 체크 모티프라 겹쳐 보이던 문제를 해결. 가운데 점만
            코랄로 고정해 "적중" 느낌을 살림(사용자 피드백 반영). -->
       <button class="examtopbtn" id="subExamBtn" aria-label="이 소챕터 시험보기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.6" stroke="none" style="fill:var(--coral)"/></svg></button>
-      <!-- 2026-09-06 라운드16: n/전체(하단바)가 "지금 넘겨볼 카드 수"를 그대로 유지하는
-           대신(사용자 결정 — 로테이션 크기=화면 숫자 일치를 깨지 않음), 소챕터 원본 상태
-           (휴지통·완전히 앎으로 빠진 개수)는 이 칩으로 따로 보여준다. 시험 아이콘 옆. -->
-      <div class="statuschip" id="statusChip" aria-label="휴지통·완전히 앎 개수">
-        <span class="sc-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg><span id="scTrash">0</span></span>
-        <span class="sc-item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><span id="scArchive">0</span></span>
-      </div>
       <button class="fontbtn-top" id="fontBtn" aria-label="글자 크기">Aa</button>
       <button class="searchbtn" id="searchOpenBtn" aria-label="검색"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></button>
     </div>
@@ -522,10 +515,10 @@
     <div class="bottombar" id="bottombar">
       <div class="scrubber" id="scrubber"><div class="scrubtrack" id="scrubTrack"><div class="track"></div></div></div>
       <div class="barrow">
-        <!-- 2026-09-06 라운드15 후속(베이크오프 O2 채택 — 테두리 글로우) — n/전체 형식으로
-             남은 개수를 항상 보여줌. 사용자 피드백대로 맥박 애니메이션은 빼고, 강조되는
-             쪽(꺼짐=전체·켜짐=남은)에 굵기＋코랄 색을 같이 준다. -->
-        <button class="filtertoggle" id="filterToggle" aria-pressed="false" aria-label="미완료만 보기"><span class="fn" id="filterN">0</span>/<span class="ft" id="filterT">0</span></button>
+        <!-- 2026-09-06 라운드16 후속: n/전체 칩과 챕터목록(☰) 버튼 위치를 맞바꿨다(사용자
+             요청 — 왼쪽 끝에 있던 게 어색하니 스크러버 쪽으로 자연스럽게). ☰가 왼쪽 끝,
+             n/전체는 오른쪽 아이콘 그룹 맨 끝으로. -->
+        <button class="barbtn" id="sheetBtn" aria-label="챕터 목록">&#9776;</button>
         <div class="barr-icons">
           <!-- 2026-09-06 라운드14: 롱프레스 메뉴 폐기, 휴지통·완전히앎을 상시 작은 버튼으로
                분리(왼쪽부터 휴지통→완전히앎→안다 — 자주 쓰는 안다가 엄지에 가장 가까움). -->
@@ -536,7 +529,10 @@
             <svg class="ic-restore" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
           </button>
           <button class="barbtn" id="hlBtn" aria-label="형광펜 모드"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg></button>
-          <button class="barbtn" id="sheetBtn" aria-label="챕터 목록">&#9776;</button>
+          <!-- 2026-09-06 라운드15 후속(베이크오프 O2 채택 — 테두리 글로우, 라운드16 후속에서
+               테두리는 뺌) — n/전체 형식으로 남은 개수를 항상 보여줌. 강조되는 쪽(꺼짐=전체·
+               켜짐=남은)에 코랄 색+굵기를 준다. -->
+          <button class="filtertoggle" id="filterToggle" aria-pressed="false" aria-label="미완료만 보기"><span class="fn" id="filterN">0</span>/<span class="ft" id="filterT">0</span></button>
         </div>
       </div>
     </div>
@@ -592,6 +588,17 @@
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>]/g, (m) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;' }[m]));
 const escBr = (s) => String(s == null ? '' : s).split(/<br\s*\/?>/i).map(esc).join('<br>');
+// 2026-09-06 라운드16 후속: 소챕터 전체를 집계하는 칩 대신, 지금 보는 카드가 휴지통/
+// 완전히 앎이면 제목 옆에 바로 배지를 붙인다 — "카드마다 정보를 빠르게 캐치"가 목적이라
+// 전체 요약보다 카드 단위 표시가 더 맞다는 사용자 피드백. 전체보기(studyMode='all')는
+// 이제 이 두 상태의 카드도 로테이션에 그대로 포함하므로(아래 applyFilter 참조) 배지가
+// 실제로 보일 기회가 있다.
+function titleBadgeHtml(c){
+  if (c && c.trashed) return ' <span class="titlebadge trashed"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>휴지통</span>';
+  if (c && c.archived) return ' <span class="titlebadge archived"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>완전히 앎</span>';
+  return '';
+}
+function titleHtml(c){ return c ? esc(c.front) + titleBadgeHtml(c) : ''; }
 function lsGet(k){ try { return localStorage.getItem(k); } catch (e) { return null; } }
 function lsSet(k, v){ try { localStorage.setItem(k, v); } catch (e) {} }
 function lsGetJSON(k, d){ try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }
@@ -785,12 +792,12 @@ function commitTitleEdit(){
   if (!card || !text || text === card.front) return;
   const oldFront = card.front, oldKey = card.key;
   card.front = text;
-  if (!examMode) $('cardTitle').textContent = text;
+  if (!examMode) $('cardTitle').innerHTML = titleHtml(card);
   else { const el = $('examTitle'); if (el) el.textContent = text; }
   apiRetitle(card.id, oldKey, text).catch(() => null).then((res) => {
     if (res && res.ok){ card.front = res.front; card.key = res.key; toast('제목 변경됨'); return; }
     card.front = oldFront;
-    if (!examMode) $('cardTitle').textContent = oldFront;
+    if (!examMode) $('cardTitle').innerHTML = titleHtml(card);
     else { const el = $('examTitle'); if (el) el.textContent = oldFront; }
     toast('제목 변경 실패');
   });
@@ -977,8 +984,6 @@ function updateSubPos(){
   if (lastShownPos && lastShownPos !== pos) flashSubPos();
   lastShownPos = pos;
   $('subPos').textContent = (chapIdx + 1) + '-' + (subIdx + 1);
-  $('scTrash').textContent = subchapterAll.filter((c) => c.trashed).length;
-  $('scArchive').textContent = subchapterAll.filter((c) => c.archived).length;
   const known = subchapterAll.filter((c) => c.known).length;
   const total = subchapterAll.length || 1;
   const filled = known / total * 5;
@@ -1096,9 +1101,13 @@ function applyFilter(atEnd){
   // 소챕터를 새로 불러온 경우(atEnd 호출)는 이전 studyCards가 다른 소챕터 카드라 어차피
   // key가 안 맞아 이 분기를 안 타고 기존 atEnd 규칙 그대로 적용된다.
   const prevKey = studyCards[studyIdx] && studyCards[studyIdx].key;
-  const visible = visibleCards(subchapterAll);
-  studyCards = studyMode === 'unknown' ? visible.filter((c) => !c.known) : visible;
-  if (!studyCards.length){ toast('이 소챕터는 모두 알고 있음 — 전체보기로 전환'); studyMode = 'all'; syncFilterButtons(); studyCards = visible; }
+  // 2026-09-06 라운드16 후속: "전체보기"는 이제 정말 전체(휴지통·완전히 앎 포함, 원본
+  // subchapterAll 그대로)를 보여준다 — "빠르게 훑어보되 카드마다 상태를 캐치"가 목적이라는
+  // 사용자 피드백. "미완료만"은 그대로 visibleCards(휴지통·완전히 앎 제외)+미확인만.
+  // .slice()로 얕은 복사 — subchapterAll과 같은 배열을 studyCards가 그대로 들고 있으면
+  // (아래) removeCurrentCardFromRotation()의 splice가 원본까지 지워버린다.
+  studyCards = studyMode === 'unknown' ? visibleCards(subchapterAll).filter((c) => !c.known) : subchapterAll.slice();
+  if (!studyCards.length){ toast('이 소챕터는 모두 알고 있음 — 전체보기로 전환'); studyMode = 'all'; syncFilterButtons(); studyCards = subchapterAll.slice(); }
   const keepIdx = prevKey ? studyCards.findIndex((c) => c.key === prevKey) : -1;
   studyIdx = keepIdx >= 0 ? keepIdx : (atEnd ? Math.max(0, studyCards.length - 1) : 0);
   setRetitleContext(() => studyCards[studyIdx]);
@@ -1112,7 +1121,7 @@ function renderStudyCard(){
   // 안 지워진 채 남아 엉뚱한 카드가 화면을 덮는 경우가 있었다(2026-09-06 테스트로 발견) —
   // 매번 여기서 한 번 더 원위치시켜 어느 경로로 와도 항상 깨끗한 상태로 그린다.
   setDragTransition('none'); resetDragX();
-  $('cardTitle').textContent = c.front;
+  $('cardTitle').innerHTML = titleHtml(c);
   $('cardTitle').href = c.url || '#';
   $('content').innerHTML = cardBodyHtml(c);
   $('scroller').scrollTop = 0;
@@ -1158,7 +1167,11 @@ async function doArchive(){
   const entry = currentSubEntry(c.key); if (entry) { entry.known = true; entry.archived = true; }
   await apiArchive(c.key, c.id);
   toast('보관함 — 더 안 보여줌');
-  removeCurrentCardFromRotation();
+  updateSubPos();
+  // "전체보기"에선 방금 보관한 카드도 배지(🎓)를 단 채 그 자리에 계속 보인다 — 사용자
+  // 요청("휴지통 처리를 하면 휴지통에도 있어야 하고 현재 챕터에도 있어야") 반영.
+  // "미완료만"에서만 즉시 로테이션에서 뺀다(markKnown()과 같은 패턴).
+  if (studyMode === 'unknown') removeCurrentCardFromRotation(); else renderStudyCard();
 }
 async function doTrash(){
   const c = studyCards[studyIdx]; if (!c) return;
@@ -1166,7 +1179,8 @@ async function doTrash(){
   const entry = currentSubEntry(c.key); if (entry) entry.trashed = true;
   await apiTrash(c.key, c.id);
   toast('휴지통으로 보냄');
-  removeCurrentCardFromRotation();
+  updateSubPos();
+  if (studyMode === 'unknown') removeCurrentCardFromRotation(); else renderStudyCard();
 }
 $('trashQuickBtn').addEventListener('click', doTrash);
 $('archiveQuickBtn').addEventListener('click', doArchive);
@@ -1213,7 +1227,6 @@ async function enterReviewMode(kind){
   $('trashQuickBtn').hidden = true;
   $('archiveQuickBtn').hidden = true;
   $('subExamBtn').hidden = true;
-  $('statusChip').hidden = true;
   $('bottombar').classList.add('reviewbar');
   knowBtn.classList.add('reviewing');
   setRetitleContext(() => studyCards[studyIdx]);
@@ -1228,7 +1241,6 @@ function exitReviewModeUi(){
   $('trashQuickBtn').hidden = false;
   $('archiveQuickBtn').hidden = false;
   $('subExamBtn').hidden = false;
-  $('statusChip').hidden = false;
   $('bottombar').classList.remove('reviewbar');
   knowBtn.classList.remove('reviewing');
 }
@@ -1313,9 +1325,11 @@ $('scrubber').addEventListener('pointercancel', () => { scrubbing = false; });
    상시 표시 — updateSubPos()가 known/total을 다시 셀 때마다 이것도 같이 갱신한다. */
 function syncFilterButtons(){
   const on = studyMode === 'unknown';
-  const visible = visibleCards(subchapterAll);
-  $('filterN').textContent = visible.filter((c) => !c.known).length;
-  $('filterT').textContent = visible.length;
+  // 분모(nn)는 항상 소챕터 원본 개수(휴지통·완전히 앎 포함) — "6/9"처럼 실제 소챕터
+  // 크기(10)보다 작게 보이던 걸 바로잡음(2026-09-06 사용자 지적). 분자(n)는 그대로
+  // "미완료만"에서 실제로 남은 개수(휴지통·완전히 앎·이미 앎 제외).
+  $('filterN').textContent = visibleCards(subchapterAll).filter((c) => !c.known).length;
+  $('filterT').textContent = subchapterAll.length;
   $('filterToggle').classList.toggle('on', on);
   $('filterToggle').setAttribute('aria-pressed', String(on));
 }
@@ -1906,6 +1920,12 @@ document.addEventListener('pointerdown', (e) => {
     pinchInput = null; // 세 손가락 이상은 무시
   }
 });
+// 2026-09-06 라운드16 후속 — 핀치가 "뚝뚝 끊긴다"는 피드백의 정황증거: applyTitleScale/
+// applyBodyScale이 매 pointermove마다 getComputedStyle(강제 리플로우) + localStorage 저장을
+// 같이 실행해, 화면을 실제로 키우는 --tscale/--bscale 변수 갱신(가벼움)까지 매 프레임
+// 발목을 잡았다. 핀치 도중엔 CSS 변수만 rAF로 갱신하고, px 라벨·저장은 손을 뗄 때
+// (pinchEnd) 딱 한 번만 한다.
+let pinchRaf = null;
 document.addEventListener('pointermove', (e) => {
   if (!pinchPointers.has(e.pointerId)) return;
   pinchPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -1913,11 +1933,22 @@ document.addEventListener('pointermove', (e) => {
   const ratio = pinchDist() / pinchStartDist;
   const next = Math.min(parseFloat(pinchInput.max), Math.max(parseFloat(pinchInput.min), pinchStartScale * ratio));
   pinchInput.value = next.toFixed(2);
-  if (pinchInput === titleScale) applyTitleScale(); else applyBodyScale();
+  if (pinchRaf) return;
+  pinchRaf = requestAnimationFrame(() => {
+    pinchRaf = null;
+    rootEl.style.setProperty(pinchInput === titleScale ? '--tscale' : '--bscale', pinchInput.value);
+  });
 });
 function pinchEnd(e){
+  const endedInput = pinchInput;
   pinchPointers.delete(e.pointerId);
   if (pinchPointers.size < 2){
+    if (pinchRaf){ cancelAnimationFrame(pinchRaf); pinchRaf = null; }
+    // 핀치가 실제로 진행 중이었을 때만(=endedInput 있음) 마무리 — px 라벨·localStorage
+    // 저장·슬라이더 채움을 여기서 한 번 반영한다(핀치 아닌 보통 터치의 pointerup에선
+    // endedInput이 애초에 null이라 이 분기를 안 탄다).
+    if (endedInput === titleScale) applyTitleScale();
+    else if (endedInput === bodyScale) applyBodyScale();
     pinchInput = null; pinchStartDist = 0;
     // 두 손가락 중 하나만 먼저 떼고 나머지 하나가 화면에 남아 있으면, 핀치 이전(다른
     // 손가락)의 오래된 sx/sy로 스와이프 델타를 계산해 카드가 엉뚱하게 튀는 걸 막기
