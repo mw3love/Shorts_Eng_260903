@@ -205,7 +205,7 @@
     border-radius:10px;cursor:pointer;
   }
   .lgrouphead:active{background:var(--ink4)}
-  .lgrouphead b{flex:1;font-family:var(--serif);font-weight:400;font-size:14px;color:var(--paper)}
+  .lgrouphead b{flex:1;font-family:var(--serif);font-weight:500;font-size:14px;color:var(--coral)}
   .lgrouphead .lgcount{font-family:var(--mono);font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
   .lgrouphead .lgcar{color:var(--muted);font-size:10px;transition:transform .15s ease}
   .lgroup.open .lgrouphead .lgcar{transform:rotate(90deg)}
@@ -501,29 +501,29 @@
       </div>
       <div class="peek peek-prev" id="peekPrev"><div class="cardtitle" id="peekPrevTitle"></div><div class="content peekbody" id="peekPrevBody"></div></div>
       <div class="peek peek-next" id="peekNext"><div class="cardtitle" id="peekNextTitle"></div><div class="content peekbody" id="peekNextBody"></div></div>
-      <div class="subpos"><button class="subpos-chip" id="subPosChip" aria-label="이 소챕터 카드 목록"><span id="subPos">1-1</span><span class="subpos-dots" id="subPosDots"><i></i><i></i><i></i><i></i><i></i></span></button></div>
+      <div class="subpos"><button class="subpos-chip" id="subPosChip" aria-label="This subchapter's card list"><span id="subPos">1-1</span><span class="subpos-dots" id="subPosDots"><i></i><i></i><i></i><i></i><i></i></span></button></div>
       <!-- 2026-09-06 라운드14: "1-1" 칩 탭이 시험에서 "목록 보기"로 바뀌면서, 시험 진입은
            좌상단 전용 아이콘으로 옮겼다. 우상단은 검색+폰트(둘 다 "화면 보조" 성격이라 묶음). -->
       <!-- 2026-09-06 라운드15 후속(베이크오프 E2 채택 — 타겟/과녁) — 체크박스+체크마크가
            하단 "안다" 버튼과 같은 체크 모티프라 겹쳐 보이던 문제를 해결. 가운데 점만
            코랄로 고정해 "적중" 느낌을 살림(사용자 피드백 반영). -->
-      <button class="examtopbtn" id="subExamBtn" aria-label="이 소챕터 시험보기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.6" stroke="none" style="fill:var(--coral)"/></svg></button>
-      <button class="fontbtn-top" id="fontBtn" aria-label="글자 크기">Aa</button>
-      <button class="searchbtn" id="searchOpenBtn" aria-label="검색"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></button>
+      <button class="examtopbtn" id="subExamBtn" aria-label="Quiz this subchapter"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.6" stroke="none" style="fill:var(--coral)"/></svg></button>
+      <button class="fontbtn-top" id="fontBtn" aria-label="Font size">Aa</button>
+      <button class="searchbtn" id="searchOpenBtn" aria-label="Search"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></button>
     </div>
 
     <!-- 트래시 카드뷰 롱프레스 전용 "완전삭제" 확인 하나만 남았다(2026-09-06 라운드14 —
          평소 보관/휴지통 갈림길은 하단바 상시 버튼으로 옮겨 이 팝업 자체가 필요 없어짐). -->
     <div class="knowpop" id="knowPop" hidden>
-      <button class="trash" id="reviewDeleteBtn">🗑 완전삭제(되돌릴 수 없음)</button>
+      <button class="trash" id="reviewDeleteBtn">🗑 Delete permanently (cannot undo)</button>
     </div>
 
     <!-- n/전체 칩 롱프레스 — 소챕터 전체 초기화 확인(2026-09-06 라운드19, 사용자 요청).
          안다/보관/휴지통 3플래그를 한 번에 지우는 되돌릴 수 없는 일괄 작업이라 확인 필수. -->
     <div class="knowpop" id="resetPop" hidden>
-      <p class="resetmsg">이 소챕터 <span id="resetCount">10</span>장을 전부 미확인으로<br>되돌릴까요? (되돌릴 수 없음)</p>
-      <button class="trash" id="resetConfirmBtn">초기화</button>
-      <button id="resetCancelBtn">취소</button>
+      <p class="resetmsg">Reset all <span id="resetCount">10</span> cards in this subchapter<br>to unchecked? (cannot undo)</p>
+      <button class="trash" id="resetConfirmBtn">Reset</button>
+      <button id="resetCancelBtn">Cancel</button>
     </div>
 
     <!-- 제목/본문 글자크기 — 2026-09-06부터 챕터 시트에서 분리(무관한 기능이 같이 묶여
@@ -534,7 +534,7 @@
            별개 기능이라 위쪽에 배치. -->
       <div class="fontpicks">
         <div>
-          <p class="fontrole">제목</p>
+          <p class="fontrole">Title</p>
           <div class="chiprow" id="titleFontPicks">
             <div class="swatch" data-font="Newsreader"><span class="nm" style="font-family:'Newsreader',serif">Newsreader</span></div>
             <div class="swatch" data-font="Lora"><span class="nm" style="font-family:'Lora',serif">Lora</span></div>
@@ -545,19 +545,19 @@
           </div>
         </div>
         <div>
-          <p class="fontrole">본문</p>
+          <p class="fontrole">Body</p>
           <div class="chiprow" id="bodyFontPicks">
             <div class="swatch" data-font="IBM Plex Sans KR"><span class="nm" style="font-family:'IBM Plex Sans KR',sans-serif">Plex Sans</span></div>
             <div class="swatch" data-font="Noto Serif KR"><span class="nm" style="font-family:'Noto Serif KR',serif">Noto Serif</span></div>
-            <div class="swatch" data-font="Gowun Dodum"><span class="nm" style="font-family:'Gowun Dodum',sans-serif">고운돋움</span></div>
+            <div class="swatch" data-font="Gowun Dodum"><span class="nm" style="font-family:'Gowun Dodum',sans-serif">Gowun Dodum</span></div>
             <div class="swatch" data-font="Pretendard"><span class="nm" style="font-family:'Pretendard',sans-serif">Pretendard</span></div>
-            <div class="swatch" data-font="Gowun Batang"><span class="nm" style="font-family:'Gowun Batang',serif">고운바탕</span></div>
-            <div class="swatch" data-font="Nanum Myeongjo"><span class="nm" style="font-family:'Nanum Myeongjo',serif">나눔명조</span></div>
+            <div class="swatch" data-font="Gowun Batang"><span class="nm" style="font-family:'Gowun Batang',serif">Gowun Batang</span></div>
+            <div class="swatch" data-font="Nanum Myeongjo"><span class="nm" style="font-family:'Nanum Myeongjo',serif">Nanum Myeongjo</span></div>
           </div>
         </div>
       </div>
-      <div class="sliderow"><label for="titleScale">제목</label><input type="range" id="titleScale" min="0.7" max="1.4" step="0.02" value="1"><span class="val" id="titleScaleVal"></span></div>
-      <div class="sliderow"><label for="bodyScale">본문</label><input type="range" id="bodyScale" min="0.8" max="1.5" step="0.02" value="1"><span class="val" id="bodyScaleVal"></span></div>
+      <div class="sliderow"><label for="titleScale">Title</label><input type="range" id="titleScale" min="0.7" max="1.4" step="0.02" value="1"><span class="val" id="titleScaleVal"></span></div>
+      <div class="sliderow"><label for="bodyScale">Body</label><input type="range" id="bodyScale" min="0.8" max="1.5" step="0.02" value="1"><span class="val" id="bodyScaleVal"></span></div>
     </div>
 
     <div class="bottombar" id="bottombar">
@@ -565,32 +565,32 @@
       <div class="barrow">
         <!-- 2026-09-06 라운드16 후속2: 라운드16후속의 ☰↔n/전체 위치 교체를 다시 원복(사용자
              재확인 결과 별로였음) — filterToggle이 왼쪽 끝, ☰는 아이콘 그룹 맨 끝. -->
-        <button class="filtertoggle" id="filterToggle" aria-pressed="false" aria-label="미완료만 보기"><span class="fn" id="filterN">0</span>/<span class="ft" id="filterT">0</span></button>
+        <button class="filtertoggle" id="filterToggle" aria-pressed="false" aria-label="Show unfinished only"><span class="fn" id="filterN">0</span>/<span class="ft" id="filterT">0</span></button>
         <div class="barr-icons">
           <!-- 2026-09-06 라운드14: 롱프레스 메뉴 폐기, 휴지통·완전히앎을 상시 작은 버튼으로
                분리(왼쪽부터 휴지통→완전히앎→안다 — 자주 쓰는 안다가 엄지에 가장 가까움). -->
-          <button class="barbtn quickbtn" id="trashQuickBtn" aria-label="휴지통으로"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
+          <button class="barbtn quickbtn" id="trashQuickBtn" aria-label="Move to trash"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
           <!-- 아이콘은 제목 옆 배지와 같은 학사모로 통일(2026-09-06 라운드17 — 배지는
                학사모인데 버튼만 원+체크라 같은 뜻인 게 안 보였다는 지적). -->
-          <button class="barbtn quickbtn" id="archiveQuickBtn" aria-label="완전히 앎(보관)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10 12 5 2 10l10 5 10-5Z"/><path d="M6 12v5c0 1.4 2.7 3 6 3s6-1.6 6-3v-5"/></svg></button>
-          <button class="knowbtn" id="knowBtn" aria-label="안다(길게 누르면 완전삭제/휴지통)">
+          <button class="barbtn quickbtn" id="archiveQuickBtn" aria-label="Mastered (archive)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10 12 5 2 10l10 5 10-5Z"/><path d="M6 12v5c0 1.4 2.7 3 6 3s6-1.6 6-3v-5"/></svg></button>
+          <button class="knowbtn" id="knowBtn" aria-label="Know (long-press: delete/trash)">
             <svg class="ic-check" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
             <svg class="ic-restore" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
           </button>
-          <button class="barbtn" id="hlBtn" aria-label="형광펜 모드"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg></button>
-          <button class="barbtn" id="sheetBtn" aria-label="챕터 목록">&#9776;</button>
+          <button class="barbtn" id="hlBtn" aria-label="Highlight mode"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg></button>
+          <button class="barbtn" id="sheetBtn" aria-label="Chapters">&#9776;</button>
         </div>
       </div>
     </div>
 
-    <div class="loadbox" id="loading"><h2 id="loadTitle">불러오는 중</h2><p id="loadMsg">Notion에서 카드를 가져옴</p></div>
+    <div class="loadbox" id="loading"><h2 id="loadTitle">Loading</h2><p id="loadMsg">Fetching cards from Notion</p></div>
   </div>
 
   <div id="examView" hidden>
-    <div class="examtop"><button id="examBack" aria-label="닫기">&#10005;</button><div class="ttl" id="examTitleBar">시험</div><button id="examHlBtn" aria-label="형광펜">&#128397;</button></div>
+    <div class="examtop"><button id="examBack" aria-label="Close">&#10005;</button><div class="ttl" id="examTitleBar">Quiz</div><button id="examHlBtn" aria-label="Highlight">&#128397;</button></div>
     <div class="examwrap"><div class="examprog" id="examProg"></div>
       <div class="examcard" id="examCard"></div>
-      <div class="examjudge" id="examJudge" hidden><button class="dontknow" data-k="0">몰랐음</button><button class="know" data-k="1">알고 있었음</button></div>
+      <div class="examjudge" id="examJudge" hidden><button class="dontknow" data-k="0">Didn't know</button><button class="know" data-k="1">Knew it</button></div>
     </div>
   </div>
 
@@ -599,13 +599,13 @@
 
 <div class="lightbox" id="lightbox" hidden>
   <img id="lbImg" alt="">
-  <button class="lbclose" id="lbClose" aria-label="닫기">&#10005;</button>
-  <div class="lbhint">더블탭·핀치로 확대 · 쓸어내려 닫기</div>
+  <button class="lbclose" id="lbClose" aria-label="Close">&#10005;</button>
+  <div class="lbhint">Double-tap or pinch to zoom · swipe down to close</div>
 </div>
 
 <div class="sheetback" id="sheetback"></div>
 <div class="sheet" id="sheet">
-  <div class="sheethandle"><button class="sheetclose" id="sheetClose" aria-label="닫기">&#10005;</button></div>
+  <div class="sheethandle"><button class="sheetclose" id="sheetClose" aria-label="Close">&#10005;</button></div>
   <div class="sheetscroll">
     <div class="chaplist" id="chapList"></div>
     <div class="trashsec" id="archiveSec"></div>
@@ -615,8 +615,8 @@
 
 <div class="searchov" id="searchOv" hidden>
   <div class="searchbar">
-    <input id="searchInput" type="search" placeholder="검색어 입력" autocomplete="off">
-    <button id="searchCloseBtn" aria-label="닫기">&#10005;</button>
+    <input id="searchInput" type="search" placeholder="Search..." autocomplete="off">
+    <button id="searchCloseBtn" aria-label="Close">&#10005;</button>
   </div>
   <div class="searchresults" id="searchResults"></div>
 </div>
@@ -625,7 +625,7 @@
 <div class="searchov" id="listOv" hidden>
   <div class="searchbar">
     <div class="listovtitle" id="listOvTitle"></div>
-    <button id="listCloseBtn" aria-label="닫기">&#10005;</button>
+    <button id="listCloseBtn" aria-label="Close">&#10005;</button>
   </div>
   <div class="searchresults" id="listResults"></div>
 </div>
@@ -645,9 +645,9 @@ const escBr = (s) => String(s == null ? '' : s).split(/<br\s*\/?>/i).map(esc).jo
 // 경로가 없어 "다른 두 개와 달리 안 된다"는 지적을 받았다 — 하단 버튼엔 라운드17에
 // 이미 토글이 붙어 있었고 배지만 빠져 있던 것).
 function titleBadgeHtml(c){
-  if (c && c.trashed) return ' <span class="titlebadge trashed" data-restore="trash" aria-label="휴지통 — 탭하면 복구"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span>';
-  if (c && c.archived) return ' <span class="titlebadge archived" data-restore="archive" aria-label="완전히 앎 — 탭하면 복구"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10 12 5 2 10l10 5 10-5Z"/><path d="M6 12v5c0 1.4 2.7 3 6 3s6-1.6 6-3v-5"/></svg></span>';
-  if (c && c.known) return ' <span class="titlebadge known" data-restore="known" aria-label="확인함 — 탭하면 취소"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>';
+  if (c && c.trashed) return ' <span class="titlebadge trashed" data-restore="trash" aria-label="Trash — tap to restore"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span>';
+  if (c && c.archived) return ' <span class="titlebadge archived" data-restore="archive" aria-label="Mastered — tap to restore"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10 12 5 2 10l10 5 10-5Z"/><path d="M6 12v5c0 1.4 2.7 3 6 3s6-1.6 6-3v-5"/></svg></span>';
+  if (c && c.known) return ' <span class="titlebadge known" data-restore="known" aria-label="Checked — tap to undo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>';
   return '';
 }
 function titleHtml(c){ return c ? esc(c.front) + titleBadgeHtml(c) : ''; }
@@ -685,7 +685,7 @@ function imageHtml(b){
   // loading="lazy" 없음 — 이미 우리가 다음/이전 카드일 때만 렌더하므로 브라우저가 또
   // 늦출 이유가 없다(2026-09-05: 지연의 진짜 원인은 /api/image가 표시 시점에야 Notion을
   // 다시 불러 프리사인드 URL을 받는 2홉 구조였다 — warmImages()로 미리 데워둔다).
-  return '<img class="shot" src="' + esc(src) + '" alt="' + esc(cap || '메모 스크린샷') + '">'
+  return '<img class="shot" src="' + esc(src) + '" alt="' + esc(cap || 'Note screenshot') + '">'
     + (cap ? '<p class="shotcap">' + esc(cap) + '</p>' : '');
 }
 // 카드 안 image 블록의 실제 바이트를 미리 받아 브라우저 캐시에 데운다 — 소챕터
@@ -759,7 +759,7 @@ function cardBodyHtml(c){
   const h = hintHtml(c);
   const hintIsImage = c.hint && c.hint.type === 'image';
   return (hintIsImage ? imageHtml(c.hint) : '') + (h ? '<p class="lhint" data-blk="hint">' + h + '</p>' : '') + detailHtml(c)
-    + (c.url ? '<a class="src" href="' + esc(c.url) + '" target="_blank" rel="noopener">원본 쇼츠 &#8599;</a>' : '');
+    + (c.url ? '<a class="src" href="' + esc(c.url) + '" target="_blank" rel="noopener">Original video &#8599;</a>' : '');
 }
 function peekBodyHtml(c){
   if (!c) return '';
@@ -848,11 +848,11 @@ function commitTitleEdit(){
   if (!examMode) $('cardTitle').innerHTML = titleHtml(card);
   else { const el = $('examTitle'); if (el) el.textContent = text; }
   apiRetitle(card.id, oldKey, text).catch(() => null).then((res) => {
-    if (res && res.ok){ card.front = res.front; card.key = res.key; toast('제목 변경됨'); return; }
+    if (res && res.ok){ card.front = res.front; card.key = res.key; toast('Title updated'); return; }
     card.front = oldFront;
     if (!examMode) $('cardTitle').innerHTML = titleHtml(card);
     else { const el = $('examTitle'); if (el) el.textContent = oldFront; }
-    toast('제목 변경 실패');
+    toast('Title update failed');
   });
 }
 $('cardTitleInput').addEventListener('keydown', (e) => {
@@ -973,7 +973,7 @@ function doHighlight(blk, start, end){
       Object.assign(card, res.card);
       if (!examMode) $('content').innerHTML = cardBodyHtml(card);
       else { const el = $('examBody'); if (el) el.innerHTML = cardBodyHtml(card); }
-    } else toast('형광펜 실패');
+    } else toast('Highlight failed');
   });
 }
 function tryAutoHighlight(){
@@ -1112,7 +1112,7 @@ function showLoading(title, msg, retry){
   $('loadTitle').textContent = title; $('loadMsg').textContent = msg;
   const box = $('loading'); box.hidden = false;
   let btn = box.querySelector('button');
-  if (retry){ if (!btn){ btn = document.createElement('button'); box.appendChild(btn); } btn.textContent = '다시 시도'; btn.onclick = retry; }
+  if (retry){ if (!btn){ btn = document.createElement('button'); box.appendChild(btn); } btn.textContent = 'Retry'; btn.onclick = retry; }
   else if (btn) btn.remove();
 }
 function hideLoading(){ $('loading').hidden = true; }
@@ -1164,14 +1164,14 @@ async function loadSubchapter(atEnd){
   if (!cards){
     // 캐시가 비었을 때만 로딩을 띄우되, 250ms 안에 끝나면 아예 안 보여준다 — 프리페치가
     // 이미 절반쯤 진행돼 있는 경우가 대부분이라 이 지연 하나로 깜빡임이 사라진다.
-    const t = setTimeout(() => showLoading('불러오는 중', '카드를 가져옴'), 250);
+    const t = setTimeout(() => showLoading('Loading', 'Fetching cards'), 250);
     cards = await fetchSub(id);
     clearTimeout(t);
-    if (!cards){ showLoading('불러오기 실패', '카드를 못 받음', () => loadSubchapter(atEnd)); return; }
+    if (!cards){ showLoading('Load failed', "Couldn't fetch cards", () => loadSubchapter(atEnd)); return; }
   }
   hideLoading();
   subchapterAll = cards;
-  if (!subchapterAll.length){ toast('카드 없음'); return; }
+  if (!subchapterAll.length){ toast('No cards'); return; }
   updateSubPos();
   applyFilter(atEnd);
   prefetchNeighbors();
@@ -1191,7 +1191,7 @@ function applyFilter(atEnd){
   // .slice()로 얕은 복사 — subchapterAll과 같은 배열을 studyCards가 그대로 들고 있으면
   // (아래) removeCurrentCardFromRotation()의 splice가 원본까지 지워버린다.
   studyCards = studyMode === 'unknown' ? visibleCards(subchapterAll).filter((c) => !c.known) : subchapterAll.slice();
-  if (!studyCards.length){ toast('이 소챕터는 모두 알고 있음 — 전체보기로 전환'); studyMode = 'all'; syncFilterButtons(); studyCards = subchapterAll.slice(); }
+  if (!studyCards.length){ toast('All cards known here — switched to Show all'); studyMode = 'all'; syncFilterButtons(); studyCards = subchapterAll.slice(); }
   const keepIdx = prevKey ? studyCards.findIndex((c) => c.key === prevKey) : -1;
   studyIdx = keepIdx >= 0 ? keepIdx : (atEnd ? Math.max(0, studyCards.length - 1) : 0);
   setRetitleContext(() => studyCards[studyIdx]);
@@ -1249,7 +1249,7 @@ function removeCurrentCardFromRotation(){
   // 마지막 소챕터에서 전부 처리하면 갈 곳이 없다(라운드18에서 전역 wrap을 없앤 뒤로는
   // 첫 카드로 되감지 않는다) — 그 자리에 빈 상태만 보여준다(reviewMode의 renderReviewEmpty와 같은 패턴).
   if (!studyCards.length){
-    if (neighborPos(1)){ toast('이 소챕터에 더 볼 카드 없음 — 다음 소챕터로'); advanceSubchapter(); }
+    if (neighborPos(1)){ toast('No more cards here — moving to next subchapter'); advanceSubchapter(); }
     else renderStudyEmpty();
     return;
   }
@@ -1314,7 +1314,7 @@ async function doArchive(){
   const wasTrashed = c.trashed;
   c.known = true; c.archived = true; c.trashed = false;
   const entry = currentSubEntry(c.key); if (entry) { entry.known = true; entry.archived = true; entry.trashed = false; }
-  toast('보관함 — 더 안 보여줌');
+  toast('Archived — won\'t show again');
   // "전체보기"에선 방금 보관한 카드도 배지(학사모)를 단 채 그 자리에 계속 보인다 — 사용자
   // 요청("휴지통 처리를 하면 휴지통에도 있어야 하고 현재 챕터에도 있어야") 반영.
   // "미완료만"에서만 즉시 로테이션에서 뺀다(markKnown()과 같은 패턴).
@@ -1327,7 +1327,7 @@ async function doTrash(){
   const wasArchived = c.archived;
   c.trashed = true; c.archived = false;
   const entry = currentSubEntry(c.key); if (entry){ entry.trashed = true; entry.archived = false; }
-  toast('휴지통으로 보냄');
+  toast('Moved to trash');
   if (studyMode === 'unknown') removeCurrentCardFromRotation(); else refreshCardState(c);
   if (wasArchived) queueFlagApi(() => apiArchiveRestore(c.key, c.id));
   queueFlagApi(() => apiTrash(c.key, c.id));
@@ -1348,7 +1348,7 @@ async function undoFlag(kind){
   } else {
     c.archived = false; if (entry) entry.archived = false;
   }
-  toast('복구함');
+  toast('Restored');
   refreshCardState(c);
   queueFlagApi(() => (kind === 'trash' ? apiTrashRestore(c.key, c.id) : apiArchiveRestore(c.key, c.id)));
 }
@@ -1399,11 +1399,11 @@ knowBtn.addEventListener('pointerleave', () => clearTimeout(knowPressT));
 let reviewMode = null; // null | 'archive' | 'trash'
 async function enterReviewMode(kind){
   const path = (kind === 'archive' ? '/api/archive' : '/api/trash') + '?full=1';
-  showLoading('불러오는 중', '카드를 가져옴');
+  showLoading('Loading', 'Fetching cards');
   let data;
   try { data = await (await fetch(path)).json(); } catch (e) { data = null; }
   hideLoading();
-  if (!data || !Array.isArray(data.items) || !data.items.length){ toast('비어 있음'); return; }
+  if (!data || !Array.isArray(data.items) || !data.items.length){ toast('Empty'); return; }
   reviewMode = kind;
   knowLongPressed = false;
   studyCards = data.items; studyIdx = 0;
@@ -1441,7 +1441,7 @@ function renderStudyEmpty(){
   setDragTransition('none'); resetDragX();
   $('cardTitle').innerHTML = '';
   $('content').innerHTML = '<p style="text-align:center;color:var(--muted);padding:60px 20px;font-size:14px">'
-    + '마지막 소챕터 — 더 볼 카드 없음</p>';
+    + 'Last subchapter — no more cards</p>';
   renderStudyScrubber();
   syncCardStateButtons();
 }
@@ -1449,7 +1449,7 @@ function renderReviewEmpty(){
   setDragTransition('none'); resetDragX();
   $('cardTitle').textContent = '';
   $('content').innerHTML = '<p style="text-align:center;color:var(--muted);padding:60px 20px;font-size:14px">'
-    + (reviewMode === 'archive' ? '완전히 앎 — 비어 있음' : '휴지통 — 비어 있음') + '</p>';
+    + (reviewMode === 'archive' ? 'Mastered — empty' : 'Trash — empty') + '</p>';
   $('subPos').textContent = (reviewMode === 'archive' ? '🎓' : '🗑') + ' 0/0';
   renderStudyScrubber();
 }
@@ -1466,21 +1466,21 @@ async function doReviewRestore(){
   // 복구 직후 이 소챕터를 다시 열면 캐시(subCache)에 archived/trashed:true가 남아있어
   // 안 보이던 문제(2026-09-06 라운드12)와 같은 이유로 여기서도 지운다.
   subCache.clear();
-  toast('복구함');
+  toast('Restored');
   removeCurrentReviewCard();
 }
 async function doArchiveToTrash(){
   const c = studyCards[studyIdx]; if (!c) return;
   await apiArchiveToTrash(c.key, c.id);
   subCache.clear();
-  toast('휴지통으로 보냄');
+  toast('Moved to trash');
   removeCurrentReviewCard();
 }
 $('reviewDeleteBtn').addEventListener('click', async () => {
   const c = studyCards[studyIdx]; if (!c) return;
   hideKnowPop();
   await apiTrashDelete(c.key);
-  toast('완전삭제됨');
+  toast('Deleted permanently');
   removeCurrentReviewCard();
 });
 function renderStudyScrubber(){
@@ -1562,7 +1562,7 @@ $('resetConfirmBtn').addEventListener('click', async () => {
   hideResetPop();
   const sub = subId();
   const cards = subchapterAll.slice();
-  showLoading('초기화 중', '0/' + cards.length);
+  showLoading('Resetting', '0/' + cards.length);
   let done = 0;
   for (const c of cards) {
     const st = cardStatus(c);
@@ -1580,7 +1580,7 @@ $('resetConfirmBtn').addEventListener('click', async () => {
   subCache.clear();
   applyFilter();
   updateSubPos();
-  toast('초기화됨');
+  toast('Reset done');
 });
 
 /* 소챕터/챕터 경계 — 자동으로 다음 소챕터, 챕터가 끝나면 전체시험 넛지 */
@@ -1592,17 +1592,17 @@ $('resetConfirmBtn').addEventListener('click', async () => {
 // 무마찰 원칙과도 맞는다). 챕터를 넘을 때도 소챕터 이동과 같은 토스트 하나만 남긴다.
 async function advanceSubchapter(){
   const p = neighborPos(1);
-  if (!p){ toast('마지막 카드'); return; }
+  if (!p){ toast('Last card'); return; }
   const crossed = p.chap !== chapIdx;
   chapIdx = p.chap; subIdx = p.sub;
   savePos();
   await loadSubchapter();
-  toast(crossed ? '챕터 ' + (chapIdx + 1) + '로 이동' : '소챕터 ' + (subIdx + 1) + '로 이동');
+  toast(crossed ? 'Moved to chapter ' + (chapIdx + 1) : 'Moved to subchapter ' + (subIdx + 1));
   refreshChapterMeta();
 }
 async function retreatSubchapter(){
   const p = neighborPos(-1);
-  if (!p){ toast('첫 카드'); return; }
+  if (!p){ toast('First card'); return; }
   chapIdx = p.chap; subIdx = p.sub;
   savePos();
   await loadSubchapter(true);
@@ -1712,14 +1712,14 @@ scroller.addEventListener('pointerup', (e) => {
         content.removeEventListener('transitionend', onEnd); setDragTransition('none'); resetDragX();
         // reviewMode에선 소챕터 경계가 없다 — 마지막 카드에서 그냥 멈춘다(advanceSubchapter는
         // chapIdx/subIdx 기준 실제 챕터로 튀어버려 복습 풀을 이탈시킨다).
-        if (studyIdx + 1 >= studyCards.length) { if (reviewMode) toast('마지막 카드'); else advanceSubchapter(); }
+        if (studyIdx + 1 >= studyCards.length) { if (reviewMode) toast('Last card'); else advanceSubchapter(); }
         else { studyIdx++; renderStudyCard(); }
       }, { once: true });
     } else if (commit && dx > 0){
       setDragX(dragW);
       content.addEventListener('transitionend', function onEnd(){
         content.removeEventListener('transitionend', onEnd); setDragTransition('none'); resetDragX();
-        if (studyIdx - 1 < 0) { if (reviewMode) toast('첫 카드'); else retreatSubchapter(); }
+        if (studyIdx - 1 < 0) { if (reviewMode) toast('First card'); else retreatSubchapter(); }
         else { studyIdx--; renderStudyCard(); }
       }, { once: true });
     } else resetDragX();
@@ -1767,36 +1767,36 @@ $('subExamBtn').addEventListener('click', () => { if (!reviewMode) enterSubchapt
 async function enterSubchapterExam(){
   // 이미 받아둔 subchapterAll을 그대로 쓴다 — 보관·휴지통 카드는 시험 문제 풀에서도 뺀다.
   const pool = visibleCards(subchapterAll);
-  if (!pool.length){ toast('시험 볼 카드 없음(전부 보관/휴지통)'); return; }
+  if (!pool.length){ toast('No cards to test (all archived/trashed)'); return; }
   examScope = 'sub';
   examCards = shuffle(pool.map((c) => ({ ...c, subId: subId() })));
-  startExam('소챕터 ' + (chapIdx + 1) + '-' + (subIdx + 1) + ' 시험');
+  startExam('Subchapter ' + (chapIdx + 1) + '-' + (subIdx + 1) + ' Quiz');
 }
 async function enterChapterExam(cId){
-  showLoading('불러오는 중', '챕터 전체 문제를 가져옴');
+  showLoading('Loading', 'Fetching all chapter questions');
   let data;
   try { data = await apiChapterExam(cId); }
-  catch (e) { showLoading('불러오기 실패', String(e.message || e)); return; }
+  catch (e) { showLoading('Load failed', String(e.message || e)); return; }
   hideLoading();
-  if (data.error || !data.cards.length){ toast(data.error || '카드 없음'); return; }
+  if (data.error || !data.cards.length){ toast(data.error || 'No cards'); return; }
   const pool = visibleCards(data.cards);
-  if (!pool.length){ toast('시험 볼 카드 없음(전부 보관/휴지통)'); return; }
+  if (!pool.length){ toast('No cards to test (all archived/trashed)'); return; }
   examScope = 'chap';
   examCards = shuffle(pool);
-  startExam('챕터 ' + (Number(cId.slice(1)) + 1) + ' 전체시험');
+  startExam('Chapter ' + (Number(cId.slice(1)) + 1) + ' Full Quiz');
 }
 /* 종합시험(2026-09-06 라운드18) — 챕터 10개 범위. 서버가 이미 보관·휴지통을 걸러 무작위
    100장을 뽑아 주므로(전량 1,000장은 응답 약 1.5MB라 기각, 사용자 확인) 여기선 순서만 섞는다. */
 async function enterMegaExam(gId, label){
-  showLoading('불러오는 중', '종합시험 문제를 가져옴');
+  showLoading('Loading', 'Fetching combined quiz questions');
   let data;
   try { data = await apiMegaExam(gId); }
-  catch (e) { showLoading('불러오기 실패', String(e.message || e)); return; }
+  catch (e) { showLoading('Load failed', String(e.message || e)); return; }
   hideLoading();
-  if (data.error || !data.cards || !data.cards.length){ toast(data.error || '시험 볼 카드 없음'); return; }
+  if (data.error || !data.cards || !data.cards.length){ toast(data.error || 'No cards to test'); return; }
   examScope = 'mega';
   examCards = shuffle(data.cards);
-  startExam(label || '종합시험');
+  startExam(label || 'Combined Quiz');
 }
 function startExam(title){
   examIdx = 0; examResults = {}; examLastSub = null; examLastChap = null; examLastMega = null;
@@ -1811,7 +1811,7 @@ function renderExamCard(){
   $('examProg').textContent = (examIdx + 1) + ' / ' + examCards.length;
   const c = examCards[examIdx];
   $('examCard').innerHTML = '<div class="examtitle" id="examTitle">' + esc(c.front) + '</div>'
-    + '<button class="examreveal" id="examReveal">정답 확인</button>';
+    + '<button class="examreveal" id="examReveal">Reveal answer</button>';
   $('examJudge').hidden = true;
   $('examReveal').addEventListener('click', () => {
     $('examCard').innerHTML = '<div class="examtitle" id="examTitle">' + esc(c.front) + '</div>'
@@ -1834,12 +1834,12 @@ function renderExamResult(){
   // 종합시험은 출제가 100문제 표본이라 위 점수(n/100)와 최고기록(범위 전체 기준)의 분모가
   // 다르다 — 라벨로 "이 범위"임을 밝혀 둘이 다른 축임을 드러낸다.
   const best = examScope === 'mega' ? examLastMega : examScope === 'chap' ? examLastChap : examLastSub;
-  const bestLabel = examScope === 'mega' ? '이 범위 최고기록 ' : examScope === 'chap' ? '이 챕터 최고기록 ' : '이 소챕터 최고기록 ';
+  const bestLabel = examScope === 'mega' ? 'Best in this range ' : examScope === 'chap' ? 'Best in this chapter ' : 'Best in this subchapter ';
   const bestLine = best ? bestLabel + best.best + '/' + best.total : '';
-  let actions = '<button class="primary" id="examExit">닫기</button>';
+  let actions = '<button class="primary" id="examExit">Close</button>';
   if (wrong.length){
-    actions = '<button id="examRetryStudy">오답만 다시 복습(' + wrong.length + ')</button>'
-      + '<button id="examRetryExam">오답만 바로 재시험</button>' + actions;
+    actions = '<button id="examRetryStudy">Review wrong answers (' + wrong.length + ')</button>'
+      + '<button id="examRetryExam">Retest wrong answers</button>' + actions;
   }
   $('examCard').innerHTML = '';
   $('examJudge').hidden = true;
@@ -1854,7 +1854,7 @@ function renderExamResult(){
     studyCards = wrong; studyIdx = 0;
     setRetitleContext(() => studyCards[studyIdx]);
     renderStudyCard();
-    toast('오답 ' + wrong.length + '개만 복습');
+    toast('Reviewing ' + wrong.length + ' wrong answers');
   });
   const re = $('examRetryExam'); if (re) re.addEventListener('click', () => {
     examCards = shuffle(wrong);
@@ -1874,9 +1874,9 @@ function openSheet(){
 }
 function closeSheet(){ $('sheet').classList.remove('on'); $('sheetback').classList.remove('on'); }
 async function renderChapList(){
-  $('chapList').innerHTML = '<div style="padding:20px;color:var(--muted);font-size:13px;text-align:center">불러오는 중…</div>';
+  $('chapList').innerHTML = '<div style="padding:20px;color:var(--muted);font-size:13px;text-align:center">Loading…</div>';
   const data = allChaptersData || await apiChapters().catch(() => null);
-  if (!data || !data.chapters){ $('chapList').innerHTML = '<div style="padding:20px;color:var(--muted);font-size:13px;text-align:center">불러오기 실패</div>'; return; }
+  if (!data || !data.chapters){ $('chapList').innerHTML = '<div style="padding:20px;color:var(--muted);font-size:13px;text-align:center">Load failed</div>'; return; }
   allChaptersData = data; totalChapters = data.chapters.length || 1;
   // 종합시험 행(챕터 10개 묶음)을 그 범위 「마지막 챕터 다음」에 끼워 넣는다 — 챕터 14개면
   // 10 다음(1~10)과 14 다음(11~14) 두 줄(2026-09-06 라운드18, 넛지 배너를 대체한 상시 진입점).
@@ -1889,10 +1889,10 @@ async function renderChapList(){
 }
 function chapRowHtml(c, i, pct){
   return '<div class="chaprow" data-idx="' + i + '" data-id="' + esc(c.id) + '" data-act="go">'
-      + '<div class="chaprow-top"><span class="chaprow-label"><b>챕터 ' + (i + 1) + '</b><span class="chaprow-range">' + c.start + '~' + c.end + '</span></span>'
+      + '<div class="chaprow-top"><span class="chaprow-label"><b>Chapter ' + (i + 1) + '</b><span class="chaprow-range">' + c.start + '~' + c.end + '</span></span>'
       + '<span class="chaprow-scorewrap"><span class="chaprow-score">' + c.current + '/' + c.total + '</span>'
-      + '<span class="chaprow-best" title="최고 기록"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0Z"/><path d="M7 5H4a3 3 0 0 0 3 5"/><path d="M17 5h3a3 3 0 0 1-3 5"/></svg>' + c.best + '</span>'
-      + '<button class="chaprow-exam" data-act="exam">전체시험</button></span></div>'
+      + '<span class="chaprow-best" title="Best score"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0Z"/><path d="M7 5H4a3 3 0 0 0 3 5"/><path d="M17 5h3a3 3 0 0 1-3 5"/></svg>' + c.best + '</span>'
+      + '<button class="chaprow-exam" data-act="exam">Full quiz</button></span></div>'
       + '<div class="chaprow-bar"><i style="width:' + pct + '%"></i></div>'
       + '</div>';
 }
@@ -1901,12 +1901,12 @@ function chapRowHtml(c, i, pct){
    실제 출제는 서버가 뽑은 무작위 100장. */
 function megaRowHtml(g){
   const pct = g.total ? Math.round(g.current / g.total * 100) : 0;
-  const label = '챕터 ' + (g.from + 1) + '~' + (g.to + 1) + ' 종합시험';
+  const label = 'Chapters ' + (g.from + 1) + '–' + (g.to + 1) + ' Combined Quiz';
   return '<div class="chaprow chaprow-mega" data-id="' + esc(g.id) + '" data-act="mega">'
     + '<div class="chaprow-top"><span class="chaprow-label"><b>' + label + '</b>'
-    + '<span class="chaprow-range">무작위 100문제</span></span>'
+    + '<span class="chaprow-range">Random 100 questions</span></span>'
     + '<span class="chaprow-scorewrap"><span class="chaprow-score">' + g.current + '/' + g.total + '</span>'
-    + '<span class="chaprow-best" title="최고 기록"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0Z"/><path d="M7 5H4a3 3 0 0 0 3 5"/><path d="M17 5h3a3 3 0 0 1-3 5"/></svg>' + g.best + '</span></span></div>'
+    + '<span class="chaprow-best" title="Best score"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0Z"/><path d="M7 5H4a3 3 0 0 0 3 5"/><path d="M17 5h3a3 3 0 0 1-3 5"/></svg>' + g.best + '</span></span></div>'
     + '<div class="chaprow-bar"><i style="width:' + pct + '%"></i></div>'
     + '</div>';
 }
@@ -1934,19 +1934,19 @@ $('chapList').addEventListener('click', (e) => {
    요청으로 교체). 실제 복구/완전삭제는 그 복습 화면(enterReviewMode)의 하단 바에서. */
 function reviewRowHtml(id, icon, label, n){
   return '<div class="chaprow" id="' + id + '"><div class="chaprow-top">'
-    + '<span class="chaprow-label"><b>' + icon + ' ' + label + '</b><span class="chaprow-range">' + n + '개</span></span>'
+    + '<span class="chaprow-label"><b>' + icon + ' ' + label + '</b><span class="chaprow-range">' + n + ' cards</span></span>'
     + '<span class="chaprow-score">' + n + '</span></div></div>';
 }
 async function renderArchiveToggle(){
   const data = await apiArchiveList().catch(() => ({ items: [] }));
   const n = (data.items || []).length;
-  $('archiveSec').innerHTML = reviewRowHtml('archiveRow', '🎓', '완전히 앎', n);
+  $('archiveSec').innerHTML = reviewRowHtml('archiveRow', '🎓', 'Mastered', n);
   if (n) $('archiveRow').addEventListener('click', () => { closeSheet(); enterReviewMode('archive'); });
 }
 async function renderTrashToggle(){
   const data = await apiTrashList().catch(() => ({ items: [] }));
   const n = (data.items || []).length;
-  $('trashSec').innerHTML = reviewRowHtml('trashRow', '🗑', '휴지통', n);
+  $('trashSec').innerHTML = reviewRowHtml('trashRow', '🗑', 'Trash', n);
   if (n) $('trashRow').addEventListener('click', () => { closeSheet(); enterReviewMode('trash'); });
 }
 
@@ -2297,7 +2297,7 @@ function parseSubIdClient(id){
   const m = /^c(\d+)s(\d+)$/.exec(String(id || ''));
   return m ? { chap: Number(m[1]), sub: Number(m[2]) } : { chap: 0, sub: 0 };
 }
-const SEARCH_BADGE = { unknown: '미확인', known: '확인함', archive: '완전히 앎', trash: '휴지통' };
+const SEARCH_BADGE = { unknown: 'Unchecked', known: 'Checked', archive: 'Mastered', trash: 'Trash' };
 // 검색·소챕터목록·챕터목록 셋 다 "제목+상태배지 목록 → 탭해서 이동" 모양이 같아 공유한다.
 function renderPickList(el, items, emptyMsg, onPick, showIndex){
   if (!items.length){ el.innerHTML = '<div style="padding:16px 4px;color:var(--muted);font-size:12.5px;text-align:center">' + emptyMsg + '</div>'; return; }
@@ -2308,19 +2308,18 @@ function renderPickList(el, items, emptyMsg, onPick, showIndex){
     + '</div>').join('');
   el.querySelectorAll('.trashrow').forEach((row) => row.addEventListener('click', () => onPick(items[Number(row.dataset.i)])));
 }
-function renderSearchResults(items){ renderPickList($('searchResults'), items, '결과 없음', (it) => { closeSearch(); navigateToCard(it); }); }
+function renderSearchResults(items){ renderPickList($('searchResults'), items, 'No results', (it) => { closeSearch(); navigateToCard(it); }); }
 // key로 직접 찾아 위치를 맞춘다 — 로테이션·필터 상태와 무관하게 항상 정확한 카드에 도착.
+// 2026-09-06 실기기 피드백 — 예전엔 휴지통/완전히 앎/확인함 카드를 탭하면 그 카드가 속한
+// 챕터가 아니라 전역 복습뷰(enterReviewMode, 챕터 무관하게 전부 모아놓은 별도 목록)로
+// 튀었다. "그냥 그 카드가 있는 챕터로 이동하되, 미완료만 필터에 가려지지 않게 전체보기로"
+// 요청 반영 — 상태와 무관하게 항상 실제 챕터/소챕터로 이동하고 studyMode를 'all'로 강제한다.
 function navigateToCard(it){
-  if (it.status === 'archive' || it.status === 'trash'){
-    enterReviewMode(it.status).then(() => {
-      const i = studyCards.findIndex((c) => c.key === it.key);
-      if (i >= 0){ studyIdx = i; renderStudyCard(); }
-    });
-    return;
-  }
   const p = parseSubIdClient(it.subId);
   chapIdx = p.chap; subIdx = p.sub; savePos();
+  studyMode = 'all';
   loadSubchapter().then(() => {
+    syncFilterButtons();
     const i = studyCards.findIndex((c) => c.key === it.key);
     if (i >= 0){ studyIdx = i; setRetitleContext(() => studyCards[studyIdx]); renderStudyCard(); updateSubPos(); }
     refreshChapterMeta();
@@ -2341,8 +2340,8 @@ function closeListOv(){ $('listOv').hidden = true; }
 $('listCloseBtn').addEventListener('click', closeListOv);
 function openSubchapterList(){
   const items = subchapterAll.map((c) => ({ key: c.key, front: c.front, subId: subId(), status: cardStatus(c) }));
-  openListOv((chapIdx + 1) + '-' + (subIdx + 1) + ' 목록');
-  renderPickList($('listResults'), items, '카드 없음', (it) => { closeListOv(); navigateToCard(it); }, true);
+  openListOv((chapIdx + 1) + '-' + (subIdx + 1) + ' List');
+  renderPickList($('listResults'), items, 'No cards', (it) => { closeListOv(); navigateToCard(it); }, true);
 }
 /* 챕터 목록(100장)은 소챕터 10개로 접어서 보여준다(2026-09-06 라운드18 사용자 요청).
    기본 전부 접힘 + 지금 보고 있는 소챕터만 펼침 — 100줄 스크롤 대신 "내 위치"부터 잡힌다. */
@@ -2355,16 +2354,16 @@ function renderGroupedPickList(el, groups, openId){
       + '<div class="lgbody"></div></div>';
   }).join('');
   el.querySelectorAll('.lgroup').forEach((wrap, i) => {
-    renderPickList(wrap.querySelector('.lgbody'), groups[i].items, '카드 없음', (it) => { closeListOv(); navigateToCard(it); }, true);
+    renderPickList(wrap.querySelector('.lgbody'), groups[i].items, 'No cards', (it) => { closeListOv(); navigateToCard(it); }, true);
     wrap.querySelector('.lgrouphead').addEventListener('click', () => wrap.classList.toggle('open'));
   });
 }
 async function openChapterList(cId){
-  showLoading('불러오는 중', '챕터 목록을 가져옴');
+  showLoading('Loading', 'Fetching chapter list');
   let data;
-  try { data = await apiChapterExam(cId); } catch (e) { hideLoading(); toast('불러오기 실패'); return; }
+  try { data = await apiChapterExam(cId); } catch (e) { hideLoading(); toast('Load failed'); return; }
   hideLoading();
-  if (data.error || !data.cards.length){ toast(data.error || '카드 없음'); return; }
+  if (data.error || !data.cards.length){ toast(data.error || 'No cards'); return; }
   const ci = Number(cId.slice(1));
   const bySub = new Map();
   data.cards.forEach((c) => {
@@ -2374,7 +2373,7 @@ async function openChapterList(cId){
   const groups = [...bySub.entries()].map(([sid, items]) => ({
     id: sid, label: (ci + 1) + '-' + (parseSubIdClient(sid).sub + 1), items,
   }));
-  openListOv('챕터 ' + (ci + 1) + ' 목록');
+  openListOv('Chapter ' + (ci + 1) + ' List');
   renderGroupedPickList($('listResults'), groups, ci === chapIdx ? subId() : null);
 }
 $('searchInput').addEventListener('input', () => {
@@ -2391,10 +2390,10 @@ $('searchInput').addEventListener('input', () => {
 (async () => {
   applyTitleScale(); applyBodyScale();
   loadPos();
-  showLoading('불러오는 중', '챕터 정보를 가져옴');
+  showLoading('Loading', 'Fetching chapter info');
   await refreshChapterMeta();
   if (!allChaptersData || !allChaptersData.chapters || !allChaptersData.chapters.length){
-    showLoading('동기화 중', 'Notion에서 카드를 가져오는 중 — 잠시 후 다시 시도', async () => { await refreshChapterMeta(); loadSubchapter(); });
+    showLoading('Syncing', 'Fetching cards from Notion — try again shortly', async () => { await refreshChapterMeta(); loadSubchapter(); });
     return;
   }
   if (chapIdx >= totalChapters) chapIdx = 0;

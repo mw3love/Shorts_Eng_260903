@@ -575,7 +575,7 @@ async function handleChapterDetail(env, chapId) {
   const ci = parseChapId(chapId);
   if (ci == null) return json({ error: 'bad id' }, 400);
   const idxRaw = await env.KV.get(K_INDEX);
-  if (!idxRaw) return json({ error: '동기화 중' }, 202);
+  if (!idxRaw) return json({ error: 'Syncing' }, 202);
 
   const idx = JSON.parse(idxRaw);
   const { known, best } = await loadKnownAndBest(env);
@@ -614,7 +614,7 @@ async function handleSubchapter(env, subId, mode) {
   const parsed = parseSubId(subId);
   if (!parsed) return json({ error: 'bad id' }, 400);
   const idxRaw = await env.KV.get(K_INDEX);
-  if (!idxRaw) return json({ error: '동기화 중' }, 202);
+  if (!idxRaw) return json({ error: 'Syncing' }, 202);
 
   const idx = JSON.parse(idxRaw);
   const chaps = buildChapters(idx.items);
@@ -650,7 +650,7 @@ async function handleChapterExam(env, chapId) {
   const ci = parseChapId(chapId);
   if (ci == null) return json({ error: 'bad id' }, 400);
   const idxRaw = await env.KV.get(K_INDEX);
-  if (!idxRaw) return json({ error: '동기화 중' }, 202);
+  if (!idxRaw) return json({ error: 'Syncing' }, 202);
   const idx = JSON.parse(idxRaw);
   const chaps = buildChapters(idx.items);
   const subsInChap = chaps[ci];
@@ -692,7 +692,7 @@ async function handleMegaExam(env, gId) {
   const gi = parseGroupId(gId);
   if (gi == null) return json({ error: 'bad id' }, 400);
   const idxRaw = await env.KV.get(K_INDEX);
-  if (!idxRaw) return json({ error: '동기화 중' }, 202);
+  if (!idxRaw) return json({ error: 'Syncing' }, 202);
   const idx = JSON.parse(idxRaw);
   const chaps = buildChapters(idx.items);
   const from = gi * GROUP_SIZE;
@@ -750,12 +750,12 @@ async function handleMegaExam(env, gId) {
 // (단조증가 — 나중에 다시 도전해서 점수가 낮아져도 최고기록은 안 내려간다).
 async function handleAnswer(env, token, dbId, body, ctx) {
   const { subId, key, know, pageId } = body || {};
-  if (!subId || !key || typeof know !== 'boolean') return json({ error: 'subId/key/know 필요' }, 400);
+  if (!subId || !key || typeof know !== 'boolean') return json({ error: 'subId/key/know required' }, 400);
   const parsed = parseSubId(subId);
   if (!parsed) return json({ error: 'bad subId' }, 400);
 
   const idxRaw = await env.KV.get(K_INDEX);
-  if (!idxRaw) return json({ error: '동기화 중' }, 202);
+  if (!idxRaw) return json({ error: 'Syncing' }, 202);
   const idx = JSON.parse(idxRaw);
   const chaps = buildChapters(idx.items);
   const subItems = chaps[parsed.chap]?.[parsed.sub];
@@ -807,7 +807,7 @@ async function handleAnswer(env, token, dbId, body, ctx) {
 // 로테이션에서만 뺀다(점수·총량은 안 바꾼다, 순수 가시성 플래그).
 async function handleArchive(env, token, dbId, body) {
   const { key, pageId } = body || {};
-  if (!key) return json({ error: 'key 필요' }, 400);
+  if (!key) return json({ error: 'key required' }, 400);
   const [known, archived] = await Promise.all([
     env.KV.get(K_KNOWN).then((v) => JSON.parse(v || '{}')),
     env.KV.get(K_ARCHIVED).then((v) => JSON.parse(v || '{}')),
@@ -822,7 +822,7 @@ async function handleArchive(env, token, dbId, body) {
 // 그 전 단계의 시각적 표시일 뿐 — handleTrashDelete()의 archived:true 전환과는 다른 층위).
 async function handleTrash(env, token, dbId, body) {
   const { key, pageId } = body || {};
-  if (!key) return json({ error: 'key 필요' }, 400);
+  if (!key) return json({ error: 'key required' }, 400);
   const trashed = JSON.parse((await env.KV.get(K_TRASHED)) || '{}');
   trashed[key] = true;
   await env.KV.put(K_TRASHED, JSON.stringify(trashed));
@@ -878,7 +878,7 @@ async function handleArchiveList(env, full) { return json({ items: await (full ?
 
 async function handleTrashRestore(env, token, dbId, body) {
   const { key, pageId } = body || {};
-  if (!key) return json({ error: 'key 필요' }, 400);
+  if (!key) return json({ error: 'key required' }, 400);
   const notionOk = await unflagAndReset(env, token, dbId, K_TRASHED, key, pageId);
   return json({ ok: true, notionOk });
 }
@@ -888,7 +888,7 @@ async function handleTrashRestore(env, token, dbId, body) {
 // 보관 복구는 "다시 로테이션에 보이게" 이상의 의미를 갖지 않는다(트래시 복구와 동일 원칙).
 async function handleArchiveRestore(env, token, dbId, body) {
   const { key, pageId } = body || {};
-  if (!key) return json({ error: 'key 필요' }, 400);
+  if (!key) return json({ error: 'key required' }, 400);
   const notionOk = await unflagAndReset(env, token, dbId, K_ARCHIVED, key, pageId);
   return json({ ok: true, notionOk });
 }
@@ -898,7 +898,7 @@ async function handleArchiveRestore(env, token, dbId, body) {
 // 지우고 trashed를 세워 "이동"으로 만든다(둘 다 켜진 채로 남지 않게).
 async function handleArchiveToTrash(env, token, dbId, body) {
   const { key, pageId } = body || {};
-  if (!key) return json({ error: 'key 필요' }, 400);
+  if (!key) return json({ error: 'key required' }, 400);
   const [archived, trashed] = await Promise.all([
     env.KV.get(K_ARCHIVED).then((v) => JSON.parse(v || '{}')),
     env.KV.get(K_TRASHED).then((v) => JSON.parse(v || '{}')),
@@ -915,9 +915,9 @@ async function handleArchiveToTrash(env, token, dbId, body) {
 // 우리 인덱스·버킷에서도 즉시 제거해 다음 재동기화를 안 기다리고 바로 사라지게 한다.
 async function handleTrashDelete(env, token, body) {
   const { key } = body || {};
-  if (!key) return json({ error: 'key 필요' }, 400);
+  if (!key) return json({ error: 'key required' }, 400);
   const idxRaw = await env.KV.get(K_INDEX);
-  if (!idxRaw) return json({ error: '동기화 중' }, 202);
+  if (!idxRaw) return json({ error: 'Syncing' }, 202);
   const idx = JSON.parse(idxRaw);
   const item = idx.items.find((it) => it.key === key);
   if (!item) return json({ error: 'not found' }, 404);
@@ -953,10 +953,10 @@ async function handleTrashDelete(env, token, body) {
 async function handleRetitle(env, token, body) {
   const { pageId, oldKey, newTitle } = body || {};
   const title = String(newTitle || '').trim();
-  if (!pageId || !oldKey || !title) return json({ error: 'pageId/oldKey/newTitle 필요' }, 400);
+  if (!pageId || !oldKey || !title) return json({ error: 'pageId/oldKey/newTitle required' }, 400);
 
   const idxRaw = await env.KV.get(K_INDEX);
-  if (!idxRaw) return json({ error: '동기화 중' }, 202);
+  if (!idxRaw) return json({ error: 'Syncing' }, 202);
   const idx = JSON.parse(idxRaw);
   const item = idx.items.find((it) => it.id === pageId);
   if (!item) return json({ error: 'not found' }, 404);
@@ -998,10 +998,10 @@ async function handleRetitle(env, token, body) {
 async function handleHighlight(env, token, body) {
   const { pageId, field, blockIndex, start, end } = body || {};
   if (!pageId || (field !== 'hint' && field !== 'detail') || typeof start !== 'number' || typeof end !== 'number' || start >= end) {
-    return json({ error: 'pageId/field/start/end 필요' }, 400);
+    return json({ error: 'pageId/field/start/end required' }, 400);
   }
   const idxRaw = await env.KV.get(K_INDEX);
-  if (!idxRaw) return json({ error: '동기화 중' }, 202);
+  if (!idxRaw) return json({ error: 'Syncing' }, 202);
   const idx = JSON.parse(idxRaw);
   const item = idx.items.find((it) => it.id === pageId);
   if (!item) return json({ error: 'not found' }, 404);
@@ -1012,7 +1012,7 @@ async function handleHighlight(env, token, body) {
   if (!card) return json({ error: 'not found' }, 404);
 
   const block = field === 'hint' ? card.hint : card.detail?.[blockIndex];
-  if (!block || !Array.isArray(block.rich)) return json({ error: '이 블록은 형광펜을 지원 안 함' }, 400);
+  if (!block || !Array.isArray(block.rich)) return json({ error: 'This block does not support highlighting' }, 400);
 
   block.rich = toggleCodeInRich(block.rich, start, end);
   await env.KV.put(K_BUCKET + item.bucket, JSON.stringify(bucket));
@@ -1033,11 +1033,11 @@ async function handleHighlight(env, token, body) {
 // Notion 자체 호스팅 이미지(file.url)는 프리사인드 URL이라 캐시해두면 만료된다 —
 // 표시 시점에 그 블록을 다시 조회해 방금 발급된 URL로 302 리다이렉트한다.
 async function handleImage(env, token, blockId) {
-  if (!blockId || !token) return json({ error: 'id 필요' }, 400);
+  if (!blockId || !token) return json({ error: 'id required' }, 400);
   try {
     const data = await notion(token, `/blocks/${blockId}`);
     const fresh = data.image?.file?.url || data.image?.external?.url;
-    if (!fresh) return json({ error: '이미지 없음' }, 404);
+    if (!fresh) return json({ error: 'No image' }, 404);
     return Response.redirect(fresh, 302);
   } catch (e) {
     return json({ error: String(e.message || e) }, 502);
@@ -1123,7 +1123,7 @@ export default {
     if (url.pathname === '/api/search') return handleSearch(env, url.searchParams.get('q') || '');
 
     if (url.pathname === '/api/sync') {
-      if (!token || !dbId) return json({ error: 'NOTION_TOKEN / NOTION_DB_ID 미설정' }, 500);
+      if (!token || !dbId) return json({ error: 'NOTION_TOKEN / NOTION_DB_ID not set' }, 500);
       if (url.searchParams.get('restart') === '1') await env.KV.delete(K_STATE);
       try { return json(await syncStep(env, token, dbId)); }
       catch (e) { return json({ error: String(e.message || e) }, 502); }
