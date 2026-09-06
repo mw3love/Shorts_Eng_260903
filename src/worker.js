@@ -14,6 +14,7 @@
  *   3. GET  /api/chapter?id=cN    대챕터 하나의 소챕터 10개 상세(현재/최고 점수 + 카드 제목·known)
  *   4. GET  /api/subchapter?id=cNsM&mode=all|unknown   소챕터 하나의 카드 전체 본문(학습·시험 공용)
  *   5. GET  /api/chapterexam?id=cN  대챕터 전체(100장) 시험용 — 카드마다 원래 소속 subId를 붙여 반환
+ *   5-b. GET /api/megaexam?id=gN  종합시험(대챕터 10개 범위)용 — 그 범위에서 무작위 100장 표본
  *   6. POST /api/answer           시험 정답 기록(안다/모른다) + 소챕터·대챕터 점수 갱신(최고기록 포함)
  *   7. GET/POST /api/archive      "완전히 안다" 보관 목록 조회(?full=1이면 본문까지) / 보관 등록
  *   8. GET/POST /api/trash        휴지통 목록 조회(?full=1이면 본문까지) / 보내기(로컬 소프트 삭제)
@@ -486,6 +487,32 @@ function buildChapters(items) {
   const subs = chunk(sortedByCreated(items), SUB_SIZE);
   return chunk(subs, CHAP_SIZE); // chaps[chapIdx][subIdxInChap] = 인덱스 항목 배열(최대 10)
 }
+/* ── 종합시험 그룹(2026-09-06 라운드18) ──
+   대챕터 10개(=1,000장)를 한 「그룹」으로 묶어 그 범위의 종합시험 진입점을 만든다.
+   마지막 그룹은 남은 챕터만으로 짧게 잡힌다(챕터 14개면 g0=1~10, g1=11~14).
+   ⚠ 출제는 전량이 아니라 무작위 MEGA_EXAM_N장 표본이다 — 1,000장을 통째로 내리면
+   응답이 약 1.5MB라 셀룰러 첫 로딩이 무겁고 한 세션에 완주 자체가 불가능하다
+   (2026-09-06 사용자 확인). 매번 다시 섞이므로 재도전 가치는 오히려 커진다. */
+const GROUP_SIZE = 10;   // 그룹 하나에 묶이는 대챕터 수
+const MEGA_EXAM_N = 100; // 종합시험 출제 수(무작위 표본)
+// 표본이 흩어져 읽어야 할 버킷 수 상한 — Cloudflare 무료 요금제의 「요청당 서브요청 50회」를
+// 넘기지 않기 위한 방어선이다(KV get도 이 예산에 포함). 카드가 지금(약 1,400장)의 몇 배로
+// 늘어나면 100장 표본이 100개 버킷에 흩어질 수 있어, 그때 조용히 죽지 않도록 미리 건다.
+const MAX_EXAM_BUCKETS = 30;
+function groupRanges(chapCount) {
+  const out = [];
+  for (let g = 0; g * GROUP_SIZE < chapCount; g++) {
+    out.push({ id: 'g' + g, from: g * GROUP_SIZE, to: Math.min(chapCount, (g + 1) * GROUP_SIZE) - 1 });
+  }
+  return out;
+}
+function groupItemsOf(chaps, from, to) {
+  return chaps.slice(from, to + 1).flat(2);
+}
+function parseGroupId(id) {
+  const m = /^g(\d+)$/.exec(String(id || ''));
+  return m ? Number(m[1]) : null;
+}
 function knownCountFor(items, known) {
   return items.filter((it) => known[it.key]).length;
 }
@@ -503,6 +530,7 @@ async function loadKnownAndBest(env) {
   const best = JSON.parse((await env.KV.get(K_BEST)) || '{}');
   if (!best.sub) best.sub = {};
   if (!best.chap) best.chap = {};
+  if (!best.mega) best.mega = {}; // 종합시험 그룹 최고기록(2026-09-06 라운드18)
   return { known, best };
 }
 async function loadFlags(env) {
@@ -534,7 +562,13 @@ async function handleChapters(env) {
     return { id, start, end: pos, total: items.length, current: knownCountFor(items, known), best: best.chap[id] || 0 };
   });
 
-  return json({ chapters, total: idx.items.length, syncing: !!st, builtAt: idx.builtAt });
+  // 종합시험 행(챕터 10개 묶음)도 같이 내려준다 — 시트가 챕터 행 사이에 끼워 그린다.
+  const groups = groupRanges(chaps.length).map((g) => {
+    const items = groupItemsOf(chaps, g.from, g.to);
+    return { ...g, total: items.length, current: knownCountFor(items, known), best: best.mega[g.id] || 0 };
+  });
+
+  return json({ chapters, groups, total: idx.items.length, syncing: !!st, builtAt: idx.builtAt });
 }
 
 async function handleChapterDetail(env, chapId) {
@@ -651,6 +685,63 @@ async function handleChapterExam(env, chapId) {
   return json({ id: chapId, cards });
 }
 
+/* 종합시험(2026-09-06 라운드18) — 챕터 10개 범위에서 무작위 100장을 뽑아 출제한다.
+   챕터 전체시험과 달리 「표본」이라, 보관·휴지통 카드는 뽑기 전에 서버에서 걸러낸다
+   (뽑고 나서 클라이언트가 거르면 실제 문제 수가 표본보다 줄어든다). */
+async function handleMegaExam(env, gId) {
+  const gi = parseGroupId(gId);
+  if (gi == null) return json({ error: 'bad id' }, 400);
+  const idxRaw = await env.KV.get(K_INDEX);
+  if (!idxRaw) return json({ error: '동기화 중' }, 202);
+  const idx = JSON.parse(idxRaw);
+  const chaps = buildChapters(idx.items);
+  const from = gi * GROUP_SIZE;
+  if (from >= chaps.length) return json({ error: 'not found' }, 404);
+  const to = Math.min(chaps.length, from + GROUP_SIZE) - 1;
+
+  const { archived, trashed } = await loadFlags(env);
+  const pool = [];
+  for (let ci = from; ci <= to; ci++) {
+    chaps[ci].forEach((items, si) => {
+      const subId = 'c' + ci + 's' + si;
+      for (const it of items) if (!archived[it.key] && !trashed[it.key]) pool.push({ it, subId });
+    });
+  }
+  if (!pool.length) return json({ id: gId, from, to, poolSize: 0, cards: [] });
+
+  for (let i = pool.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [pool[i], pool[j]] = [pool[j], pool[i]]; }
+  let picked = pool.slice(0, MEGA_EXAM_N);
+
+  const byBucket = new Map();
+  for (const p of picked) {
+    if (!byBucket.has(p.it.bucket)) byBucket.set(p.it.bucket, []);
+    byBucket.get(p.it.bucket).push(p);
+  }
+  // 서브요청 상한 방어 — 카드가 적게 걸린 버킷부터 통째로 버린다. 표본이 조금 줄지만
+  // (지금 규모에선 아예 발생하지 않는다) 요청이 50회를 넘겨 죽는 것보다 낫다.
+  if (byBucket.size > MAX_EXAM_BUCKETS) {
+    const keep = [...byBucket.entries()].sort((a, b) => b[1].length - a[1].length).slice(0, MAX_EXAM_BUCKETS);
+    byBucket.clear();
+    for (const [num, arr] of keep) byBucket.set(num, arr);
+    picked = keep.flatMap(([, arr]) => arr);
+  }
+
+  const byId = new Map();
+  for (const [num, arr] of byBucket) {
+    const raw = await env.KV.get(K_BUCKET + num);
+    if (!raw) continue;
+    const ids = arr.map((p) => p.it.id);
+    for (const c of JSON.parse(raw).cards) if (ids.includes(c.id)) byId.set(c.id, c);
+  }
+  const known = JSON.parse((await env.KV.get(K_KNOWN)) || '{}');
+  const cards = picked.map(({ it, subId }) => ({
+    ...(byId.get(it.id) || {}), id: it.id, key: it.key, front: it.front, url: it.url, created: it.created, subId,
+    known: !!known[it.key], archived: false, trashed: false,
+  }));
+
+  return json({ id: gId, from, to, poolSize: pool.length, cards });
+}
+
 // 시험 정답 기록 — 소챕터·대챕터의 현재 점수를 다시 계산하고, 최고기록을 필요하면 올린다
 // (단조증가 — 나중에 다시 도전해서 점수가 낮아져도 최고기록은 안 내려간다).
 async function handleAnswer(env, token, dbId, body, ctx) {
@@ -676,6 +767,13 @@ async function handleAnswer(env, token, dbId, body, ctx) {
   const chapScore = knownCountFor(chapItems, known);
   best.sub[subId] = Math.max(best.sub[subId] || 0, subScore);
   best.chap[chapId] = Math.max(best.chap[chapId] || 0, chapScore);
+  // 종합시험 그룹도 같은 규칙으로 따라 오른다 — 그룹은 챕터 인덱스에서 바로 유도되므로
+  // (floor(chap/10)) 시험 종류와 무관하게 어느 채점에서든 최신으로 유지된다.
+  const gi = Math.floor(parsed.chap / GROUP_SIZE);
+  const gId = 'g' + gi;
+  const groupItems = groupItemsOf(chaps, gi * GROUP_SIZE, Math.min(chaps.length, (gi + 1) * GROUP_SIZE) - 1);
+  const groupScore = knownCountFor(groupItems, known);
+  best.mega[gId] = Math.max(best.mega[gId] || 0, groupScore);
   await env.KV.put(K_BEST, JSON.stringify(best));
 
   // know:false(시험에서 "몰랐음" / 안다 버튼 취소)도 Notion을 '미확인'으로 되돌린다 —
@@ -696,6 +794,7 @@ async function handleAnswer(env, token, dbId, body, ctx) {
     ok: true, notionOk,
     sub: { id: subId, current: subScore, best: best.sub[subId], total: subItems.length },
     chap: { id: chapId, current: chapScore, best: best.chap[chapId], total: chapItems.length },
+    mega: { id: gId, current: groupScore, best: best.mega[gId], total: groupItems.length },
   });
 }
 
@@ -979,6 +1078,7 @@ export default {
     if (url.pathname === '/api/chapter') return handleChapterDetail(env, url.searchParams.get('id') || '');
     if (url.pathname === '/api/subchapter') return handleSubchapter(env, url.searchParams.get('id') || '', url.searchParams.get('mode') || 'all');
     if (url.pathname === '/api/chapterexam') return handleChapterExam(env, url.searchParams.get('id') || '');
+    if (url.pathname === '/api/megaexam') return handleMegaExam(env, url.searchParams.get('id') || '');
     if (url.pathname === '/api/answer' && request.method === 'POST') {
       try { return await handleAnswer(env, token, dbId, await request.json(), ctx); }
       catch (e) { return json({ error: String(e.message || e) }, 500); }

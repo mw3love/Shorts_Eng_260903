@@ -195,20 +195,23 @@
   /* 챕터/소챕터 "제목 리스트" 화면(2026-09-06 라운드14) — 검색 오버레이와 같은 뼈대
      (.searchov/.searchbar/.searchresults)를 그대로 재사용, 입력창 대신 제목 텍스트만. */
   .listovtitle{flex:1;font-family:var(--serif);font-size:16px;color:var(--paper);padding:6px 4px}
-
-  /* ── 챕터 완주 넛지 배너 ── */
-  .chapnudge{
-    position:absolute;left:16px;right:16px;bottom:calc(var(--barh) + 12px);z-index:3;
-    background:color-mix(in srgb,var(--ink2) 94%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
-    border-radius:14px;padding:12px 14px;box-shadow:0 8px 24px rgba(0,0,0,.4);
-    display:flex;flex-direction:column;gap:8px;
-    opacity:0;pointer-events:none;transform:translateY(16px);transition:opacity .22s ease,transform .22s ease;
+  /* 챕터 목록(100장)은 소챕터 10개로 접어 둔다(2026-09-06 라운드18) — 100줄을 한 번에
+     쏟아내면 스크롤로 위치를 잃는다. 기본은 전부 접힘 + 지금 보고 있는 소챕터만 펼침. */
+  .lgroup{margin:5px 0}
+  .lgrouphead{
+    display:flex;align-items:center;gap:9px;padding:9px 11px;background:var(--ink3);
+    border-radius:10px;cursor:pointer;
   }
-  .chapnudge.on{opacity:1;pointer-events:auto;transform:translateY(0)}
-  .chapnudge p{margin:0;font-size:13px;color:var(--paper)}
-  .chapnudge .row{display:flex;gap:8px}
-  .chapnudge button{flex:1;border:0;border-radius:9px;padding:9px;font-size:12.5px;cursor:pointer;background:var(--ink4);color:var(--body-text)}
-  .chapnudge button.primary{background:color-mix(in srgb,var(--coral) 22%,var(--ink4));color:var(--coral)}
+  .lgrouphead:active{background:var(--ink4)}
+  .lgrouphead b{flex:1;font-family:var(--serif);font-weight:400;font-size:14px;color:var(--paper)}
+  .lgrouphead .lgcount{font-family:var(--mono);font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .lgrouphead .lgcar{color:var(--muted);font-size:10px;transition:transform .15s ease}
+  .lgroup.open .lgrouphead .lgcar{transform:rotate(90deg)}
+  .lgroup .lgbody{display:none;padding:2px 0 4px}
+  .lgroup.open .lgbody{display:block}
+
+  /* 2026-09-06 라운드18: 챕터 완주 넛지 배너(.chapnudge) 폐기 — 시험 진입은 챕터 시트의
+     종합시험 행이 상시로 맡는다(사용자 요청: "제안하지 말고 그냥 챕터행을 하나 더"). */
 
   /* ── 하단 플로팅 바: 스크러버 + 필터/형광펜/시트 ── 본문 위에 떠서 엄지 반경을 채운다.
      시험 버튼은 자주 안 쓰는 액션이라 상단 "1-1" 칩으로 옮겼다 — 엄지 영역은 자주 쓰는
@@ -222,7 +225,14 @@
   .scrubtrack{position:relative;height:14px}
   .scrubtrack .track{position:absolute;left:0;right:0;top:50%;height:2px;background:var(--ink4);transform:translateY(-50%);border-radius:2px}
   .scrubtrack .dot{position:absolute;top:50%;width:7px;height:7px;border-radius:50%;background:var(--faint);transform:translate(-50%,-50%);transition:background-color .1s ease}
-  .scrubtrack .dot.cur{background:var(--coral);width:10px;height:10px}
+  /* 2026-09-06 라운드18: 점 색 = 카드 상태(제목 배지와 같은 3색), 현재 위치 = 크기+흰 링.
+     ⚠ 예전엔 현재 위치가 코랄 채움이었는데 휴지통도 코랄이라 둘이 겹쳤다 — 색은 상태
+     전용으로 넘기고 위치는 별도 채널(크기·링)이 지게 나눴다. "미완료만" 모드에선 세 상태가
+     목록에서 빠지므로 사실상 전체보기에서만 색이 보인다(의도된 동작). */
+  .scrubtrack .dot.s-known{background:var(--know)}
+  .scrubtrack .dot.s-archive{background:var(--mastered)}
+  .scrubtrack .dot.s-trash{background:var(--coral)}
+  .scrubtrack .dot.cur{width:9px;height:9px;box-shadow:0 0 0 2px var(--paper)}
   /* 스크러버 위치는 그대로 두고 버튼 행만 더 아래로 밀기 위해, 줄어든 바깥 여백(위)만큼
      여기 margin-top으로 다시 넣어준다 — 순 이동분은 버튼~화면끝 간격에만 반영되고
      스크러버~버튼 간격은 오히려 넓어진다(2026-09-05 실기기 피드백: "너무 붙어 보임"). */
@@ -403,6 +413,10 @@
   .chaprow-best svg{width:11px;height:11px;stroke:currentColor;flex:none}
   .chaprow-bar{height:4px;border-radius:2px;background:var(--ink4);overflow:hidden}
   .chaprow-bar i{display:block;height:100%;background:var(--coral);border-radius:2px}
+  /* 종합시험 행 — 챕터 행과 같은 뼈대에 코랄 라벨만 얹어 "이건 시험 진입"임을 구분한다
+     (2026-09-06 라운드18). 배경까지 코랄로 채우면 목록에서 과하게 튄다. */
+  .chaprow-mega .chaprow-label b{color:var(--coral)}
+  .chaprow-mega .chaprow-range{color:color-mix(in srgb,var(--coral) 60%,var(--muted))}
   .chaprow-exam{flex:none;white-space:nowrap;background:var(--ink4);border:0;border-radius:9px;color:var(--coral);font-family:var(--sans);font-size:11px;padding:6px 9px;cursor:pointer}
   .trashsec{padding:4px 16px 18px}
   .trashrow{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--ink3);border-radius:10px;padding:10px 12px;margin-top:6px}
@@ -488,11 +502,6 @@
       <button class="examtopbtn" id="subExamBtn" aria-label="이 소챕터 시험보기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.6" stroke="none" style="fill:var(--coral)"/></svg></button>
       <button class="fontbtn-top" id="fontBtn" aria-label="글자 크기">Aa</button>
       <button class="searchbtn" id="searchOpenBtn" aria-label="검색"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></button>
-    </div>
-
-    <div class="chapnudge" id="chapNudge">
-      <p id="chapNudgeText"></p>
-      <div class="row"><button id="chapNudgeSkip">다음 챕터로 계속</button><button class="primary" id="chapNudgeGo">지금 전체시험 보기</button></div>
     </div>
 
     <!-- 트래시 카드뷰 롱프레스 전용 "완전삭제" 확인 하나만 남았다(2026-09-06 라운드14 —
@@ -610,11 +619,13 @@ const escBr = (s) => String(s == null ? '' : s).split(/<br\s*\/?>/i).map(esc).jo
 // 실제로 보일 기회가 있다.
 // 휴지통/완전히 앎 배지는 탭하면 미확인으로 복구된다(2026-09-06 라운드16 후속3 —
 // "전체보기에서 상태 초기화" 요청, data-restore로 표시해 클릭 핸들러가 구분한다).
-// 확인함 배지는 순수 표시용 — 되돌리는 길은 시험 채점뿐이라는 기존 원칙 그대로.
+// 2026-09-06 라운드18: 확인함 배지도 탭하면 취소된다(그 전엔 배지 셋 중 이것만 취소
+// 경로가 없어 "다른 두 개와 달리 안 된다"는 지적을 받았다 — 하단 버튼엔 라운드17에
+// 이미 토글이 붙어 있었고 배지만 빠져 있던 것).
 function titleBadgeHtml(c){
   if (c && c.trashed) return ' <span class="titlebadge trashed" data-restore="trash" aria-label="휴지통 — 탭하면 복구"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span>';
   if (c && c.archived) return ' <span class="titlebadge archived" data-restore="archive" aria-label="완전히 앎 — 탭하면 복구"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10 12 5 2 10l10 5 10-5Z"/><path d="M6 12v5c0 1.4 2.7 3 6 3s6-1.6 6-3v-5"/></svg></span>';
-  if (c && c.known) return ' <span class="titlebadge known" aria-label="확인함"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>';
+  if (c && c.known) return ' <span class="titlebadge known" data-restore="known" aria-label="확인함 — 탭하면 취소"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>';
   return '';
 }
 function titleHtml(c){ return c ? esc(c.front) + titleBadgeHtml(c) : ''; }
@@ -748,6 +759,7 @@ function toast(msg){
 async function apiChapters(){ const r = await fetch('/api/chapters'); return r.json(); }
 async function apiSubchapter(id, mode){ const r = await fetch('/api/subchapter?id=' + encodeURIComponent(id) + '&mode=' + mode); return r.json(); }
 async function apiChapterExam(id){ const r = await fetch('/api/chapterexam?id=' + encodeURIComponent(id)); return r.json(); }
+async function apiMegaExam(id){ const r = await fetch('/api/megaexam?id=' + encodeURIComponent(id)); return r.json(); }
 function apiAnswer(subId, key, know, pageId){
   return fetch('/api/answer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subId, key, know, pageId }) })
     .then((r) => r.json()).catch(() => null);
@@ -842,9 +854,15 @@ $('cardTitle').addEventListener('pointerdown', (e) => {
 $('cardTitle').addEventListener('pointerup', () => clearTimeout(titlePressT));
 $('cardTitle').addEventListener('pointerleave', () => clearTimeout(titlePressT));
 $('cardTitle').addEventListener('click', (e) => {
-  // 배지 탭 = 복구(아래 undoFlag) — 제목 자체의 유튜브 이동/편집 로직을 안 태운다.
+  // 배지 탭 = 그 상태 취소 — 제목 자체의 유튜브 이동/편집 로직을 안 태운다.
+  // 확인함은 undoKnown(점수에 영향), 휴지통/완전히앎은 undoFlag(가시성 플래그)로 갈린다.
   const badge = e.target.closest('.titlebadge[data-restore]');
-  if (badge){ e.preventDefault(); undoFlag(badge.dataset.restore); return; }
+  if (badge){
+    e.preventDefault();
+    if (reviewMode) return; // 복습 카드뷰에선 하단 knowBtn의 복구 흐름만 쓴다
+    if (badge.dataset.restore === 'known') undoKnown(); else undoFlag(badge.dataset.restore);
+    return;
+  }
   if (titleLongPressed){ e.preventDefault(); titleLongPressed = false; return; }
   // url 없는 카드는 href가 '#'로 채워져 있어(target=_blank라 탭하면 새 탭이 열리며
   // 앱이 처음부터 부팅돼 소챕터 첫 카드로 떨어지는 버그가 있었다) — url 없으면 그냥
@@ -1031,11 +1049,14 @@ function subCountOf(c){
   const ch = allChaptersData && allChaptersData.chapters && allChaptersData.chapters[c];
   return ch ? Math.max(1, Math.ceil(ch.total / 10)) : 1;
 }
-// 다음(+1)/이전(-1) 소챕터의 좌표. 챕터 경계와 전체 wrap을 여기 한 곳에서 처리한다.
+// 다음(+1)/이전(-1) 소챕터의 좌표. 챕터 경계를 여기 한 곳에서 처리한다.
+// ⚠ 2026-09-06 라운드18: 전역 양끝에서 고리를 도는 wrap을 없앴다(null 반환) — 1-1 첫
+// 카드에서 뒤로 스와이프하면 마지막 챕터 끝으로 튀었고, 그 반대도 마찬가지였다.
+// 호출부는 전부 null을 "더 갈 곳 없음"으로 처리한다.
 function neighborPos(dir){
   let c = chapIdx, s = subIdx + dir;
-  if (s >= subCountOf(c)){ c = (c + 1) % totalChapters; s = 0; }
-  else if (s < 0){ c = (c - 1 + totalChapters) % totalChapters; s = Math.max(0, subCountOf(c) - 1); }
+  if (s >= subCountOf(c)){ c += 1; s = 0; if (c >= totalChapters) return null; }
+  else if (s < 0){ c -= 1; if (c < 0) return null; s = Math.max(0, subCountOf(c) - 1); }
   return { chap: c, sub: s };
 }
 const posId = (p) => 'c' + p.chap + 's' + p.sub;
@@ -1095,6 +1116,7 @@ async function fetchSub(id){
 }
 function prefetchNeighbors(){
   [neighborPos(1), neighborPos(-1)].forEach((p) => {
+    if (!p) return; // 전역 양끝 — 이웃이 없다
     const id = posId(p);
     if (id !== subId()) fetchSub(id);
   });
@@ -1163,17 +1185,22 @@ function renderStudyCard(){
    보여주고, 켜져 있을 때 다시 누르면 그 상태를 취소한다(2026-09-06 라운드17 사용자 요청 —
    제목 옆 배지 탭만으로 취소하는 건 손이 멀어 불편). reviewMode에선 퀵버튼이 숨고
    안다 버튼은 "복구" 역할이라 상태 표시를 끈다. */
+// ⚠ 2026-09-06 라운드18: 셋은 이제 「배타」다 — 정확히 하나만 켜진다. 근거는 취향이 아니라
+// 정합성이다: Notion `복습 상태`가 select라 애초에 한 값만 담기는데, 예전엔 doArchive()가
+// known도 같이 세워서 안다+완전히앎 두 버튼이 동시에 켜져 보였다(제목 배지는 이미 우선순위
+// 하나만 그리고 있어 버튼만 규칙이 어긋나 있었다). 우선순위는 배지와 같은 cardStatus().
 function syncCardStateButtons(){
   const c = studyCards[studyIdx];
-  const mark = (id, v) => $(id).classList.toggle('on', !reviewMode && !!v);
-  mark('trashQuickBtn', c && c.trashed);
-  mark('archiveQuickBtn', c && c.archived);
-  mark('knowBtn', c && c.known);
+  const st = (c && !reviewMode) ? cardStatus(c) : null;
+  $('trashQuickBtn').classList.toggle('on', st === 'trash');
+  $('archiveQuickBtn').classList.toggle('on', st === 'archive');
+  $('knowBtn').classList.toggle('on', st === 'known');
 }
-// 카드 상태를 바꾼 직후 화면 반영 3종 세트(제목 배지·하단 버튼·소챕터 진행 표시).
+// 카드 상태를 바꾼 직후 화면 반영(제목 배지·하단 버튼·스크러버 점 색·소챕터 진행 표시).
 function refreshCardState(c){
   $('cardTitle').innerHTML = titleHtml(c);
   syncCardStateButtons();
+  renderStudyScrubber();
   updateSubPos();
 }
 
@@ -1185,7 +1212,13 @@ function removeCurrentCardFromRotation(){
   studyCards.splice(studyIdx, 1);
   if (studyIdx >= studyCards.length) studyIdx = Math.max(0, studyCards.length - 1);
   updateSubPos();
-  if (!studyCards.length){ toast('이 소챕터에 더 볼 카드 없음 — 다음 소챕터로'); advanceSubchapter(); return; }
+  // 마지막 소챕터에서 전부 처리하면 갈 곳이 없다(라운드18에서 전역 wrap을 없앤 뒤로는
+  // 첫 카드로 되감지 않는다) — 그 자리에 빈 상태만 보여준다(reviewMode의 renderReviewEmpty와 같은 패턴).
+  if (!studyCards.length){
+    if (neighborPos(1)){ toast('이 소챕터에 더 볼 카드 없음 — 다음 소챕터로'); advanceSubchapter(); }
+    else renderStudyEmpty();
+    return;
+  }
   setRetitleContext(() => studyCards[studyIdx]);
   renderStudyCard();
 }
@@ -1202,14 +1235,23 @@ function removeCurrentCardFromRotation(){
    마지막에 도착하게 한다 — 대기는 백그라운드라 체감 속도는 그대로다. */
 let flagQueue = Promise.resolve();
 function queueFlagApi(run){ flagQueue = flagQueue.then(run, run); }
+/* ⚠ 세 상태는 배타다(2026-09-06 라운드18) — 누른 하나가 이 카드의 유일한 상태가 되고,
+   나머지 둘은 해제 API를 같이 태운다. 큐(queueFlagApi)가 직렬화하므로 「해제 → 설정」
+   순서가 뒤집히지 않는다(해제는 Notion을 '미확인'으로 되돌리므로 순서가 뒤집히면 최종
+   값이 '미확인'으로 남아버린다).
+   ⚠ 단 `known` 플래그 자체는 보관 시 여전히 true로 둔다 — n/nn·챕터 진행률의 분자라,
+   여기서 지우면 점수가 내려간다. 표시만 우선순위(휴지통>완전히앎>확인함)로 하나만 켠다. */
 async function markKnown(){
   const c = studyCards[studyIdx]; if (!c) return;
-  c.known = true;
-  const entry = currentSubEntry(c.key); if (entry) entry.known = true;
+  const wasArchived = c.archived, wasTrashed = c.trashed;
+  c.known = true; c.archived = false; c.trashed = false;
+  const entry = currentSubEntry(c.key); if (entry){ entry.known = true; entry.archived = false; entry.trashed = false; }
   // renderStudyCard()를 통째로 부르면 스크롤이 맨 위로 튀어 읽던 위치를 잃으므로
   // 제목 배지·하단 버튼·진행 표시만 갱신한다.
   refreshCardState(c);
   const sub = subId();
+  if (wasArchived) queueFlagApi(() => apiArchiveRestore(c.key, c.id));
+  if (wasTrashed) queueFlagApi(() => apiTrashRestore(c.key, c.id));
   queueFlagApi(() => apiAnswer(sub, c.key, true, c.id));
   if (studyMode === 'unknown') removeCurrentCardFromRotation();
 }
@@ -1235,21 +1277,25 @@ document.addEventListener('pointerdown', (e) => {
 });
 async function doArchive(){
   const c = studyCards[studyIdx]; if (!c) return;
-  c.known = true; c.archived = true;
-  const entry = currentSubEntry(c.key); if (entry) { entry.known = true; entry.archived = true; }
+  const wasTrashed = c.trashed;
+  c.known = true; c.archived = true; c.trashed = false;
+  const entry = currentSubEntry(c.key); if (entry) { entry.known = true; entry.archived = true; entry.trashed = false; }
   toast('보관함 — 더 안 보여줌');
   // "전체보기"에선 방금 보관한 카드도 배지(학사모)를 단 채 그 자리에 계속 보인다 — 사용자
   // 요청("휴지통 처리를 하면 휴지통에도 있어야 하고 현재 챕터에도 있어야") 반영.
   // "미완료만"에서만 즉시 로테이션에서 뺀다(markKnown()과 같은 패턴).
   if (studyMode === 'unknown') removeCurrentCardFromRotation(); else refreshCardState(c);
+  if (wasTrashed) queueFlagApi(() => apiTrashRestore(c.key, c.id));
   queueFlagApi(() => apiArchive(c.key, c.id));
 }
 async function doTrash(){
   const c = studyCards[studyIdx]; if (!c) return;
-  c.trashed = true;
-  const entry = currentSubEntry(c.key); if (entry) entry.trashed = true;
+  const wasArchived = c.archived;
+  c.trashed = true; c.archived = false;
+  const entry = currentSubEntry(c.key); if (entry){ entry.trashed = true; entry.archived = false; }
   toast('휴지통으로 보냄');
   if (studyMode === 'unknown') removeCurrentCardFromRotation(); else refreshCardState(c);
+  if (wasArchived) queueFlagApi(() => apiArchiveRestore(c.key, c.id));
   queueFlagApi(() => apiTrash(c.key, c.id));
 }
 /* 보관·휴지통 취소 → 복구. 두 진입점이 이걸 공유한다:
@@ -1274,13 +1320,18 @@ async function undoFlag(kind){
 }
 // 하단 버튼은 켜져 있으면(=지금 카드가 그 상태면) 취소, 아니면 설정 — 같은 자리에서
 // 토글된다(2026-09-06 라운드17 사용자 요청).
-$('trashQuickBtn').addEventListener('click', () => {
+// ⚠ 판정 기준은 원시 플래그가 아니라 「지금 화면에 켜져 있는 것」(cardStatus)이다 —
+// 보관 카드는 known도 true라, 원시 플래그로 보면 꺼져 있는 안다 버튼을 눌렀는데 "취소"가
+// 실행됐다(2026-09-06 라운드18 로컬 테스트에서 재현). 버튼이 꺼져 보이면 항상 설정이다.
+function currentCardStatus(){
   const c = studyCards[studyIdx];
-  if (c && c.trashed) undoFlag('trash'); else doTrash();
+  return (c && !reviewMode) ? cardStatus(c) : null;
+}
+$('trashQuickBtn').addEventListener('click', () => {
+  if (currentCardStatus() === 'trash') undoFlag('trash'); else doTrash();
 });
 $('archiveQuickBtn').addEventListener('click', () => {
-  const c = studyCards[studyIdx];
-  if (c && c.archived) undoFlag('archive'); else doArchive();
+  if (currentCardStatus() === 'archive') undoFlag('archive'); else doArchive();
 });
 
 let knowPressT = null, knowLongPressed = false;
@@ -1302,8 +1353,7 @@ knowBtn.addEventListener('pointerup', () => {
   if (reviewMode){ if (!knowLongPressed) doReviewRestore(); return; }
   // 켜져 있으면(=이 카드가 이미 확인함) 다시 탭해서 취소 — 휴지통·완전히앎 버튼과 같은
   // 토글 규칙(2026-09-06 라운드17: "체크버튼 표시는 취소가 안 된다"는 지적).
-  const c = studyCards[studyIdx];
-  if (c && c.known) undoKnown(); else markKnown();
+  if (currentCardStatus() === 'known') undoKnown(); else markKnown();
 });
 knowBtn.addEventListener('pointerleave', () => clearTimeout(knowPressT));
 
@@ -1352,6 +1402,15 @@ function updateReviewBar(){
 // 목록이 다 비면(전부 복구/삭제) 예전엔 곧장 챕터 화면으로 튕겼는데, "코랄버튼 눌러서
 // 정리하다 보면 갑자기 챕터로 이동한다"는 지적(2026-09-06)으로 그 자리에 빈 상태만
 // 보여주고 나가는 건 상단 칩 탭(exitReviewMode, 이미 있는 경로)에 맡긴다.
+// 학습 화면에서 이 소챕터의 볼 카드가 다 떨어졌는데 다음 소챕터도 없을 때(마지막 소챕터).
+function renderStudyEmpty(){
+  setDragTransition('none'); resetDragX();
+  $('cardTitle').innerHTML = '';
+  $('content').innerHTML = '<p style="text-align:center;color:var(--muted);padding:60px 20px;font-size:14px">'
+    + '마지막 소챕터 — 더 볼 카드 없음</p>';
+  renderStudyScrubber();
+  syncCardStateButtons();
+}
 function renderReviewEmpty(){
   setDragTransition('none'); resetDragX();
   $('cardTitle').textContent = '';
@@ -1396,7 +1455,11 @@ function renderStudyScrubber(){
   let dots = track.querySelectorAll('.dot');
   while (dots.length < n){ const d = document.createElement('div'); d.className = 'dot'; track.appendChild(d); dots = track.querySelectorAll('.dot'); }
   while (dots.length > n){ dots[dots.length - 1].remove(); dots = track.querySelectorAll('.dot'); }
-  dots.forEach((d, i) => { d.style.left = (n > 1 ? (i / (n - 1)) * 100 : 0) + '%'; d.classList.toggle('cur', i === studyIdx); });
+  dots.forEach((d, i) => {
+    d.style.left = (n > 1 ? (i / (n - 1)) * 100 : 0) + '%';
+    const c = studyCards[i];
+    d.className = 'dot s-' + (c ? cardStatus(c) : 'unknown') + (i === studyIdx ? ' cur' : '');
+  });
 }
 function scrubIndexFromX(clientX){
   const rect = $('scrubTrack').getBoundingClientRect();
@@ -1447,34 +1510,27 @@ $('filterToggle').addEventListener('click', () => {
 // ⚠ 여기서 /api/chapters를 기다리지 않는다 — allChaptersData가 이미 전체 챕터를 들고 있어
 // 이웃 좌표는 즉시 계산되고(subCountOf), 점수 갱신은 뒤에서 따라오면 된다. 예전엔 챕터를
 // 넘을 때마다 이 왕복이 로딩 화면을 한 번 더 만들었다.
+// ⚠ 2026-09-06 라운드18: 챕터를 다 봤을 때 뜨던 "전체 시험 볼까요?" 넛지 배너를 폐기했다
+// — 시험 진입은 이제 챕터 시트의 「종합시험 행」이 상시로 맡는다(제안이 끼어들지 않는
+// 무마찰 원칙과도 맞는다). 챕터를 넘을 때도 소챕터 이동과 같은 토스트 하나만 남긴다.
 async function advanceSubchapter(){
-  const finishedChap = chapIdx, p = neighborPos(1), crossed = p.chap !== chapIdx;
+  const p = neighborPos(1);
+  if (!p){ toast('마지막 카드'); return; }
+  const crossed = p.chap !== chapIdx;
   chapIdx = p.chap; subIdx = p.sub;
   savePos();
   await loadSubchapter();
-  if (crossed) showChapNudge(finishedChap);
-  else toast('소챕터 ' + (subIdx + 1) + '로 이동');
+  toast(crossed ? '챕터 ' + (chapIdx + 1) + '로 이동' : '소챕터 ' + (subIdx + 1) + '로 이동');
   refreshChapterMeta();
 }
 async function retreatSubchapter(){
   const p = neighborPos(-1);
+  if (!p){ toast('첫 카드'); return; }
   chapIdx = p.chap; subIdx = p.sub;
   savePos();
   await loadSubchapter(true);
   refreshChapterMeta();
 }
-function showChapNudge(finishedChapIdx){
-  $('chapNudgeText').textContent = '챕터 ' + (finishedChapIdx + 1) + ' 다 봤음 — 전체 시험 볼까요?';
-  $('chapNudge').classList.add('on');
-  $('chapNudge').dataset.chap = finishedChapIdx;
-}
-function hideChapNudge(){ $('chapNudge').classList.remove('on'); }
-$('chapNudgeSkip').addEventListener('click', hideChapNudge);
-$('chapNudgeGo').addEventListener('click', () => {
-  const ci = Number($('chapNudge').dataset.chap);
-  hideChapNudge();
-  enterChapterExam('c' + ci);
-});
 
 /* ── 좌우 스와이프=소챕터 안 이전/다음(경계에서 자동 다음 소챕터), 상하=스크롤.
    긴 누르기(길게 눌러 안 움직이면)는 텍스트 선택으로 넘긴다 — 스와이프 트래킹 자체를
@@ -1491,7 +1547,9 @@ let pressTimer = null, selectPrimed = false;
 // 예전엔 % 로 고리를 돌아 같은 소챕터 카드를 그렸고, 그래서 손가락을 떼면 화면이 바뀌었다.
 // 프리페치가 아직 안 끝났으면 null → peek이 비어 보이지만, 틀린 카드를 보여주는 것보다 낫다.
 function boundaryCard(dir){
-  const cards = subCache.get(posId(neighborPos(dir)));
+  const p = neighborPos(dir);
+  if (!p) return null; // 전역 양끝 — peek을 비워 "더 없음"이 미리 보이게 한다
+  const cards = subCache.get(posId(p));
   if (!cards) return null;
   const vis = visibleCards(cards);
   let list = vis;
@@ -1619,7 +1677,7 @@ function shuffle(arr){
   for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
   return a;
 }
-let examScope = 'sub', examCards = [], examIdx = 0, examResults = {}, examLastSub = null, examLastChap = null;
+let examScope = 'sub', examCards = [], examIdx = 0, examResults = {}, examLastSub = null, examLastChap = null, examLastMega = null;
 
 function enterExamMode(){ examMode = true; $('readRoot').hidden = true; $('examView').hidden = false; }
 function exitExamMode(){ examMode = false; $('examView').hidden = true; $('readRoot').hidden = false; clearRetitleContext(); setRetitleContext(() => studyCards[studyIdx]); }
@@ -1650,8 +1708,21 @@ async function enterChapterExam(cId){
   examCards = shuffle(pool);
   startExam('챕터 ' + (Number(cId.slice(1)) + 1) + ' 전체시험');
 }
+/* 종합시험(2026-09-06 라운드18) — 챕터 10개 범위. 서버가 이미 보관·휴지통을 걸러 무작위
+   100장을 뽑아 주므로(전량 1,000장은 응답 약 1.5MB라 기각, 사용자 확인) 여기선 순서만 섞는다. */
+async function enterMegaExam(gId, label){
+  showLoading('불러오는 중', '종합시험 문제를 가져옴');
+  let data;
+  try { data = await apiMegaExam(gId); }
+  catch (e) { showLoading('불러오기 실패', String(e.message || e)); return; }
+  hideLoading();
+  if (data.error || !data.cards || !data.cards.length){ toast(data.error || '시험 볼 카드 없음'); return; }
+  examScope = 'mega';
+  examCards = shuffle(data.cards);
+  startExam(label || '종합시험');
+}
 function startExam(title){
-  examIdx = 0; examResults = {}; examLastSub = null; examLastChap = null;
+  examIdx = 0; examResults = {}; examLastSub = null; examLastChap = null; examLastMega = null;
   $('examTitleBar').textContent = title;
   enterExamMode();
   setRetitleContext(() => examCards[examIdx]);
@@ -1675,7 +1746,7 @@ async function judgeCard(know){
   const c = examCards[examIdx];
   examResults[c.key] = know;
   const res = await apiAnswer(c.subId, c.key, know, c.id);
-  if (res && res.ok){ examLastSub = res.sub; examLastChap = res.chap; }
+  if (res && res.ok){ examLastSub = res.sub; examLastChap = res.chap; examLastMega = res.mega; }
   examIdx++;
   renderExamCard();
 }
@@ -1683,8 +1754,11 @@ function renderExamResult(){
   const total = examCards.length;
   const score = examCards.filter((c) => examResults[c.key]).length;
   const wrong = examCards.filter((c) => !examResults[c.key]);
-  const best = examScope === 'chap' ? examLastChap : examLastSub;
-  const bestLine = best ? (examScope === 'chap' ? '이 챕터 최고기록 ' : '이 소챕터 최고기록 ') + best.best + '/' + best.total : '';
+  // 종합시험은 출제가 100문제 표본이라 위 점수(n/100)와 최고기록(범위 전체 기준)의 분모가
+  // 다르다 — 라벨로 "이 범위"임을 밝혀 둘이 다른 축임을 드러낸다.
+  const best = examScope === 'mega' ? examLastMega : examScope === 'chap' ? examLastChap : examLastSub;
+  const bestLabel = examScope === 'mega' ? '이 범위 최고기록 ' : examScope === 'chap' ? '이 챕터 최고기록 ' : '이 소챕터 최고기록 ';
+  const bestLine = best ? bestLabel + best.best + '/' + best.total : '';
   let actions = '<button class="primary" id="examExit">닫기</button>';
   if (wrong.length){
     actions = '<button id="examRetryStudy">오답만 다시 복습(' + wrong.length + ')</button>'
@@ -1727,16 +1801,37 @@ async function renderChapList(){
   const data = allChaptersData || await apiChapters().catch(() => null);
   if (!data || !data.chapters){ $('chapList').innerHTML = '<div style="padding:20px;color:var(--muted);font-size:13px;text-align:center">불러오기 실패</div>'; return; }
   allChaptersData = data; totalChapters = data.chapters.length || 1;
+  // 종합시험 행(챕터 10개 묶음)을 그 범위 「마지막 챕터 다음」에 끼워 넣는다 — 챕터 14개면
+  // 10 다음(1~10)과 14 다음(11~14) 두 줄(2026-09-06 라운드18, 넛지 배너를 대체한 상시 진입점).
+  const groups = data.groups || [];
+  const megaAfter = new Map(groups.map((g) => [g.to, g]));
   $('chapList').innerHTML = data.chapters.map((c, i) => {
     const pct = c.total ? Math.round(c.current / c.total * 100) : 0;
-    return '<div class="chaprow" data-idx="' + i + '" data-id="' + esc(c.id) + '" data-act="go">'
+    return chapRowHtml(c, i, pct) + (megaAfter.has(i) ? megaRowHtml(megaAfter.get(i)) : '');
+  }).join('');
+}
+function chapRowHtml(c, i, pct){
+  return '<div class="chaprow" data-idx="' + i + '" data-id="' + esc(c.id) + '" data-act="go">'
       + '<div class="chaprow-top"><span class="chaprow-label"><b>챕터 ' + (i + 1) + '</b><span class="chaprow-range">' + c.start + '~' + c.end + '</span></span>'
       + '<span class="chaprow-scorewrap"><span class="chaprow-score">' + c.current + '/' + c.total + '</span>'
       + '<span class="chaprow-best" title="최고 기록"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0Z"/><path d="M7 5H4a3 3 0 0 0 3 5"/><path d="M17 5h3a3 3 0 0 1-3 5"/></svg>' + c.best + '</span>'
       + '<button class="chaprow-exam" data-act="exam">전체시험</button></span></div>'
       + '<div class="chaprow-bar"><i style="width:' + pct + '%"></i></div>'
       + '</div>';
-  }).join('');
+}
+/* 종합시험 행 — 챕터 행과 같은 모양이되 행 전체가 시험 진입 버튼이다(챕터 행의 "탭=목록,
+   버튼=시험"과 달리 볼 목록이 따로 없다). 표시는 그 범위의 진행 현황(현재/전체 + 최고),
+   실제 출제는 서버가 뽑은 무작위 100장. */
+function megaRowHtml(g){
+  const pct = g.total ? Math.round(g.current / g.total * 100) : 0;
+  const label = '챕터 ' + (g.from + 1) + '~' + (g.to + 1) + ' 종합시험';
+  return '<div class="chaprow chaprow-mega" data-id="' + esc(g.id) + '" data-act="mega">'
+    + '<div class="chaprow-top"><span class="chaprow-label"><b>' + label + '</b>'
+    + '<span class="chaprow-range">무작위 100문제</span></span>'
+    + '<span class="chaprow-scorewrap"><span class="chaprow-score">' + g.current + '/' + g.total + '</span>'
+    + '<span class="chaprow-best" title="최고 기록"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0Z"/><path d="M7 5H4a3 3 0 0 0 3 5"/><path d="M17 5h3a3 3 0 0 1-3 5"/></svg>' + g.best + '</span></span></div>'
+    + '<div class="chaprow-bar"><i style="width:' + pct + '%"></i></div>'
+    + '</div>';
 }
 // 2026-09-06 라운드14: 챕터 행 탭 = 곧장 이동 → "이 챕터 카드 목록"부터 보여주고 탭한
 // 제목으로 이동(사용자 요청). "전체시험"은 그대로 즉시 실행되는 별도 버튼.
@@ -1750,6 +1845,9 @@ $('chapList').addEventListener('click', (e) => {
   } else if (btn.dataset.act === 'exam'){
     closeSheet();
     enterChapterExam(id);
+  } else if (btn.dataset.act === 'mega'){
+    closeSheet();
+    enterMegaExam(id, row.querySelector('.chaprow-label b').textContent);
   }
 });
 
@@ -2163,15 +2261,38 @@ function openSubchapterList(){
   openListOv((chapIdx + 1) + '-' + (subIdx + 1) + ' 목록');
   renderPickList($('listResults'), items, '카드 없음', (it) => { closeListOv(); navigateToCard(it); }, true);
 }
+/* 챕터 목록(100장)은 소챕터 10개로 접어서 보여준다(2026-09-06 라운드18 사용자 요청).
+   기본 전부 접힘 + 지금 보고 있는 소챕터만 펼침 — 100줄 스크롤 대신 "내 위치"부터 잡힌다. */
+function renderGroupedPickList(el, groups, openId){
+  el.innerHTML = groups.map((g) => {
+    const done = g.items.filter((it) => it.status !== 'unknown').length;
+    return '<div class="lgroup' + (g.id === openId ? ' open' : '') + '" data-sub="' + esc(g.id) + '">'
+      + '<div class="lgrouphead"><span class="lgcar">▶</span><b>' + esc(g.label) + '</b>'
+      + '<span class="lgcount">' + done + '/' + g.items.length + '</span></div>'
+      + '<div class="lgbody"></div></div>';
+  }).join('');
+  el.querySelectorAll('.lgroup').forEach((wrap, i) => {
+    renderPickList(wrap.querySelector('.lgbody'), groups[i].items, '카드 없음', (it) => { closeListOv(); navigateToCard(it); }, true);
+    wrap.querySelector('.lgrouphead').addEventListener('click', () => wrap.classList.toggle('open'));
+  });
+}
 async function openChapterList(cId){
   showLoading('불러오는 중', '챕터 목록을 가져옴');
   let data;
   try { data = await apiChapterExam(cId); } catch (e) { hideLoading(); toast('불러오기 실패'); return; }
   hideLoading();
   if (data.error || !data.cards.length){ toast(data.error || '카드 없음'); return; }
-  const items = data.cards.map((c) => ({ key: c.key, front: c.front, subId: c.subId, status: cardStatus(c) }));
-  openListOv('챕터 ' + (Number(cId.slice(1)) + 1) + ' 목록');
-  renderPickList($('listResults'), items, '카드 없음', (it) => { closeListOv(); navigateToCard(it); }, true);
+  const ci = Number(cId.slice(1));
+  const bySub = new Map();
+  data.cards.forEach((c) => {
+    if (!bySub.has(c.subId)) bySub.set(c.subId, []);
+    bySub.get(c.subId).push({ key: c.key, front: c.front, subId: c.subId, status: cardStatus(c) });
+  });
+  const groups = [...bySub.entries()].map(([sid, items]) => ({
+    id: sid, label: (ci + 1) + '-' + (parseSubIdClient(sid).sub + 1), items,
+  }));
+  openListOv('챕터 ' + (ci + 1) + ' 목록');
+  renderGroupedPickList($('listResults'), groups, ci === chapIdx ? subId() : null);
 }
 $('searchInput').addEventListener('input', () => {
   clearTimeout(searchT);
