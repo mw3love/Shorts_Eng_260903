@@ -404,11 +404,15 @@
   .fontpicks{display:flex;flex-direction:column;gap:12px}
   .sliderow{display:flex;align-items:center;gap:10px}
   .sliderow label{flex:none;width:38px;font-family:var(--mono);font-size:11px;color:var(--muted)}
-  .sliderow input[type="range"]{flex:1;-webkit-appearance:none;appearance:none;height:6px;border-radius:999px;outline:none;background:linear-gradient(to right,var(--coral) 0%,var(--coral) var(--fill,50%),var(--ink4) var(--fill,50%),var(--ink4) 100%)}
-  .sliderow input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:16px;border-radius:50%;background:var(--coral);cursor:pointer;border:2px solid var(--ink)}
+  /* 손잡이가 시각적으로는 6px 트랙이지만 실제 탭 영역은 입력 요소 높이 자체다 — 예전엔
+     그 높이도 6px라 "정확히 그 얇은 줄 위"를 짚어야 했다(2026-09-06 사용자 지적: 신중하게
+     해야 조절됨). 트랙은 얇게 유지하되 입력 요소 자체 높이를 28px로 키워 탭 영역만 넓힌다. */
+  .sliderow input[type="range"]{flex:1;-webkit-appearance:none;appearance:none;height:28px;margin:0;outline:none;background:transparent}
+  .sliderow input[type="range"]::-webkit-slider-runnable-track{height:6px;border-radius:999px;background:linear-gradient(to right,var(--coral) 0%,var(--coral) var(--fill,50%),var(--ink4) var(--fill,50%),var(--ink4) 100%)}
+  .sliderow input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:26px;height:26px;margin-top:-10px;border-radius:50%;background:var(--coral);cursor:pointer;border:3px solid var(--ink)}
   .sliderow input[type="range"]::-moz-range-track{height:6px;border-radius:999px;background:var(--ink4)}
   .sliderow input[type="range"]::-moz-range-progress{height:6px;border-radius:999px;background:var(--coral)}
-  .sliderow input[type="range"]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--coral);border:2px solid var(--ink);cursor:pointer}
+  .sliderow input[type="range"]::-moz-range-thumb{width:26px;height:26px;border-radius:50%;background:var(--coral);border:3px solid var(--ink);cursor:pointer}
   .sliderow .val{flex:none;width:38px;text-align:right;font-family:var(--mono);font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
 
   /* ── 이미지 확대(라이트박스) ── 본문 스크린샷을 탭하면 전체화면으로 띄우고 핀치·더블탭으로
