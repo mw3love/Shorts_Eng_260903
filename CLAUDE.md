@@ -29,7 +29,37 @@ Notion DB `3. 영어 DB`에 자동 저장한다. **저장은 되는데 복습이
 때문. **`git push`는 예외** — 전역 규칙 10대로 사용자가 마무리 시점에 직접 판단해서
 한다(이 예외는 push까지 확장하지 않는다).
 
-## 현재 상태 (2026-09-06 라운드22 — 로딩화면 깜빡임 제거 + 챕터목록 페이로드 축소) — 여기부터 읽을 것
+## 현재 상태 (2026-09-07 라운드23 — 예문 잘림(형광펜 nowrap) 수정) — 여기부터 읽을 것
+
+`Version ID d918c0f8-b8e1-4687-926c-f8a7da28f1a9` 배포. 재동기화 불요(CSS만).
+
+사용자가 폰에서 "예시문장이 짤려보임"을 신고 — 긴 예문("Now that you're here, we can
+start")이 "can" 부근에서 화면 밖으로 잘려 사라짐.
+
+- **원인(확인함, 직접증거) — `richHtml()`이 Notion `code` 주석을 `<code class="hl">`로
+  감싸는데(`public/index.html`), `.content .hl`에 `white-space:nowrap`이 걸려 있었다.**
+  이 카드의 예문은 문장 전체가 하나의 code 주석 구간이라 `<code class="hl">`가 문장
+  전체를 한 줄로 강제 → 부모 `.scroller`가 `overflow-x:hidden`이라 화면 폭을 넘는
+  부분이 그대로 안 보였다. `.hl`이 nowrap이던 이유는 짧은 단어 하이라이트가 어중간하게
+  줄바꿈되지 않게 하려던 것으로 보이나(도입 시점 커밋에 별도 근거 기록 없음), 문장
+  전체를 감싸는 경우엔 오히려 잘림을 만들어 제거 — 이제 일반 텍스트처럼 줄바꿈된다.
+- ⚠ **이 PC엔 Node.js/npx가 PATH에 없고 wrangler도 Cloudflare 로그인이 안 돼 있었다**
+  (이번에 `wrangler login`으로 해결, 세션에 남는 인증이라 다음 세션은 문제없을 것으로
+  예상). 로컬 `node_modules` 설치·dev 서버 구동은 `npx` 대신 `bun`(`~/.bun/bin/bun`)으로
+  우회했다 — 상세: `~/.claude/projects/C--Users-KBS-Dev-Shorts-Eng-260903/memory/
+  env_no_node_no_wrangler_auth.md`. 같은 이유로 **이번 라운드는 실제 `wrangler dev` 앱
+  구동 검증을 못 했다** — 이 PC에서 `wrangler dev`가 `Ready` 로그까지는 뜨지만 실제
+  HTTP 요청엔 응답 없이 무한 대기하는 별도 증상이 있었음(원인 미확정, 위 memory 참조).
+
+✓ **검증 상태 — 프록시검증.** 실제 `.content`/`.scroller` CSS를 그대로 추출한 격리
+재현(narrow viewport)으로 수정 전(잘림 재현)·수정 후(정상 줄바꿈) 스크린샷 확인. 실제
+앱을 띄운 상태에서의 회귀 확인(다른 `.hl` 사용처 없음은 grep으로 확인)과 실기기 확인은
+아직 안 됨.
+
+**남은 것**: 실기기 확인(이 예문 카드 실제 렌더), 다음 세션에서 `wrangler dev` 로컬
+구동이 이 PC에서 정상화됐는지(안 됐다면 원인 추적 필요).
+
+## 현재 상태 (2026-09-06 라운드22 — 로딩화면 깜빡임 제거 + 챕터목록 페이로드 축소) — 위 라운드23 다음으로 읽을 것
 
 `Version ID b41897ca-7bc3-42df-ac2f-3b4804c8aefb` 배포. 재동기화 불요(UI+응답 필드만).
 
