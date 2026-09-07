@@ -1057,16 +1057,30 @@ function getHighlightTarget(){
 // 났다(라운드17에서 known/archive/trash가 겪었던 것과 동일한 클래스의 결함 — 형광펜만
 // 이 큐를 안 타고 있었다). 큐가 "이전 요청 응답까지 기다린 뒤에만 다음 요청을 보낸다"라
 // 응답 순서와 요청 순서가 항상 일치하게 된다.
+// ⚠ 직렬화만으론 부족했다(2026-09-07 실기기 재현) — 빠르게 두 번 칠하면 최종 결과는
+// 맞는데 그 "사이"에 깜빡인다. 원인: 큐는 요청/응답 순서만 보장할 뿐, 중간(첫 번째)
+// 응답도 여전히 도착하는 대로 본문 전체를 다시 그린다 — 그 시점에 두 번째 동작은
+// 이미 낙관적으로 다른 모습을 보여주고 있는데, 첫 번째의 "그 시점 기준 정답"으로
+// 화면이 잠깐 되돌아갔다가 두 번째 응답이 와서야 다시 최종 모습으로 바뀐다. 최신
+// 요청 번호(highlightSeq)를 비교해 "이미 그보다 최신 동작이 시작된" 응답은 화면을
+// 안 건드리게 막는다 — 마지막 응답만 그리면 중간 상태를 아예 안 보여주므로 깜빡일
+// 것이 없다. currentCardForHighlight() 재확인은 그 사이 다른 카드로 넘어갔을 때
+// 늦게 도착한 응답이 지금 보이는 다른 카드의 본문을 덮어쓰는 것도 같이 막는다.
+let highlightSeq = 0;
 function doHighlight(blk, start, end){
   const card = currentCardForHighlight();
   if (!card) return;
   const field = blk === 'hint' ? 'hint' : (blk[0] === 'p' ? 'pre' : 'detail');
   const blockIndex = blk === 'hint' ? null : Number(blk[0] === 'p' ? blk.slice(1) : blk);
+  const seq = ++highlightSeq;
   queueFlagApi(() => apiHighlight(card.id, field, blockIndex, start, end).catch(() => null).then((res) => {
+    if (seq !== highlightSeq) return; // 더 최신 형광펜 동작이 이미 시작됨 — 그 응답이 곧 따로 옴, 지금은 화면을 안 건드린다
     if (res && res.ok){
       Object.assign(card, res.card);
-      if (!examMode) $('content').innerHTML = cardBodyHtml(card);
-      else { const el = $('examBody'); if (el) el.innerHTML = cardBodyHtml(card); }
+      if (currentCardForHighlight() === card){
+        if (!examMode) $('content').innerHTML = cardBodyHtml(card);
+        else { const el = $('examBody'); if (el) el.innerHTML = cardBodyHtml(card); }
+      }
     } else toast('Highlight failed');
   }));
 }
