@@ -1876,6 +1876,19 @@ function isOverlayOpen(){
     !$('searchOv').hidden || !$('listOv').hidden || $('sheet').classList.contains('on') ||
     !$('fontPop').hidden || !$('knowPop').hidden || !$('resetPop').hidden;
 }
+// isOverlayOpen()에서 highlightMode만 뺀 버전(2026-09-07, 왼손 단축키 실사용 피드백으로
+// 수정) — highlightMode는 "형광펜 모드 on" 자체라 F 토글이 이 조건에 걸리면 껐다 켰다가
+// 안 되고 켜지기만 한다(재현 확인: F를 누르면 highlightMode=true가 되고, 그 순간부터
+// isOverlayOpen()이 true를 반환해 다음 F 입력이 통째로 무시됨). Q/E/Space도 같은 이유로
+// 막혀 있었는데, 이건 A/D(카드 전환)와 달리 텍스트 드래그-선택 중인 상태와 실질적으로
+// 안 겹친다(마우스 드래그≠키보드) — 막을 이유가 없어 같이 풀었다. A/D·화살표·PageUp/Down
+// 만 원래 isOverlayOpen()(highlightMode 포함)을 계속 쓴다 — 형광펜 선택 중 카드가
+// 넘어가면 선택이 끊기는 건 실제 충돌이라 그대로 차단.
+function isModalOpen(){
+  return examMode || titleEditing || !lb.hidden ||
+    !$('searchOv').hidden || !$('listOv').hidden || $('sheet').classList.contains('on') ||
+    !$('fontPop').hidden || !$('knowPop').hidden || !$('resetPop').hidden;
+}
 // 왼손 단축키(2026-09-07, 사용자 요청 — "오른손 마우스+왼손 키보드" 전제).
 // 화살표 키는 키보드 우측 하단이라 왼손 전용 조작엔 안 맞아 A/D를 홈로우에 추가로
 // 배정(기존 화살표/PageUp·Down은 그대로 유지 — 오른손만 쓰는 사용자와 공존).
@@ -1887,7 +1900,9 @@ function knowShortcut(){
 document.addEventListener('keydown', (e) => {
   const ae = document.activeElement;
   if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
-  if (isOverlayOpen()) return;
+  if (isModalOpen()) return;
+  if (highlightMode && (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === 'd' || e.key === 'D' ||
+      e.key === 'ArrowLeft' || e.key === 'PageUp' || e.key === 'a' || e.key === 'A')) return;
   if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === 'd' || e.key === 'D'){ e.preventDefault(); navByKey(-1); }
   else if (e.key === 'ArrowLeft' || e.key === 'PageUp' || e.key === 'a' || e.key === 'A'){ e.preventDefault(); navByKey(1); }
   else if (e.code === 'Space'){ e.preventDefault(); knowShortcut(); }
