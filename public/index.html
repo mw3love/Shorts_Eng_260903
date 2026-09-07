@@ -1724,6 +1724,17 @@ scroller.addEventListener('pointerdown', (e) => {
 scroller.addEventListener('pointermove', (e) => {
   if (studyCards.length < 2 || examMode || highlightMode || titleEditing) return;
   if (pinchPointers.size >= 2) return; // 핀치 진행 중엔 스와이프 계산 자체를 건너뛴다
+  // ⚠ 마우스는 버튼을 안 눌러도 pointermove가 계속 발생한다(터치는 손가락이 닿아있을 때만
+  // 발생 — 이 체크가 왜 지금까지 안 걸렸는지의 이유). 이게 없으면 새로고침 직후 sx/sy가
+  // 기본값 0,0인 상태에서 본문 위로 마우스만 지나가도 mdx/mdy가 커서 곧장
+  // beginSwipeTracking이 걸려 카드가 화면 밖으로 밀려 사라진다(2026-09-07 실기기 재현 —
+  // "새로고침하고 호버하면 화면 사라짐"). PC 스와이프가 먹통이던 것도 이 경로로 dragging이
+  // 미리 오염된 상태에서 실제 드래그가 겹쳐 생겼을 가능성이 높다.
+  if (e.buttons === 0){
+    if (dragging){ dragging = false; mode = null; setDragTransition('none'); resetDragX(); }
+    selectPrimed = false; clearTimeout(pressTimer);
+    return;
+  }
   const mdx = e.clientX - sx, mdy = e.clientY - sy;
   if (!dragging && !selectPrimed){
     // 가로 이동이 세로보다 뚜렷할 때만 스와이프로 캡처한다 — 길게 누르는 동안의 세로
