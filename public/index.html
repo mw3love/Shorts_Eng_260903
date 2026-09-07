@@ -1051,23 +1051,38 @@ function getHighlightTarget(){
 // 멈춰 있던 게 문제였다(2026-09-05 실기기 피드백). 성공 시 시험모드처럼 본문만 다시
 // 그린다 — 예전엔 renderStudyCard()를 썼는데, 그 안의 `scroller.scrollTop=0`이 카드
 // "이동" 전용 리셋이라 형광펜(카드 안 바뀜)에도 적용돼 화면이 최상단으로 튀었다.
+// ⚠ known/archive/trash와 같은 이유로 queueFlagApi로 직렬화한다(2026-09-07) — 칠하기
+// 직후 곧바로 취소하는 등 형광펜 요청 2개가 겹치면, 먼저 보낸(느린) 요청의 응답이
+// 나중에 도착해 화면을 오래된 상태로 덮어써 "껐는데 다시 켜졌다 꺼진다"는 깜빡임이
+// 났다(라운드17에서 known/archive/trash가 겪었던 것과 동일한 클래스의 결함 — 형광펜만
+// 이 큐를 안 타고 있었다). 큐가 "이전 요청 응답까지 기다린 뒤에만 다음 요청을 보낸다"라
+// 응답 순서와 요청 순서가 항상 일치하게 된다.
 function doHighlight(blk, start, end){
   const card = currentCardForHighlight();
   if (!card) return;
   const field = blk === 'hint' ? 'hint' : (blk[0] === 'p' ? 'pre' : 'detail');
   const blockIndex = blk === 'hint' ? null : Number(blk[0] === 'p' ? blk.slice(1) : blk);
-  apiHighlight(card.id, field, blockIndex, start, end).catch(() => null).then((res) => {
+  queueFlagApi(() => apiHighlight(card.id, field, blockIndex, start, end).catch(() => null).then((res) => {
     if (res && res.ok){
       Object.assign(card, res.card);
       if (!examMode) $('content').innerHTML = cardBodyHtml(card);
       else { const el = $('examBody'); if (el) el.innerHTML = cardBodyHtml(card); }
     } else toast('Highlight failed');
-  });
+  }));
 }
 function tryAutoHighlight(){
   if (!highlightMode) return;
+  const selBefore = window.getSelection();
+  // 드래그로 실제 텍스트를 골랐는데(빈 탭이 아니라) getHighlightTarget이 구조적 이유
+  // (문단 경계를 넘음·중첩 예문처럼 형광펜 미지원 블록)로 거절한 경우만 알려준다 —
+  // 예전엔 조용히 아무 일도 안 일어나 "드래그했는데 왜 안 되지"를 사용자가 알 방법이
+  // 없었다(2026-09-07). 단순 탭(선택 없음)에는 매번 뜨면 소음이라 안 띄운다.
+  const hadRealSelection = selBefore && selBefore.rangeCount > 0 && !selBefore.isCollapsed;
   const t = getHighlightTarget();
-  if (!t) return;
+  if (!t){
+    if (hadRealSelection){ selBefore.removeAllRanges(); toast('Select within a single paragraph'); }
+    return;
+  }
   const sel = window.getSelection();
   const range = sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
   sel.removeAllRanges();
@@ -1075,11 +1090,23 @@ function tryAutoHighlight(){
   // 칠하는 등 서버 판정과 다를 수 있는 드문 경우엔 실패해도(catch) 그냥 넘어간다 —
   // 응답이 오면 위 doHighlight가 authoritative하게 다시 그려서 어차피 바로잡힌다.
   if (range){
+    const mark = document.createElement('code');
+    mark.className = 'hl';
     try {
-      const mark = document.createElement('code');
-      mark.className = 'hl';
       range.surroundContents(mark);
-    } catch (e) {}
+    } catch (e) {
+      // 선택이 <b>/<i> 같은 인라인 서식 요소를 통째로 포함하지 않고 그 경계 중간에서
+      // 시작/끝나면 surroundContents가 예외를 던진다 — 강조 단어가 낀 문장 전체를
+      // 드래그하는 흔한 사용 패턴에서 자주 걸림. 조용히 넘기면 서버 응답이 올 때까지
+      // (~2초) 화면에 아무 반응이 없어 "전체를 드래그해도 일부만 칠해진다"로
+      // 보였다(2026-09-07). extractContents는 이런 부분 선택도 안전하게 잘라내므로
+      // 폴백으로 재시도한다.
+      try {
+        const frag = range.extractContents();
+        mark.appendChild(frag);
+        range.insertNode(mark);
+      } catch (e2) {}
+    }
   }
   doHighlight(t.blk, t.start, t.end);
 }
