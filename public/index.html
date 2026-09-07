@@ -105,6 +105,26 @@
      "가려져 있다가 나타나는" 것처럼 보인다는 실기기 피드백(2026-09-05). 처음부터 다
      보이는 쪽이 낫다. */
   .peekbody{flex:1;min-height:0}
+  /* PC 마우스 사용자용 좌우 이동 버튼(2026-09-07, 사용자 요청) — 호버 가능한 포인터
+     (마우스)에서만 존재하고, .stage 위에서 마우스를 움직여야 옅게 나타난다. 터치
+     기기는 이 미디어쿼리 자체가 안 걸려 완전히 없는 요소처럼 취급된다(display:none
+     기본값 — 화면 공간·탭 순서에 전혀 영향 없음). */
+  .navedge{display:none}
+  @media (hover:hover) and (pointer:fine){
+    .navedge{
+      display:flex;align-items:center;justify-content:center;
+      position:absolute;top:50%;transform:translateY(-50%);
+      width:44px;height:44px;border-radius:50%;
+      background:color-mix(in srgb,var(--ink) 70%,transparent);
+      border:1px solid var(--ink4);color:var(--paper);
+      opacity:0;transition:opacity .15s;cursor:pointer;z-index:5;
+    }
+    .navedge svg{width:20px;height:20px}
+    .stage:hover .navedge{opacity:1}
+    .navedge:hover{background:var(--coral);border-color:var(--coral)}
+    .navedge.prevedge{left:10px}
+    .navedge.nextedge{right:10px}
+  }
   .content p{margin:0 0 12px}
   .content h3{font-family:var(--title-font);font-weight:400;font-size:1.3em;color:var(--paper);margin:20px 0 8px}
   .content h4{font-family:var(--title-font);font-weight:400;font-size:1.15em;color:var(--paper);margin:16px 0 6px}
@@ -122,7 +142,7 @@
   .content th{color:var(--coral);font-weight:500;background:color-mix(in srgb,var(--coral) 7%,transparent)}
   .content .lhint{font-size:1.08em;font-weight:600;color:var(--paper);margin:0 0 14px}
   .content .src{display:inline-block;font-family:var(--mono);font-size:11px;color:var(--faint);text-decoration:none;border-bottom:1px solid var(--ink3);padding-bottom:2px;margin-top:4px}
-  .content .shot{max-width:100%;border-radius:10px;display:block;margin:6px 0 12px;cursor:zoom-in;-webkit-touch-callout:none}
+  .content .shot{max-width:100%;border-radius:10px;display:block;margin:6px 0 12px;cursor:zoom-in;-webkit-touch-callout:none;-webkit-user-drag:none;user-drag:none}
   .content .shotcap{font-family:var(--mono);font-size:11px;color:var(--muted);margin:-6px 0 12px}
 
   /* ── 상단 바(2026-09-06 축3) — 하단 바와 같은 이유로 오버레이에서 고정 구역으로.
@@ -526,6 +546,9 @@
       </div>
       <div class="peek peek-prev" id="peekPrev"><div class="cardtitle" id="peekPrevTitle"></div><div class="content peekbody" id="peekPrevBody"></div></div>
       <div class="peek peek-next" id="peekNext"><div class="cardtitle" id="peekNextTitle"></div><div class="content peekbody" id="peekNextBody"></div></div>
+      <!-- PC 마우스 좌우 이동 버튼(2026-09-07) — 호버 가능한 포인터에서만 CSS로 나타남. -->
+      <button class="navedge prevedge" id="navPrevBtn" aria-label="Previous card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <button class="navedge nextedge" id="navNextBtn" aria-label="Next card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></button>
     </div>
 
     <!-- 트래시 카드뷰 롱프레스 전용 "완전삭제" 확인 하나만 남았다(2026-09-06 라운드14 —
@@ -1715,7 +1738,14 @@ scroller.addEventListener('pointermove', (e) => {
   if (!dragging) return;
   dx = mdx; dy = mdy;
   if (mode === null && (Math.abs(dx) > MOVE_TOL || Math.abs(dy) > MOVE_TOL)) mode = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v';
-  if (mode === 'h') setDragX(dragCurve(dx, dragW));
+  if (mode === 'h'){
+    // 마우스로 텍스트/이미지 위를 드래그하면 브라우저 네이티브 텍스트선택·이미지드래그가
+    // 우리 스와이프와 동시에 진행될 수 있다 — 막지 않으면 마우스를 뗀 뒤에도 선택이 남아
+    // 다음 pointerdown이 "이미 선택된 텍스트가 있으면 return"(위 pointerdown 참조)에 걸려
+    // 스와이프가 다시 시작되지 않는다(PC 마우스 스와이프가 먹통처럼 보이는 원인 중 하나).
+    e.preventDefault();
+    setDragX(dragCurve(dx, dragW));
+  }
 });
 scroller.addEventListener('pointerup', (e) => {
   clearTimeout(pressTimer);
@@ -1727,27 +1757,74 @@ scroller.addEventListener('pointerup', (e) => {
     const isFlick = elapsed <= FLICK_MS && ratio >= FLICK_RATIO;
     const commit = isFlick || ratio >= COMMIT_RATIO;
     setDragTransition('transform ' + TRANSITION_MS + 'ms cubic-bezier(.2,.7,.3,1)');
-    if (commit && dx < 0){
-      setDragX(-dragW);
-      content.addEventListener('transitionend', function onEnd(){
-        content.removeEventListener('transitionend', onEnd); setDragTransition('none'); resetDragX();
-        // reviewMode에선 소챕터 경계가 없다 — 마지막 카드에서 그냥 멈춘다(advanceSubchapter는
-        // chapIdx/subIdx 기준 실제 챕터로 튀어버려 복습 풀을 이탈시킨다).
-        if (studyIdx + 1 >= studyCards.length) { if (reviewMode) toast('Last card'); else advanceSubchapter(); }
-        else { studyIdx++; renderStudyCard(); }
-      }, { once: true });
-    } else if (commit && dx > 0){
-      setDragX(dragW);
-      content.addEventListener('transitionend', function onEnd(){
-        content.removeEventListener('transitionend', onEnd); setDragTransition('none'); resetDragX();
-        if (studyIdx - 1 < 0) { if (reviewMode) toast('First card'); else retreatSubchapter(); }
-        else { studyIdx--; renderStudyCard(); }
-      }, { once: true });
-    } else resetDragX();
+    if (commit && dx < 0) goToNext();
+    else if (commit && dx > 0) goToPrev();
+    else resetDragX();
   }
   mode = null;
 });
 scroller.addEventListener('pointercancel', () => { clearTimeout(pressTimer); dragging = false; selectPrimed = false; mode = null; resetDragX(); });
+
+// 카드 커밋 — 스와이프 커밋(위 pointerup)과 키보드 내비게이션(아래)이 공유한다.
+// ⚠ 완료 콜백을 transitionend 하나에만 걸면, 그 이벤트가 못 뜨는 경우(2026-09-07 테스트로
+// 재현 — 스크립트만으로 곧장 최종값을 찍으면 브라우저가 "이전 프레임"을 못 그려 transition
+// 자체가 안 걸려 transitionend가 영영 안 뜸) 카드가 화면 밖으로 밀린 채 그대로 멈춘다 —
+// PC에서 "스와이프하고 손을 떼도 다음 카드로 안 넘어간다"던 신고와 정확히 같은 증상이다.
+// setTimeout 폴백으로 TRANSITION_MS가 지나면 이벤트 유무와 무관하게 무조건 완료시킨다.
+function afterCardTransition(fn){
+  let done = false;
+  const finish = () => { if (done) return; done = true; clearTimeout(t); content.removeEventListener('transitionend', onEnd); fn(); };
+  const onEnd = () => finish();
+  content.addEventListener('transitionend', onEnd);
+  const t = setTimeout(finish, TRANSITION_MS + 60);
+}
+function goToNext(){
+  setDragX(-dragW);
+  afterCardTransition(() => {
+    setDragTransition('none'); resetDragX();
+    // reviewMode에선 소챕터 경계가 없다 — 마지막 카드에서 그냥 멈춘다(advanceSubchapter는
+    // chapIdx/subIdx 기준 실제 챕터로 튀어버려 복습 풀을 이탈시킨다).
+    if (studyIdx + 1 >= studyCards.length) { if (reviewMode) toast('Last card'); else advanceSubchapter(); }
+    else { studyIdx++; renderStudyCard(); }
+  });
+}
+function goToPrev(){
+  setDragX(dragW);
+  afterCardTransition(() => {
+    setDragTransition('none'); resetDragX();
+    if (studyIdx - 1 < 0) { if (reviewMode) toast('First card'); else retreatSubchapter(); }
+    else { studyIdx--; renderStudyCard(); }
+  });
+}
+// PC 내비게이션(2026-09-07, 사용자 요청) — 방향키/PageUp·Down, 그리고 아래 호버 버튼이
+// 공유한다. 드래그 없이 바로 커밋하므로 beginSwipeTracking이 매 스와이프 시작 때 하던
+// 준비(dragW 실측·peek 패널 채우기)를 여기서 직접 한다.
+function navByKey(dir){
+  if (studyCards.length < 2 || examMode || highlightMode || titleEditing) return;
+  dragW = scroller.offsetWidth || 1;
+  const pc = studyPrev(), nc = studyNext();
+  $('peekPrevTitle').textContent = pc ? pc.front : ''; $('peekPrevBody').innerHTML = peekBodyHtml(pc);
+  $('peekNextTitle').textContent = nc ? nc.front : ''; $('peekNextBody').innerHTML = peekBodyHtml(nc);
+  setDragTransition('transform ' + TRANSITION_MS + 'ms cubic-bezier(.2,.7,.3,1)');
+  if (dir < 0) goToNext(); else goToPrev();
+}
+// 다른 오버레이(시험·시트·검색·라이트박스·팝업 등)가 열려 있으면 그쪽 제스처와 겹치지
+// 않게 카드 내비게이션을 비활성화한다 — 스와이프는 DOM hit-test로 자연히 막히지만
+// keydown은 document 전역이라 여기서 직접 걸러야 한다.
+function isOverlayOpen(){
+  return examMode || highlightMode || titleEditing || !lb.hidden ||
+    !$('searchOv').hidden || !$('listOv').hidden || $('sheet').classList.contains('on') ||
+    !$('fontPop').hidden || !$('knowPop').hidden || !$('resetPop').hidden;
+}
+document.addEventListener('keydown', (e) => {
+  const ae = document.activeElement;
+  if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
+  if (isOverlayOpen()) return;
+  if (e.key === 'ArrowRight' || e.key === 'PageDown'){ e.preventDefault(); navByKey(-1); }
+  else if (e.key === 'ArrowLeft' || e.key === 'PageUp'){ e.preventDefault(); navByKey(1); }
+});
+$('navPrevBtn').addEventListener('click', () => navByKey(1));
+$('navNextBtn').addEventListener('click', () => navByKey(-1));
 
 /* ── 최상단 풀다운 시 하단바까지 딸려 내려가던 증상 — CSS(html,body 잠금)로는 실기기에서
    재현이 계속돼(2026-09-05), touchmove를 직접 가로채는 더 확실한 방식으로 바꿨다.
