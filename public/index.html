@@ -1400,8 +1400,13 @@ document.addEventListener('pointerdown', (e) => {
 async function doArchive(){
   const c = studyCards[studyIdx]; if (!c) return;
   const wasTrashed = c.trashed;
-  c.known = true; c.archived = true; c.trashed = false;
-  const entry = currentSubEntry(c.key); if (entry) { entry.known = true; entry.archived = true; entry.trashed = false; }
+  // 보관이 known을 강제로 true로 만들기 「직전」의 값을 카드에 남겨둔다 — 나중에 보관을
+  // 취소했을 때 원래 미확인이던 카드까지 확인함으로 남는 걸 막기 위해(undoFlag 참조,
+  // 2026-09-07 "e를 토글하면 원래 체크가 아니였는데 archive↔check로 토글됨" 피드백).
+  const wasKnown = c.known;
+  c.known = true; c.archived = true; c.trashed = false; c._preKnown = wasKnown;
+  const entry = currentSubEntry(c.key);
+  if (entry) { entry.known = true; entry.archived = true; entry.trashed = false; entry._preKnown = wasKnown; }
   toast('Archived — won\'t show again');
   // "전체보기"에선 방금 보관한 카드도 배지(학사모)를 단 채 그 자리에 계속 보인다 — 사용자
   // 요청("휴지통 처리를 하면 휴지통에도 있어야 하고 현재 챕터에도 있어야") 반영.
@@ -1422,11 +1427,12 @@ async function doTrash(){
 }
 /* 보관·휴지통 취소 → 복구. 두 진입점이 이걸 공유한다:
    ⓐ 제목 옆 배지 탭(라운드16 후속3) ⓑ 하단 버튼이 켜져 있을 때 다시 탭(라운드17).
-   ⚠ `known`은 서버 정책대로 안 건드리지만(KV known 유지 → 앱에선 "확인함" 초록 배지),
-   서버 unflagAndReset()은 Notion을 '미확인'으로 되돌린다 — 즉 복구된 카드는 앱에선
-   "확인함", Notion에선 "미확인"으로 어긋난 채 남는다. 라운드12에 보관/휴지통 복구를
-   만들 때부터 있던 기존 정책이고(known을 되돌리는 길은 시험 채점뿐이라는 원칙),
-   라운드17 self-review에서 이 불일치를 확인만 하고 정책은 그대로 뒀다. */
+   ⚠ (2026-09-07 수정) 예전엔 known을 안 건드려 보관 복구 후 원래 미확인이던 카드까지
+   "확인함"으로 남았다(라운드17에 발견만 하고 방치했던 불일치, 왼손 단축키로 E를 빠르게
+   토글하다 실사용 피드백으로 재확인) — 이제 doArchive()가 남겨둔 `_preKnown`으로 그
+   자리에서 되돌리고, 서버 응답(`knownNow`, 새로고침 등으로 `_preKnown`이 없던 경우까지
+   커버)이 오면 한 번 더 정확한 값으로 맞춘다. 트래시는 known을 애초에 안 건드리므로
+   이 보정이 필요 없다(unflagAndReset 서버 주석 참조). */
 async function undoFlag(kind){
   if (reviewMode) return;
   const c = studyCards[studyIdx]; if (!c) return;
@@ -1435,10 +1441,18 @@ async function undoFlag(kind){
     c.trashed = false; if (entry) entry.trashed = false;
   } else {
     c.archived = false; if (entry) entry.archived = false;
+    if (!c._preKnown){ c.known = false; if (entry) entry.known = false; }
   }
   toast('Restored');
   refreshCardState(c);
-  queueFlagApi(() => (kind === 'trash' ? apiTrashRestore(c.key, c.id) : apiArchiveRestore(c.key, c.id)));
+  const key = c.key, id = c.id;
+  queueFlagApi(() => (kind === 'trash' ? apiTrashRestore(key, id) : apiArchiveRestore(key, id)).then((res) => {
+    if (kind === 'archive' && res && typeof res.knownNow === 'boolean' && res.knownNow !== c.known){
+      c.known = res.knownNow;
+      const e2 = currentSubEntry(key); if (e2) e2.known = res.knownNow;
+      if (studyCards[studyIdx] === c) refreshCardState(c);
+    }
+  }));
 }
 // 하단 버튼은 켜져 있으면(=지금 카드가 그 상태면) 취소, 아니면 설정 — 같은 자리에서
 // 토글된다(2026-09-06 라운드17 사용자 요청).
@@ -1668,8 +1682,15 @@ $('resetConfirmBtn').addEventListener('click', () => {
       if (st === 'unknown') continue;
       try {
         if (st === 'known') await apiAnswer(sub, c.key, false, c.id);
-        else if (st === 'archive') await apiArchiveRestore(c.key, c.id);
-        else if (st === 'trash') await apiTrashRestore(c.key, c.id);
+        else if (st === 'archive' || st === 'trash'){
+          // (2026-09-07) unflagAndReset이 이제 보관/휴지통 「직전」 known값(preKnown)으로
+          // 되돌린다(undoFlag 참조) — 그 카드가 원래도 known이었다면 여기서 안 지워진다.
+          // "초기화"는 개별 복구와 달리 전부 비우는 게 목적이라 뒤이어 명시적으로
+          // false를 한 번 더 강제한다(살짝 텀을 둬 Notion 3req/s를 두 배로 안 넘기게).
+          await (st === 'archive' ? apiArchiveRestore(c.key, c.id) : apiTrashRestore(c.key, c.id));
+          await new Promise((r) => setTimeout(r, 120));
+          await apiAnswer(sub, c.key, false, c.id);
+        }
       } catch (e) { /* 로컬은 이미 리셋됨 — Notion 실패해도 판정 자체는 막지 않음(기존 정책) */ }
       await new Promise((r) => setTimeout(r, 350)); // Notion 3req/s 배려(gap()과 같은 간격)
     }

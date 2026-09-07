@@ -52,10 +52,15 @@ const K_INDEX = 'index:v2';
 const K_BUCKET = 'bucket:v2:'; // + 번호
 const K_KNOWN = 'known:v1';    // { [cardKey]: true } — 안다로 판정된 카드만 기록(모른다=부재)
 const K_BEST = 'best:v1';      // { sub:{ [subId]: n }, chap:{ [chapId]: n } } — 최고기록(단조증가)
-const K_ARCHIVED = 'archived:v1'; // { [cardKey]: true } — "완전히 안다, 더 안 봐도 됨". 전체보기·시험
-                                   // 로테이션에서만 빠진다 — known/총량 점수는 안 건드린다(순수 가시성 플래그).
-const K_TRASHED = 'trashed:v1';   // { [cardKey]: true } — 로컬 소프트 삭제. 휴지통 화면에서 "진짜 삭제"를
-                                   // 눌러야 그때 Notion 페이지를 archived로 전환한다(그 전까진 원본 안전).
+// 값이 { preKnown } 객체다(2026-09-07부터 — 이전엔 단순 true. 코드에서 항상 진위값으로만
+// 읽어(!!archived[key] 등) 안전하게 마이그레이션됨). preKnown = 보관/휴지통으로 보내기
+// "직전"의 known 상태 — 복구할 때 known·Notion 상태를 여기로 되돌리기 위해 저장한다
+// ("archive 취소하면 원래 미확인이었는데 확인함으로 남는다"는 실사용 피드백으로 도입,
+// unflagAndReset() 참조).
+const K_ARCHIVED = 'archived:v1'; // { [cardKey]: {preKnown} } — "완전히 안다, 더 안 봐도 됨". 전체보기·
+                                   // 시험 로테이션에서만 빠진다 — known/총량 점수는 안 건드린다(순수 가시성 플래그).
+const K_TRASHED = 'trashed:v1';   // { [cardKey]: {preKnown} } — 로컬 소프트 삭제. 휴지통 화면에서 "진짜
+                                   // 삭제"를 눌러야 그때 Notion 페이지를 archived로 전환한다(그 전까진 원본 안전).
 const K_REVIEW_SCHEMA = 'reviewSchema:v1'; // { prop: string|null } — '복습 상태' 컬럼 이름 캐시(2026-09-06).
                                    // 하드코딩 대신 옵션 내용(확인함/완전히 앎/휴지통)으로 찾는다 — 컬럼명이
                                    // 또 바뀌면 `wrangler kv key delete reviewSchema:v1 --remote`로 지우면
@@ -838,7 +843,8 @@ async function handleArchive(env, token, dbId, body) {
     env.KV.get(K_KNOWN).then((v) => JSON.parse(v || '{}')),
     env.KV.get(K_ARCHIVED).then((v) => JSON.parse(v || '{}')),
   ]);
-  known[key] = true; archived[key] = true;
+  const preKnown = !!known[key]; // 보관이 known을 강제로 세우기 전 원래 값 — 복구용으로 저장
+  known[key] = true; archived[key] = { preKnown };
   await Promise.all([env.KV.put(K_KNOWN, JSON.stringify(known)), env.KV.put(K_ARCHIVED, JSON.stringify(archived))]);
   const notionOk = await writeReviewStatus(env, token, dbId, pageId, '완전히 앎');
   return json({ ok: true, notionOk });
@@ -849,8 +855,13 @@ async function handleArchive(env, token, dbId, body) {
 async function handleTrash(env, token, dbId, body) {
   const { key, pageId } = body || {};
   if (!key) return json({ error: 'key required' }, 400);
-  const trashed = JSON.parse((await env.KV.get(K_TRASHED)) || '{}');
-  trashed[key] = true;
+  const [known, trashed] = await Promise.all([
+    env.KV.get(K_KNOWN).then((v) => JSON.parse(v || '{}')),
+    env.KV.get(K_TRASHED).then((v) => JSON.parse(v || '{}')),
+  ]);
+  // 휴지통은 known을 안 건드리지만(그대로 유지), 그 known값을 여기 저장해둬야 복구
+  // 시 Notion을 그 당시 실제 상태('확인함'/'미확인')로 되돌릴 수 있다(unflagAndReset 참조).
+  trashed[key] = { preKnown: !!known[key] };
   await env.KV.put(K_TRASHED, JSON.stringify(trashed));
   const notionOk = await writeReviewStatus(env, token, dbId, pageId, '휴지통');
   return json({ ok: true, notionOk });
@@ -889,14 +900,31 @@ async function listFlaggedFull(env, flagKey) {
   }
   return items.map((it) => ({ ...(byId.get(it.id) || {}), id: it.id, key: it.key, front: it.front, url: it.url, created: it.created }));
 }
+// ⚠ (2026-09-07 이전 역사) 예전엔 복구 시 무조건 Notion을 '미확인'으로 되돌렸다 — 보관이
+// known을 강제로 true로 세우는 것(handleArchive)과 맞물려, 원래 이미 '확인함'이던 카드를
+// 보관했다가 복구하면 KV known은 true로 남는데 Notion만 '미확인'이 되는 불일치가 있었다
+// (실사용 피드백: "e를 토글하면 원래 체크가 아니였는데 archive↔check로 토글됨" — 정확히는
+// 그 반대 방향도 마찬가지였다는 뜻). 이제 handleArchive/handleTrash가 보내기 "직전"의
+// known값(preKnown)을 같이 저장해두므로, 복구는 그 값으로 정확히 되돌린다.
 async function unflagAndReset(env, token, dbId, flagKey, key, pageId) {
   const flagged = JSON.parse((await env.KV.get(flagKey)) || '{}');
+  const meta = flagged[key];
   delete flagged[key];
   await env.KV.put(flagKey, JSON.stringify(flagged));
-  // 보관/휴지통을 보낼 때 각각 '완전히 앎'/'휴지통'을 썼으니 복구할 때도 되돌려야 한다
-  // (2026-09-06 라운드12에서 트래시 쪽만 새로 쓰고 이 대칭을 놓쳤던 것을 실기기 피드백으로
-  // 발견·수정 — 보관 쪽 복구 기능을 새로 추가하면서 처음부터 대칭을 맞춘다).
-  return writeReviewStatus(env, token, dbId, pageId, '미확인');
+
+  // 과거(이 수정 이전)에 보관·휴지통으로 보낸 카드는 meta가 단순 true라 preKnown 정보가
+  // 없다 — false로 취급(예전과 동일하게 '미확인'으로 복구, 하위호환).
+  const preKnown = meta && typeof meta === 'object' ? !!meta.preKnown : false;
+  let knownNow = preKnown;
+  if (flagKey === K_ARCHIVED && !preKnown) {
+    // 보관이 known을 강제로 true로 세웠던 경우(preKnown===false)만 되돌린다 — 원래도
+    // known이던 카드는 K_KNOWN을 안 건드려도 이미 true라 손댈 필요가 없다.
+    const known = JSON.parse((await env.KV.get(K_KNOWN)) || '{}');
+    delete known[key];
+    await env.KV.put(K_KNOWN, JSON.stringify(known));
+  }
+  const notionOk = await writeReviewStatus(env, token, dbId, pageId, knownNow ? '확인함' : '미확인');
+  return { notionOk, knownNow };
 }
 
 async function handleTrashList(env, full) { return json({ items: await (full ? listFlaggedFull(env, K_TRASHED) : listFlagged(env, K_TRASHED)) }); }
@@ -905,18 +933,19 @@ async function handleArchiveList(env, full) { return json({ items: await (full ?
 async function handleTrashRestore(env, token, dbId, body) {
   const { key, pageId } = body || {};
   if (!key) return json({ error: 'key required' }, 400);
-  const notionOk = await unflagAndReset(env, token, dbId, K_TRASHED, key, pageId);
-  return json({ ok: true, notionOk });
+  const { notionOk, knownNow } = await unflagAndReset(env, token, dbId, K_TRASHED, key, pageId);
+  return json({ ok: true, notionOk, knownNow });
 }
 // 보관("완전히 앎")도 휴지통과 같은 방식으로 복구 가능하게 한다(2026-09-06, 사용자 요청 —
-// 롱프레스로 보관을 잘못 누르거나 마음이 바뀌었을 때 되돌릴 길이 없었다). known 플래그는
-// 안 건드린다 — 이 앱엔 known을 다시 false로 되돌리는 길이 시험 채점(handleAnswer)뿐이고,
-// 보관 복구는 "다시 로테이션에 보이게" 이상의 의미를 갖지 않는다(트래시 복구와 동일 원칙).
+// 롱프레스로 보관을 잘못 누르거나 마음이 바뀌었을 때 되돌릴 길이 없었다). ⚠ (2026-09-07
+// 수정) "known을 안 건드린다"는 예전 원칙은 known이 강제로 세워진 경우까지 포함해
+// 되돌리지 않아 불일치를 낳았다 — 이제 unflagAndReset()이 preKnown 기준으로 필요할
+// 때만 되돌린다(위 주석 참조).
 async function handleArchiveRestore(env, token, dbId, body) {
   const { key, pageId } = body || {};
   if (!key) return json({ error: 'key required' }, 400);
-  const notionOk = await unflagAndReset(env, token, dbId, K_ARCHIVED, key, pageId);
-  return json({ ok: true, notionOk });
+  const { notionOk, knownNow } = await unflagAndReset(env, token, dbId, K_ARCHIVED, key, pageId);
+  return json({ ok: true, notionOk, knownNow });
 }
 
 // 보관("완전히 앎") 카드뷰 롱프레스 → 바로 휴지통으로(2026-09-06, 사용자 요청 — "완전히
@@ -929,8 +958,13 @@ async function handleArchiveToTrash(env, token, dbId, body) {
     env.KV.get(K_ARCHIVED).then((v) => JSON.parse(v || '{}')),
     env.KV.get(K_TRASHED).then((v) => JSON.parse(v || '{}')),
   ]);
+  // 보관이 기록해둔 preKnown을 이어받는다 — 여기서 새 값(true 등)으로 덮으면 나중에
+  // 휴지통에서 복구할 때 "보관 전 원래 known"을 잊어버린다(과거 데이터라 meta가 단순
+  // true면 preKnown 정보가 없다는 뜻 그대로 false로 넘긴다, unflagAndReset과 동일 규칙).
+  const meta = archived[key];
+  const preKnown = meta && typeof meta === 'object' ? !!meta.preKnown : false;
   delete archived[key];
-  trashed[key] = true;
+  trashed[key] = { preKnown };
   await Promise.all([env.KV.put(K_ARCHIVED, JSON.stringify(archived)), env.KV.put(K_TRASHED, JSON.stringify(trashed))]);
   const notionOk = await writeReviewStatus(env, token, dbId, pageId, '휴지통');
   return json({ ok: true, notionOk });
