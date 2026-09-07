@@ -63,7 +63,7 @@ const K_REVIEW_SCHEMA = 'reviewSchema:v1'; // { prop: string|null } — '복습 
                                    // 실패해도 notionOk:false로 드러날 뿐 로컬 판정은 안 막힌다).
 
 const BUCKET_SIZE = 50;             // ⚠ 카드별 개별 KV 저장은 불가 — 무료 쓰기 1,000회/일에 걸린다
-const PARSER_VERSION = 6;           // 포맷을 바꾸면 올릴 것 — 증분 로직이 옛 포맷을 재사용하지 않게
+const PARSER_VERSION = 7;           // 포맷을 바꾸면 올릴 것 — 증분 로직이 옛 포맷을 재사용하지 않게
                                      // (v3, 2026-09-05: 블록에 원본 block.id 추가 — 형광펜 토글을
                                      //  Notion에 되쓰려면 필요 / v4, 같은 날: image 블록 지원 추가 —
                                      //  v5, 같은 날: splitBody()가 image 블록을 "텍스트 없음"으로
@@ -301,7 +301,11 @@ const LATIN = /[A-Za-z]{2,}/;
 function splitBody(blocks) {
   // ⚠ image 블록은 .rich가 없어 plainOf()가 항상 ''를 반환 — 텍스트 유무로만 거르면
   // 사진만 있는 카드(초창기 수동 메모)가 통째로 사라진다(2026-09-05 실기기 피드백으로 발견).
-  let body = blocks.filter((b) => b && (b.type === 'image' || plainOf(b).trim()));
+  // ⚠ 텍스트가 없다고 버리면 안 되는 블록들 — image(사진만 있는 옛 카드), divider(구분선),
+  // table(셀 안에만 텍스트가 있어 plainOf가 잡긴 하지만 명시해 둔다). 2026-09-07: divider가
+  // 이 필터에 걸려 최상위 구분선이 통째로 사라지고 있었다.
+  const STRUCT = { image: 1, divider: 1, table: 1 };
+  let body = blocks.filter((b) => b && (STRUCT[b.type] || plainOf(b).trim()));
   let context = null;
 
   const first = body[0] ? plainOf(body[0]) : '';
@@ -311,11 +315,17 @@ function splitBody(blocks) {
   // 힌트는 짧은 한 줄이어야 한다. 긴 해설 문단이 먼저 걸리는 카드가 있어 120자 이하 우선.
   const cand = [];
   for (let i = 0; i < Math.min(4, body.length); i++) {
+    if (STRUCT[body[i].type]) continue; // 표·구분선·이미지는 힌트 후보가 아니다
     const t = plainOf(body[i]);
     if (HANGUL.test(t) && LATIN.test(t)) cand.push(i);
   }
   const hi = cand.find((i) => plainOf(body[i]).length <= 120) ?? cand[0] ?? null;
-  return { context, hint: hi === null ? null : body[hi], detail: hi === null ? body : body.slice(hi + 1) };
+  // ⚠ 힌트 「앞」 블록을 pre로 따로 돌려준다. v6까지는 detail = body.slice(hi+1)이라
+  // 힌트보다 앞에 있던 표·제목줄이 통째로 버려졌다(2026-09-07 실기기 지적 — '요약'
+  // 헤딩과 비교표가 앱에서만 사라져 보임). 화면 순서는 노션 원본 그대로 pre → hint →
+  // detail(사용자 결정).
+  if (hi === null) return { context, pre: [], hint: null, detail: body };
+  return { context, pre: body.slice(0, hi), hint: body[hi], detail: body.slice(hi + 1) };
 }
 
 // ⚠ pageId를 학습이력 키로 쓰지 말 것. 크롬 확장의 재저장이 "새 페이지 + 옛것 archive"라
@@ -430,10 +440,10 @@ async function syncStep(env, token, dbId) {
         let blocks = [];
         try { blocks = await pageBlocks(token, row.id, budget); }
         catch (e) { if (e instanceof BudgetOut) break; /* 본문 없는 행은 앞면만 */ }
-        const { context, hint, detail } = splitBody(blocks);
+        const { context, pre, hint, detail } = splitBody(blocks);
         card = {
           id: row.id, key: cardKey(row.front), front: row.front,
-          context, hint, detail, url: row.url, created: row.created,
+          context, pre, hint, detail, url: row.url, created: row.created,
           fetchedAt: new Date().toISOString(), parserVersion: PARSER_VERSION,
         };
       } else {
@@ -1003,7 +1013,7 @@ async function handleRetitle(env, token, body) {
 // 여부를 뒤집고, KV(버킷)와 Notion 블록(진짜 원본, 미러 아님) 양쪽에 반영한다.
 async function handleHighlight(env, token, body) {
   const { pageId, field, blockIndex, start, end } = body || {};
-  if (!pageId || (field !== 'hint' && field !== 'detail') || typeof start !== 'number' || typeof end !== 'number' || start >= end) {
+  if (!pageId || (field !== 'hint' && field !== 'detail' && field !== 'pre') || typeof start !== 'number' || typeof end !== 'number' || start >= end) {
     return json({ error: 'pageId/field/start/end required' }, 400);
   }
   const idxRaw = await env.KV.get(K_INDEX);
@@ -1017,7 +1027,7 @@ async function handleHighlight(env, token, body) {
   const card = bucket.cards.find((c) => c.id === pageId);
   if (!card) return json({ error: 'not found' }, 404);
 
-  const block = field === 'hint' ? card.hint : card.detail?.[blockIndex];
+  const block = field === 'hint' ? card.hint : (field === 'pre' ? card.pre?.[blockIndex] : card.detail?.[blockIndex]);
   if (!block || !Array.isArray(block.rich)) return json({ error: 'This block does not support highlighting' }, 400);
 
   block.rich = toggleCodeInRich(block.rich, start, end);

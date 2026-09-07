@@ -767,6 +767,7 @@ function warmImages(c){
   if (!c) return;
   const blocks = [];
   if (c.hint && c.hint.type === 'image') blocks.push(c.hint);
+  if (Array.isArray(c.pre)) c.pre.forEach((b) => { if (b && b.type === 'image') blocks.push(b); });
   if (Array.isArray(c.detail)) c.detail.forEach((b) => { if (b && b.type === 'image') blocks.push(b); });
   blocks.forEach((b) => {
     const src = imageSrc(b);
@@ -803,7 +804,7 @@ function blockHtml(b, i){
     default: return b.rich ? '<p' + blk + '>' + richHtml(b.rich) + childrenHtml(b) + '</p>' : '';
   }
 }
-function blocksHtml(blocks, blkOverride){
+function blocksHtml(blocks, blkOverride, prefix){
   let html = '', open = null;
   (blocks || []).forEach((b, i) => {
     const isLi = b.type === 'bulleted_list_item' || b.type === 'numbered_list_item';
@@ -811,7 +812,7 @@ function blocksHtml(blocks, blkOverride){
     if (isLi){
       if (open !== tag){ if (open) html += '</' + open + '>'; html += '<' + tag + '>'; open = tag; }
     } else if (open){ html += '</' + open + '>'; open = null; }
-    html += blockHtml(b, blkOverride === undefined ? i : blkOverride);
+    html += blockHtml(b, blkOverride === undefined ? (prefix || '') + i : blkOverride);
   });
   if (open) html += '</' + open + '>';
   return html;
@@ -822,6 +823,13 @@ function hintHtml(c){
   if (c.hint.type === 'image') return null; // 힌트 자리엔 텍스트만(이미지면 detail 쪽에서 그림)
   return richHtml(c.hint.rich || []);
 }
+// 힌트보다 「앞」에 있던 블록(표·제목줄 등, 서버 PARSER_VERSION 7부터). data-blk는
+// 'p0','p1'…로 찍어 detail의 숫자 인덱스와 안 겹치게 한다 — 형광펜은 서버에
+// field:'pre'로 보낸다.
+function preHtml(c){
+  if (!c.pre || !c.pre.length) return '';
+  return blocksHtml(c.pre, undefined, 'p');
+}
 function detailHtml(c){
   if (!c.detail || !c.detail.length) return '';
   if (typeof c.detail[0] === 'string') return c.detail.map((t) => '<p>' + escBr(t) + '</p>').join('');
@@ -830,14 +838,14 @@ function detailHtml(c){
 function cardBodyHtml(c){
   const h = hintHtml(c);
   const hintIsImage = c.hint && c.hint.type === 'image';
-  return (hintIsImage ? imageHtml(c.hint) : '') + (h ? '<p class="lhint" data-blk="hint">' + h + '</p>' : '') + detailHtml(c)
+  return preHtml(c) + (hintIsImage ? imageHtml(c.hint) : '') + (h ? '<p class="lhint" data-blk="hint">' + h + '</p>' : '') + detailHtml(c)
     + (c.url ? '<a class="src" href="' + esc(c.url) + '" target="_blank" rel="noopener">Original video &#8599;</a>' : '');
 }
 function peekBodyHtml(c){
   if (!c) return '';
   const h = hintHtml(c);
   const hintIsImage = c.hint && c.hint.type === 'image';
-  return (hintIsImage ? imageHtml(c.hint) : '') + (h ? '<p class="lhint">' + h + '</p>' : '') + detailHtml(c);
+  return preHtml(c) + (hintIsImage ? imageHtml(c.hint) : '') + (h ? '<p class="lhint">' + h + '</p>' : '') + detailHtml(c);
 }
 
 /* ── 토스트 ── */
@@ -1024,7 +1032,7 @@ function getHighlightTarget(){
   const startBlk = findBlockEl(range.startContainer), endBlk = findBlockEl(range.endContainer);
   if (!startBlk || !endBlk || startBlk !== endBlk) return null;
   const blk = startBlk.dataset.blk;
-  if (blk !== 'hint' && !/^\d+$/.test(blk)) return null; // 중첩 예문 블록 — 형광펜 미지원(위 childrenHtml 주석 참조)
+  if (blk !== 'hint' && !/^p?\d+$/.test(blk)) return null; // 중첩 예문 블록 — 형광펜 미지원(위 childrenHtml 주석 참조)
   const start = plainOffsetInBlock(startBlk, range.startContainer, range.startOffset);
   const end = plainOffsetInBlock(startBlk, range.endContainer, range.endOffset);
   if (start == null || end == null || start >= end) return null;
@@ -1038,8 +1046,8 @@ function getHighlightTarget(){
 function doHighlight(blk, start, end){
   const card = currentCardForHighlight();
   if (!card) return;
-  const field = blk === 'hint' ? 'hint' : 'detail';
-  const blockIndex = blk === 'hint' ? null : Number(blk);
+  const field = blk === 'hint' ? 'hint' : (blk[0] === 'p' ? 'pre' : 'detail');
+  const blockIndex = blk === 'hint' ? null : Number(blk[0] === 'p' ? blk.slice(1) : blk);
   apiHighlight(card.id, field, blockIndex, start, end).catch(() => null).then((res) => {
     if (res && res.ok){
       Object.assign(card, res.card);
