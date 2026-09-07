@@ -119,6 +119,56 @@ AskUserQuestion으로 두 결정(확장 범위·단축키 스킴) 확인 → 승
 **남은 것**: 실기기에서 형광펜 토글 재확인, archive↔known 불일치 정책을 고칠지 결정
 (사용자 확인 대기).
 
+### 라운드27 후속2 — archive↔known 불일치 정책 수정 (같은 날, 사용자가 "지금 고치기" 선택)
+
+`Version ID 9e051f41-8ccc-4452-8da7-6d547d1e52c0` 배포. 재동기화 불요(로직만, 데이터
+스키마는 자연 마이그레이션 — 아래 참조).
+
+- **핵심 아이디어 — 보관/휴지통으로 보내기 "직전"의 known값(`preKnown`)을 같이
+  저장해뒀다가, 복구할 때 그 값으로 되돌린다.** `doArchive()`가 진행률 분자 보존을
+  위해 known을 항상 true로 세우는 것(라운드18 의도, 그대로 유지)과, 그걸 취소했을 때
+  "원래 어떤 상태였는지 기억이 없어" known이 true로 눌어붙는 문제(라운드17에 발견만
+  하고 방치)를 이 한 줄로 같이 푼다.
+- **`K_ARCHIVED`/`K_TRASHED` KV의 값 shape을 `true` → `{preKnown}` 객체로 바꿨다.**
+  기존 코드는 이 맵을 전부 `!!archived[key]`류 진위값으로만 읽어(전수 grep으로 확인)
+  객체로 바뀌어도 안전 — 마이그레이션 스크립트 불필요. 과거(이 수정 이전)에 이미
+  보관·휴지통으로 보낸 카드는 값이 단순 `true`라 `preKnown` 정보가 없다 — `false`로
+  취급해 예전과 동일하게 '미확인'으로 복구(하위호환).
+- **`handleArchive`/`handleTrash`가 보내는 순간의 known을 캡처, `handleArchiveToTrash`
+  (보관→휴지통 이동)는 그 메타를 이어받아 전달, `unflagAndReset`(공용 복구 함수)이
+  `preKnown`으로 known KV 삭제 여부·Notion 목표 상태('확인함'/'미확인')를 결정.**
+  복구 응답에 `knownNow`를 새로 실어 클라이언트가 낙관적 추정이 틀렸을 때(새로고침 뒤라
+  카드에 `_preKnown`이 없는 경우 등) 한 번 더 정확히 맞추게 했다.
+- **클라이언트 — `doArchive()`가 보관 직전 known값을 카드에 `_preKnown`으로 남기고,
+  `undoFlag('archive')`가 그 자리에서 낙관적으로 되돌린 뒤 서버 응답(`knownNow`)으로
+  재확인.** 트래시는 known을 애초에 안 건드리므로 이 낙관적 보정이 필요 없다(서버
+  Notion 상태만 정확해지면 됨).
+- **소챕터 초기화(`resetConfirmBtn`) 후속 조치 — 보관/휴지통이던 카드를 복구한 뒤
+  known:false를 한 번 더 명시적으로 강제.** 위 수정으로 `apiArchiveRestore`/
+  `apiTrashRestore`가 이제 원래 known이던 카드는 known을 안 지우게 됐는데, "초기화"는
+  개별 복구와 달리 무조건 전부 비우는 게 목적이라 그대로 두면 회귀였다 — 발견해서
+  같이 고침(Notion 3req/s 부담 완화로 두 호출 사이 120ms 텀 추가).
+- ⚠ **이 PC 로컬 `wrangler dev`에 `NOTION_TOKEN`이 없어(`.dev.vars` 미설정) 실제 Notion
+  카드로는 검증 못 함.** 대신 `wrangler kv key put --local`로 `known:v1`을 직접
+  조작해 "원래 미확인"/"원래 확인함" 두 전제조건을 만든 뒤 실제 `/api/archive`,
+  `/api/archive/restore`, `/api/archive/totrash` 엔드포인트를 호출해 `preKnown`
+  전파·`knownNow` 응답을 확인, 브라우저에서 `doArchive`/`undoFlag`를 실제로 호출해
+  `_preKnown` 기록과 낙관적 보정을 확인. ⚠ 첫 시도(archive→restore 왕복으로 "이미
+  known인 카드"를 만들려 함)는 실패했다 — 왕복 자체가 원래 값(false)으로 정확히
+  되돌아가 버려서다(수정이 의도대로 동작한다는 방증이기도 함) — `wrangler kv key put`
+  으로 직접 known:v1을 세팅해야 진짜 "이미 확인함" 전제를 만들 수 있었다.
+
+✓ **검증 상태 — 프록시검증(로컬 wrangler dev + 합성 KV 데이터).** 서버: preKnown=false
+카드 복구 → `knownNow:false`(버그 수정 확인), preKnown=true 카드 복구 →
+`knownNow:true`(원래도 확인함이던 카드 보존 확인), archive→totrash→trash restore로
+메타 전파까지 확인. 클라이언트: 두 케이스 모두 `doArchive`/`undoFlag` 호출 후
+`c.known`이 올바른 값으로 수렴하는 것 확인. **실기기 확인 대기** — 실제 Notion 카드로
+왕복(특히 Notion 쪽 '확인함'/'미확인' 값이 실제로 맞게 반영되는지)은 다음 세션 또는
+사용자가 직접 확인.
+
+**남은 것**: 실기기에서 실제 카드로 보관→취소 왕복 확인(원래 미확인/확인함 두 경우
+다), 소챕터 초기화 기능도 같이 재확인.
+
 ## 현재 상태 (2026-09-07 라운드26 — 형광펜 끊김·노션 회색·표/구분선 유실·카드 순서 수정) — 위 라운드27 다음으로 읽을 것
 
 `Version ID 8cd66426-5325-49d4-b92d-2cb5a7b16764` 배포. `PARSER_VERSION` 6→7,
