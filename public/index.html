@@ -268,6 +268,16 @@
   .lgroup.open .lgrouphead .lgcar{transform:rotate(90deg)}
   .lgroup .lgbody{display:none;padding:2px 0 4px}
   .lgroup.open .lgbody{display:block}
+  /* 소챕터 폴더 헤더의 시험 버튼(2026-09-08) — subExamBtn(좌상단, 지금 보는 소챕터 전용)과
+     같은 과녁 아이콘을 재사용해 "이 아이콘=소챕터 10문제 시험"이라는 뜻을 그대로 물려받는다.
+     챕터 행의 텍스트 버튼("Full quiz", 100문제)과 시각적으로도 자연히 구분됨. */
+  .lgquiz{
+    width:24px;height:24px;border-radius:50%;border:0;cursor:pointer;flex:none;
+    background:var(--ink4);color:var(--muted);display:flex;align-items:center;justify-content:center;
+    -webkit-touch-callout:none;
+  }
+  .lgquiz svg{width:13px;height:13px;stroke:currentColor}
+  .lgquiz:active{transform:scale(.9)}
 
   /* 2026-09-06 라운드18: 챕터 완주 넛지 배너(.chapnudge) 폐기 — 시험 진입은 챕터 시트의
      종합시험 행이 상시로 맡는다(사용자 요청: "제안하지 말고 그냥 챕터행을 하나 더"). */
@@ -376,6 +386,12 @@
     position:fixed;left:50%;top:50%;right:auto;bottom:auto;transform:translate(-50%,-50%);
     width:min(440px,86vw);background:color-mix(in srgb,var(--ink2) 90%,transparent);
     gap:22px;padding:20px 18px;
+  }
+  /* fontPop과 같은 이유로 화면 중앙 고정 — 제목(화면 최상단)에 바로 붙이면 좁은 화면에서
+     손가락에 가려진다. ID 선택자라 .knowpop(하단 고정)보다 우선순위가 높다. */
+  #titleEditPop{
+    position:fixed;left:50%;top:42%;right:auto;bottom:auto;transform:translate(-50%,-50%);
+    width:min(260px,78vw);
   }
 
   /* ── 제목 롱프레스 → 그 자리에서 바로 편집 — 메뉴·입력창 팝업 둘 다 폐기했다
@@ -585,6 +601,15 @@
          평소 보관/휴지통 갈림길은 하단바 상시 버튼으로 옮겨 이 팝업 자체가 필요 없어짐). -->
     <div class="knowpop" id="knowPop" hidden>
       <button class="trash" id="reviewDeleteBtn">🗑 Delete permanently (cannot undo)</button>
+    </div>
+
+    <!-- 제목 롱프레스 → 붙여넣기 즉시적용 / 직접수정 갈림길(2026-09-08 사용자 요청).
+         예문을 복사해 그대로 제목으로 쓰는 경우와, 타이핑하거나 붙여넣은 뒤 한두 글자
+         다듬는 경우가 둘 다 잦다는 실사용 피드백 — 붙여넣기 즉시 저장(입력창 없이 한
+         번에 끝남)과 기존 인라인 입력창 편집(자유롭게 고친 뒤 확정)을 분리했다. -->
+    <div class="knowpop" id="titleEditPop" hidden>
+      <button id="titlePasteBtn">Paste &amp; apply</button>
+      <button id="titleManualBtn">Edit manually</button>
     </div>
 
     <!-- n/전체 칩 롱프레스 — 소챕터 전체 초기화 확인(2026-09-06 라운드19, 사용자 요청).
@@ -902,7 +927,7 @@ async function apiHighlight(pageId, field, blockIndex, start, end){
    메뉴의 "유튜브 링크" 항목도 따로 필요 없다(2026-09-05 사용자 요청). */
 let retitleCtx = null;
 function setRetitleContext(getCard){ retitleCtx = { getCard }; }
-function clearRetitleContext(){ retitleCtx = null; cancelTitleEdit(); }
+function clearRetitleContext(){ retitleCtx = null; cancelTitleEdit(); hideTitleEditPop(); }
 
 let titleEditing = false;
 function beginTitleEdit(){
@@ -925,11 +950,10 @@ function cancelTitleEdit(){
 // 읽기/쓰기가 순차로 쌓여 2초 가까이 걸리는데, 그동안 화면이 안 바뀌어 "안 바뀐 줄"
 // 알았다는 게 실기기 피드백이었다. key는 서버가 정하는 정규화 규칙을 그대로 믿어야
 // 하므로 응답 오기 전까진 안 건드린다 — 그 사이 "안다" 등을 눌러도 옛 key로 정상 동작.
-function commitTitleEdit(){
-  if (!titleEditing) return;
+// 인라인 입력창 확정(commitTitleEdit)과 "붙여넣기 즉시적용"(titlePasteBtn) 둘 다 이
+// 저장 로직을 공유한다 — 후자는 입력창을 거치지 않고 텍스트를 바로 넘길 뿐 나머지는 동일.
+function applyTitleText(text){
   const card = retitleCtx && retitleCtx.getCard();
-  const text = $('cardTitleInput').value.trim();
-  cancelTitleEdit();
   if (!card || !text || text === card.front) return;
   const oldFront = card.front, oldKey = card.key;
   card.front = text;
@@ -942,6 +966,12 @@ function commitTitleEdit(){
     else { const el = $('examTitle'); if (el) el.textContent = oldFront; }
     toast('Title update failed');
   });
+}
+function commitTitleEdit(){
+  if (!titleEditing) return;
+  const text = $('cardTitleInput').value.trim();
+  cancelTitleEdit();
+  applyTitleText(text);
 }
 $('cardTitleInput').addEventListener('keydown', (e) => {
   if (e.key === 'Enter'){ e.preventDefault(); commitTitleEdit(); }
@@ -959,7 +989,7 @@ $('cardTitle').addEventListener('pointerdown', (e) => {
   // 핀치로 확대하는 도중 450ms 뒤에 편집 입력창이 끼어든다(2026-09-06 테스트로 발견).
   if (pinchPointers.size >= 1) return;
   titleLongPressed = false;
-  titlePressT = setTimeout(() => { titleLongPressed = true; beginTitleEdit(); }, 450);
+  titlePressT = setTimeout(() => { titleLongPressed = true; showTitleEditPop(); }, 450);
 });
 $('cardTitle').addEventListener('pointerup', () => clearTimeout(titlePressT));
 $('cardTitle').addEventListener('pointerleave', () => clearTimeout(titlePressT));
@@ -979,6 +1009,26 @@ $('cardTitle').addEventListener('click', (e) => {
   // 아무 일도 안 하게 막는다(2026-09-05 실기기 피드백).
   const card = retitleCtx && retitleCtx.getCard();
   if (!card || !card.url) e.preventDefault();
+});
+
+// 롱프레스 → 미니팝업(붙여넣기 즉시적용 / 직접수정) — 2026-09-08. "붙여넣으면 그 자리에서
+// 바로 저장"과 "타이핑하거나 붙여넣은 뒤 한두 글자 다듬기"가 둘 다 잦다는 실사용 피드백이라
+// 자동판별 대신 갈림길을 명시적으로 물어본다.
+function showTitleEditPop(){ $('titleEditPop').hidden = false; }
+function hideTitleEditPop(){ $('titleEditPop').hidden = true; }
+document.addEventListener('pointerdown', (e) => {
+  if (!$('titleEditPop').hidden && !e.target.closest('#titleEditPop') && e.target !== $('cardTitle')) hideTitleEditPop();
+});
+$('titleManualBtn').addEventListener('click', () => { hideTitleEditPop(); beginTitleEdit(); });
+$('titlePasteBtn').addEventListener('click', async () => {
+  hideTitleEditPop();
+  // iOS는 첫 호출 시 시스템 붙여넣기 허용 팝업을 띄울 수 있다(실기기 확인 필요) — 거절·
+  // 미지원이면 조용히 실패하지 말고 알려서 "직접수정"으로 대신 하게 유도한다.
+  let text = '';
+  try { text = (await navigator.clipboard.readText()).trim(); }
+  catch (e) { toast('Clipboard read failed — try Edit manually'); return; }
+  if (!text){ toast('Clipboard is empty'); return; }
+  applyTitleText(text);
 });
 
 /* ── 형광펜 모드 ── 켜면 유지되고, 그 뒤 드래그마다 자동으로 그 구간의 code(형광펜)를
@@ -1948,7 +1998,7 @@ function navByKey(dir){
 function isOverlayOpen(){
   return examMode || highlightMode || titleEditing || !lb.hidden ||
     !$('searchOv').hidden || !$('listOv').hidden || $('sheet').classList.contains('on') ||
-    !$('fontPop').hidden || !$('knowPop').hidden || !$('resetPop').hidden;
+    !$('fontPop').hidden || !$('knowPop').hidden || !$('resetPop').hidden || !$('titleEditPop').hidden;
 }
 // isOverlayOpen()에서 highlightMode만 뺀 버전(2026-09-07, 왼손 단축키 실사용 피드백으로
 // 수정) — highlightMode는 "형광펜 모드 on" 자체라 F 토글이 이 조건에 걸리면 껐다 켰다가
@@ -1961,7 +2011,7 @@ function isOverlayOpen(){
 function isModalOpen(){
   return examMode || titleEditing || !lb.hidden ||
     !$('searchOv').hidden || !$('listOv').hidden || $('sheet').classList.contains('on') ||
-    !$('fontPop').hidden || !$('knowPop').hidden || !$('resetPop').hidden;
+    !$('fontPop').hidden || !$('knowPop').hidden || !$('resetPop').hidden || !$('titleEditPop').hidden;
 }
 // 왼손 단축키(2026-09-07, 사용자 요청 — "오른손 마우스+왼손 키보드" 전제).
 // 화살표 키는 키보드 우측 하단이라 왼손 전용 조작엔 안 맞아 A/D를 홈로우에 추가로
@@ -2035,13 +2085,23 @@ $('examBack').addEventListener('click', exitExamMode);
 // 시험은 좌상단 전용 아이콘(subExamBtn)으로 옮김.
 $('subPosChip').addEventListener('click', () => { if (reviewMode) exitReviewMode(); else openSubchapterList(); });
 $('subExamBtn').addEventListener('click', () => { if (!reviewMode) enterSubchapterExam(); });
-async function enterSubchapterExam(){
-  // 이미 받아둔 subchapterAll을 그대로 쓴다 — 보관·휴지통 카드는 시험 문제 풀에서도 뺀다.
-  const pool = visibleCards(subchapterAll);
+function enterSubchapterExam(){ return enterSubchapterExamFor(subId()); }
+// 챕터 아코디언(openChapterList)의 소챕터 폴더 헤더에서 "지금 안 보고 있는" 소챕터도
+// 바로 시험을 시작할 수 있어야 해서(2026-09-08 사용자 요청) subId를 인자로 받게 일반화 —
+// enterChapterExam(cId)가 "지금 챕터"에 안 얽매이는 것과 같은 패턴. fetchSub()는 이미
+// 캐시·중복요청 방지를 갖고 있어 지금 보는 소챕터를 부르면 네트워크 없이 즉시 반환된다.
+async function enterSubchapterExamFor(sId){
+  const t = setTimeout(() => showLoading('Loading', 'Fetching quiz questions'), 250);
+  let cards;
+  try { cards = await fetchSub(sId); } catch (e) { cards = null; }
+  clearTimeout(t); hideLoading();
+  if (!cards){ toast('Load failed'); return; }
+  const pool = visibleCards(cards);
   if (!pool.length){ toast('No cards to test (all archived/trashed)'); return; }
+  const p = parseSubIdClient(sId);
   examScope = 'sub';
-  examCards = shuffle(pool.map((c) => ({ ...c, subId: subId() })));
-  startExam('Subchapter ' + (chapIdx + 1) + '-' + (subIdx + 1) + ' Quiz');
+  examCards = shuffle(pool.map((c) => ({ ...c, subId: sId })));
+  startExam('Subchapter ' + (p.chap + 1) + '-' + (p.sub + 1) + ' Quiz');
 }
 async function enterChapterExam(cId){
   const t = setTimeout(() => showLoading('Loading', 'Fetching all chapter questions'), 250);
@@ -2660,17 +2720,24 @@ function openSubchapterList(){
 }
 /* 챕터 목록(100장)은 소챕터 10개로 접어서 보여준다(2026-09-06 라운드18 사용자 요청).
    기본 전부 접힘 + 지금 보고 있는 소챕터만 펼침 — 100줄 스크롤 대신 "내 위치"부터 잡힌다. */
+const LGQUIZ_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.6" stroke="none" style="fill:var(--coral)"/></svg>';
 function renderGroupedPickList(el, groups, openId){
   el.innerHTML = groups.map((g) => {
     const done = g.items.filter((it) => it.status !== 'unknown').length;
     return '<div class="lgroup' + (g.id === openId ? ' open' : '') + '" data-sub="' + esc(g.id) + '">'
       + '<div class="lgrouphead"><span class="lgcar">▶</span><b>' + esc(g.label) + '</b>'
-      + '<span class="lgcount">' + done + '/' + g.items.length + '</span></div>'
+      + '<span class="lgcount">' + done + '/' + g.items.length + '</span>'
+      + '<button class="lgquiz" data-act="quiz" aria-label="Quiz this subchapter">' + LGQUIZ_ICON + '</button></div>'
       + '<div class="lgbody"></div></div>';
   }).join('');
   el.querySelectorAll('.lgroup').forEach((wrap, i) => {
     renderPickList(wrap.querySelector('.lgbody'), groups[i].items, 'No cards', (it) => { closeListOv(); navigateToCard(it); }, true);
-    wrap.querySelector('.lgrouphead').addEventListener('click', () => wrap.classList.toggle('open'));
+    // 헤더 탭=펼치기/접기, 시험 버튼 탭=그 소챕터 시험 즉시 시작(2026-09-08 사용자 요청) —
+    // chapRowHtml의 "행 탭=목록, 버튼=시험" 위임 패턴과 동일.
+    wrap.querySelector('.lgrouphead').addEventListener('click', (e) => {
+      if (e.target.closest('[data-act="quiz"]')){ closeListOv(); enterSubchapterExamFor(wrap.dataset.sub); return; }
+      wrap.classList.toggle('open');
+    });
   });
 }
 async function openChapterList(cId){
