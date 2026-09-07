@@ -1010,7 +1010,11 @@ function setHighlightMode(on, btn){
       try { sel.removeAllRanges(); sel.addRange(lastSelRange); } catch (e) {}
     }
     const t = getHighlightTarget();
-    if (t){ window.getSelection().removeAllRanges(); doHighlight(t.blk, t.start, t.end); }
+    if (t){
+      const range = sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
+      sel.removeAllRanges();
+      applyHighlightToRange(range, t.blk, t.start, t.end);
+    }
   }
 }
 function toggleHighlightMode(){ setHighlightMode(!highlightMode); }
@@ -1084,25 +1088,13 @@ function doHighlight(blk, start, end){
     } else toast('Highlight failed');
   }));
 }
-function tryAutoHighlight(){
-  if (!highlightMode) return;
-  const selBefore = window.getSelection();
-  // 드래그로 실제 텍스트를 골랐는데(빈 탭이 아니라) getHighlightTarget이 구조적 이유
-  // (문단 경계를 넘음·중첩 예문처럼 형광펜 미지원 블록)로 거절한 경우만 알려준다 —
-  // 예전엔 조용히 아무 일도 안 일어나 "드래그했는데 왜 안 되지"를 사용자가 알 방법이
-  // 없었다(2026-09-07). 단순 탭(선택 없음)에는 매번 뜨면 소음이라 안 띄운다.
-  const hadRealSelection = selBefore && selBefore.rangeCount > 0 && !selBefore.isCollapsed;
-  const t = getHighlightTarget();
-  if (!t){
-    if (hadRealSelection){ selBefore.removeAllRanges(); toast('Select within a single paragraph'); }
-    return;
-  }
-  const sel = window.getSelection();
-  const range = sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
-  sel.removeAllRanges();
-  // 낙관적 표시 — 서버 응답 전에 미리 코랄 배경을 씌워둔다. 이미 형광펜된 부분을 다시
-  // 칠하는 등 서버 판정과 다를 수 있는 드문 경우엔 실패해도(catch) 그냥 넘어간다 —
-  // 응답이 오면 위 doHighlight가 authoritative하게 다시 그려서 어차피 바로잡힌다.
+// 낙관적 표시 — 서버 응답 전에 미리 코랄 배경을 씌워둔다. 이미 형광펜된 부분을 다시
+// 칠하는 등 서버 판정과 다를 수 있는 드문 경우엔 실패해도(catch) 그냥 넘어간다 —
+// 응답이 오면 doHighlight가 authoritative하게 다시 그려서 어차피 바로잡힌다.
+// "드래그 먼저 → 형광펜 켜기"(setHighlightMode)와 "형광펜 먼저 → 드래그"(tryAutoHighlight)
+// 둘 다 이 함수를 거쳐야 같은 즉시반응을 얻는다 — 전자만 이게 빠져 있어 서버 왕복
+// (~1초)이 끝나야 화면이 바뀌는 지연이 있었다(2026-09-08 실기기 피드백).
+function applyHighlightToRange(range, blk, start, end){
   if (range){
     const mark = document.createElement('code');
     mark.className = 'hl';
@@ -1122,7 +1114,25 @@ function tryAutoHighlight(){
       } catch (e2) {}
     }
   }
-  doHighlight(t.blk, t.start, t.end);
+  doHighlight(blk, start, end);
+}
+function tryAutoHighlight(){
+  if (!highlightMode) return;
+  const selBefore = window.getSelection();
+  // 드래그로 실제 텍스트를 골랐는데(빈 탭이 아니라) getHighlightTarget이 구조적 이유
+  // (문단 경계를 넘음·중첩 예문처럼 형광펜 미지원 블록)로 거절한 경우만 알려준다 —
+  // 예전엔 조용히 아무 일도 안 일어나 "드래그했는데 왜 안 되지"를 사용자가 알 방법이
+  // 없었다(2026-09-07). 단순 탭(선택 없음)에는 매번 뜨면 소음이라 안 띄운다.
+  const hadRealSelection = selBefore && selBefore.rangeCount > 0 && !selBefore.isCollapsed;
+  const t = getHighlightTarget();
+  if (!t){
+    if (hadRealSelection){ selBefore.removeAllRanges(); toast('Select within a single paragraph'); }
+    return;
+  }
+  const sel = window.getSelection();
+  const range = sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
+  sel.removeAllRanges();
+  applyHighlightToRange(range, t.blk, t.start, t.end);
 }
 function onHighlightAreaClick(e){
   if (!highlightMode) return;
