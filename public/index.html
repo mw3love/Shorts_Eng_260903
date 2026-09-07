@@ -1834,8 +1834,12 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'ArrowRight' || e.key === 'PageDown'){ e.preventDefault(); navByKey(-1); }
   else if (e.key === 'ArrowLeft' || e.key === 'PageUp'){ e.preventDefault(); navByKey(1); }
 });
-$('navPrevBtn').addEventListener('click', () => navByKey(1));
-$('navNextBtn').addEventListener('click', () => navByKey(-1));
+// 클릭 직후 blur — 포커스가 버튼에 남아있으면, 이후 아무 키나 눌렀을 때(우리가
+// preventDefault로 가로채도) 브라우저가 그 포커스를 focus-visible로 승격시켜
+// 테두리를 그린다. 클릭 자체는 마우스 조작이라 남길 이유가 없다(2026-09-07 실기기
+// 피드백 — 클릭한 버튼에 테두리가 생겨 안 없어짐, 원인: 포커스 잔존).
+$('navPrevBtn').addEventListener('click', function(){ this.blur(); navByKey(1); });
+$('navNextBtn').addEventListener('click', function(){ this.blur(); navByKey(-1); });
 
 /* ── 최상단 풀다운 시 하단바까지 딸려 내려가던 증상 — CSS(html,body 잠금)로는 실기기에서
    재현이 계속돼(2026-09-05), touchmove를 직접 가로채는 더 확실한 방식으로 바꿨다.
