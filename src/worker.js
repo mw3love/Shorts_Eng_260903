@@ -211,11 +211,16 @@ function toggleCodeInRich(items, start, end) {
   const newMiddle = middle.map((it) => (allCode ? { ...it, code: false } : (it.code ? it : { ...it, code: true })));
   return [...before, ...newMiddle, ...after].filter((it) => it.t.length);
 }
+// ⚠ color를 명시적으로 'default'로 써넣지 않는다(2026-09-07 실험) — 노션 인라인
+// 코드의 빨간 글씨는 "텍스트 색상"·"배경 색상" 두 채널이 각각 켜져 있어야 나오는데
+// (실기기 발견), 공개 API의 annotations.color는 단일 enum이라 이 둘을 따로 못
+// 담는다. 여기서 color:'default'를 명시하면 그 순간 한쪽 채널이 꺼지는 것으로
+// 추정 — 필드 자체를 생략해 우리가 그 채널을 건드리지 않게 한다.
 function toNotionRichText(rich) {
   return (rich || []).map((t) => ({
     type: 'text',
     text: { content: t.t, ...(t.href ? { link: { url: t.href } } : {}) },
-    annotations: { bold: !!t.bold, italic: !!t.italic, strikethrough: !!t.strike, underline: !!t.underline, code: !!t.code, color: 'default' },
+    annotations: { bold: !!t.bold, italic: !!t.italic, strikethrough: !!t.strike, underline: !!t.underline, code: !!t.code },
   }));
 }
 
