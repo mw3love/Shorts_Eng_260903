@@ -62,6 +62,11 @@ const K_REVIEW_SCHEMA = 'reviewSchema:v1'; // { prop: string|null } — '복습 
                                    // 다음 호출이 다시 찾는다(schema:v1의 "낡으면 조용히 실패" 전례와 달리,
                                    // 실패해도 notionOk:false로 드러날 뿐 로컬 판정은 안 막힌다).
 
+// ⚠ 정렬 없이 질의하면 순서가 미지정이다(2026-09-07). created_time이 분 단위까지만
+// 나오는 카드가 있어(예: 06:47:00.000Z 동률) 우리 sortedByCreated()의 안정정렬이
+// 그 동률을 이 API 응답 순서로 깬다 — Notion 질의 자체를 오름차순으로 정렬해
+// UI에서 보이는 순서와 맞춘다.
+const DB_SORTS = [{ timestamp: 'created_time', direction: 'ascending' }];
 const BUCKET_SIZE = 50;             // ⚠ 카드별 개별 KV 저장은 불가 — 무료 쓰기 1,000회/일에 걸린다
 const PARSER_VERSION = 7;           // 포맷을 바꾸면 올릴 것 — 증분 로직이 옛 포맷을 재사용하지 않게
                                      // (v3, 2026-09-05: 블록에 원본 block.id 추가 — 형광펜 토글을
@@ -371,7 +376,7 @@ async function syncStep(env, token, dbId) {
       await gap();
       const data = await notion(token, `/databases/${dbId}/query`, {
         method: 'POST',
-        body: JSON.stringify({ page_size: 100, ...(cursor ? { start_cursor: cursor } : {}) }),
+        body: JSON.stringify({ page_size: 100, sorts: DB_SORTS, ...(cursor ? { start_cursor: cursor } : {}) }),
       }, budget);
       for (const r of data.results || []) {
         const p = r.properties || {};
@@ -395,7 +400,7 @@ async function syncStep(env, token, dbId) {
     do {
       await gap();
       const data = await notion(token, `/databases/${dbId}/query`, {
-        method: 'POST', body: JSON.stringify({ page_size: 100, start_cursor: cursor }),
+        method: 'POST', body: JSON.stringify({ page_size: 100, sorts: DB_SORTS, start_cursor: cursor }),
       }, budget);
       for (const r of data.results || []) {
         const p = r.properties || {};
