@@ -788,28 +788,28 @@ function warmImages(c){
 // "예시:" 불릿 아래 중첩된 진짜 예문 불릿처럼, 블록에 딸린 자식(b.children, 2026-09-06
 // 서버 PARSER_VERSION 6부터 채워짐)을 그 블록 안에 이어 그린다 — blocksHtml이 재귀적으로
 // li들을 ul/ol로 다시 묶어주므로 중첩 목록도 그대로 들여쓰기된다.
-// 중첩 자식은 항상 data-blk="nested"로 찍는다(고유 인덱스 아님) — 형광펜 오프셋 매핑은
-// 서버의 flat detail[index] 기준이라 중첩 블록까지 그 체계에 안전하게 끼워 넣을 방법이
-// 없다. getHighlightTarget()이 이 마커를 보고 형광펜 대상에서 걸러낸다(표시는 되지만
-// 이번 라운드에선 형광펜 미지원 — 범위를 "보이게"까지로 좁힌 것).
-function childrenHtml(b){ return (b.children && b.children.length) ? blocksHtml(b.children, 'nested') : ''; }
+// 중첩 자식은 부모 경로에 순번을 이어붙인 점(.) 구분 주소로 찍는다(예: 부모가 "3"이면
+// 자식은 "3.0","3.1", 그 자식의 자식은 "3.0.0" — 2026-09-08, 이전엔 전부 "nested"라는
+// 고정값 하나를 공유해 형광펜이 통째로 막혀 있었다. 서버 handleHighlight()가 이 경로를
+// 그대로 받아 card.detail[i].children[...]를 순회해 블록을 찾는다).
+function childrenHtml(b, path){ return (b.children && b.children.length) ? blocksHtml(b.children, undefined, path + '.') : ''; }
 function blockHtml(b, i){
   if (!b) return '';
   const blk = i == null ? '' : ' data-blk="' + i + '"';
   switch (b.type){
-    case 'heading_1': return '<h3' + blk + '>' + richHtml(b.rich) + '</h3>' + childrenHtml(b);
-    case 'heading_2': return '<h4' + blk + '>' + richHtml(b.rich) + '</h4>' + childrenHtml(b);
-    case 'heading_3': return '<h5' + blk + '>' + richHtml(b.rich) + '</h5>' + childrenHtml(b);
-    case 'bulleted_list_item': return '<li' + blk + '>' + richHtml(b.rich) + childrenHtml(b) + '</li>';
-    case 'numbered_list_item': return '<li' + blk + '>' + richHtml(b.rich) + childrenHtml(b) + '</li>';
-    case 'quote': return '<blockquote' + blk + '>' + richHtml(b.rich) + childrenHtml(b) + '</blockquote>';
-    case 'callout': return '<div class="callout"' + blk + '>' + richHtml(b.rich) + childrenHtml(b) + '</div>';
-    case 'to_do': return '<div>' + (b.checked ? '&#9745; ' : '&#9744; ') + richHtml(b.rich) + childrenHtml(b) + '</div>';
+    case 'heading_1': return '<h3' + blk + '>' + richHtml(b.rich) + '</h3>' + childrenHtml(b, i);
+    case 'heading_2': return '<h4' + blk + '>' + richHtml(b.rich) + '</h4>' + childrenHtml(b, i);
+    case 'heading_3': return '<h5' + blk + '>' + richHtml(b.rich) + '</h5>' + childrenHtml(b, i);
+    case 'bulleted_list_item': return '<li' + blk + '>' + richHtml(b.rich) + childrenHtml(b, i) + '</li>';
+    case 'numbered_list_item': return '<li' + blk + '>' + richHtml(b.rich) + childrenHtml(b, i) + '</li>';
+    case 'quote': return '<blockquote' + blk + '>' + richHtml(b.rich) + childrenHtml(b, i) + '</blockquote>';
+    case 'callout': return '<div class="callout"' + blk + '>' + richHtml(b.rich) + childrenHtml(b, i) + '</div>';
+    case 'to_do': return '<div>' + (b.checked ? '&#9745; ' : '&#9744; ') + richHtml(b.rich) + childrenHtml(b, i) + '</div>';
     case 'code': return '<pre><code>' + richHtml(b.rich) + '</code></pre>';
     case 'divider': return '<hr>';
     case 'table': return tableHtml(b);
     case 'image': return imageHtml(b);
-    default: return b.rich ? '<p' + blk + '>' + richHtml(b.rich) + childrenHtml(b) + '</p>' : '';
+    default: return b.rich ? '<p' + blk + '>' + richHtml(b.rich) + childrenHtml(b, i) + '</p>' : '';
   }
 }
 function blocksHtml(blocks, blkOverride, prefix){
@@ -1044,7 +1044,8 @@ function getHighlightTarget(){
   const startBlk = findBlockEl(range.startContainer), endBlk = findBlockEl(range.endContainer);
   if (!startBlk || !endBlk || startBlk !== endBlk) return null;
   const blk = startBlk.dataset.blk;
-  if (blk !== 'hint' && !/^p?\d+$/.test(blk)) return null; // 중첩 예문 블록 — 형광펜 미지원(위 childrenHtml 주석 참조)
+  // "3"(top-level), "p0"(pre), "3.0"/"p0.1.2"(중첩 자식 경로, 위 childrenHtml 참조) 전부 허용.
+  if (blk !== 'hint' && !/^p?\d+(\.\d+)*$/.test(blk)) return null;
   const start = plainOffsetInBlock(startBlk, range.startContainer, range.startOffset);
   const end = plainOffsetInBlock(startBlk, range.endContainer, range.endOffset);
   if (start == null || end == null || start >= end) return null;
@@ -1075,7 +1076,8 @@ function doHighlight(blk, start, end){
   const card = currentCardForHighlight();
   if (!card) return;
   const field = blk === 'hint' ? 'hint' : (blk[0] === 'p' ? 'pre' : 'detail');
-  const blockIndex = blk === 'hint' ? null : Number(blk[0] === 'p' ? blk.slice(1) : blk);
+  // "3.0" 같은 중첩 경로를 [3,0]으로 — 서버가 children을 그 순서대로 순회해 블록을 찾는다.
+  const blockIndex = blk === 'hint' ? null : (blk[0] === 'p' ? blk.slice(1) : blk).split('.').map(Number);
   const seq = ++highlightSeq;
   queueFlagApi(() => apiHighlight(card.id, field, blockIndex, start, end).catch(() => null).then((res) => {
     if (seq !== highlightSeq) return; // 더 최신 형광펜 동작이 이미 시작됨 — 그 응답이 곧 따로 옴, 지금은 화면을 안 건드린다

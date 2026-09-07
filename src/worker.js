@@ -1053,13 +1053,28 @@ async function handleRetitle(env, token, body) {
   return json({ ok: true, key: newKey, front: title, notionOk });
 }
 
-// 형광펜 토글 — 본문 블록(hint 또는 detail[i])의 rich-text에서 [start,end) 구간의 code
-// 여부를 뒤집고, KV(버킷)와 Notion 블록(진짜 원본, 미러 아님) 양쪽에 반영한다.
+// blockIndex는 최상위 배열(card.pre/card.detail) 안의 경로다 — [3]이면 그 배열의 3번,
+// [3,0]이면 3번 블록의 children[0](중첩 자식, 2026-09-08부터 클라이언트가 "3.0" 같은
+// data-blk 경로를 이렇게 배열로 풀어 보낸다). 깊이는 pageBlocks()의 재귀 제한(depth<3)과
+// 같이 맞물려 최대 3단.
+function resolveBlockPath(arr, path) {
+  if (!Array.isArray(arr) || !Array.isArray(path) || !path.length) return null;
+  let cur = arr[path[0]];
+  for (let k = 1; k < path.length; k++) {
+    if (!cur) return null;
+    cur = (cur.children || [])[path[k]];
+  }
+  return cur;
+}
+// 형광펜 토글 — 본문 블록(hint 또는 detail/pre 경로가 가리키는 블록, 중첩 자식 포함)의
+// rich-text에서 [start,end) 구간의 code 여부를 뒤집고, KV(버킷)와 Notion 블록(진짜 원본,
+// 미러 아님) 양쪽에 반영한다.
 async function handleHighlight(env, token, body) {
   const { pageId, field, blockIndex, start, end } = body || {};
   if (!pageId || (field !== 'hint' && field !== 'detail' && field !== 'pre') || typeof start !== 'number' || typeof end !== 'number' || start >= end) {
     return json({ error: 'pageId/field/start/end required' }, 400);
   }
+  if (field !== 'hint' && !Array.isArray(blockIndex)) return json({ error: 'blockIndex required' }, 400);
   const idxRaw = await env.KV.get(K_INDEX);
   if (!idxRaw) return json({ error: 'Syncing' }, 202);
   const idx = JSON.parse(idxRaw);
@@ -1071,7 +1086,7 @@ async function handleHighlight(env, token, body) {
   const card = bucket.cards.find((c) => c.id === pageId);
   if (!card) return json({ error: 'not found' }, 404);
 
-  const block = field === 'hint' ? card.hint : (field === 'pre' ? card.pre?.[blockIndex] : card.detail?.[blockIndex]);
+  const block = field === 'hint' ? card.hint : resolveBlockPath(field === 'pre' ? card.pre : card.detail, blockIndex);
   if (!block || !Array.isArray(block.rich)) return json({ error: 'This block does not support highlighting' }, 400);
 
   block.rich = toggleCodeInRich(block.rich, start, end);
