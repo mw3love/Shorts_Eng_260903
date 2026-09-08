@@ -1966,6 +1966,18 @@ scroller.addEventListener('pointermove', (e) => {
   if (!dragging) return;
   dx = mdx; dy = mdy;
   if (mode === null && (Math.abs(dx) > MOVE_TOL || Math.abs(dy) > MOVE_TOL)) mode = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v';
+  // ⚠ 위 판정은 이 터치에서 딱 한 번, 임계값을 처음 넘는 순간의 dx/dy만 본다 — 실제로는
+  // 세로 스크롤인데 그 찰나에 손가락이 살짝 대각선이라 'h'로 고정되면, 손을 안 뗀 채
+  // 스크롤을 계속하는 내내 안 풀렸다(2026-09-08 실기기 영상 — pointerdown 시점 정리
+  // 라운드32로도 못 잡은 이유: 같은 터치 안이라 다음 pointerdown 자체가 없다). dx가
+  // 아직 크게 안 벌어졌는데 dy가 확실히 앞서가면 오판으로 보고 스크롤로 되돌린다 —
+  // 이미 상당히 끌어당긴 뒤(dragW의 15% 이상)라면 진짜 스와이프 의도로 보고 존중한다.
+  if (mode === 'h' && Math.abs(dx) < dragW * 0.15 && Math.abs(dy) > Math.abs(dx) * 1.5){
+    mode = 'v'; dragging = false;
+    setDragTransition('none'); resetDragX();
+    try { scroller.releasePointerCapture(e.pointerId); } catch (err) {}
+    return;
+  }
   if (mode === 'h'){
     // 마우스로 텍스트/이미지 위를 드래그하면 브라우저 네이티브 텍스트선택·이미지드래그가
     // 우리 스와이프와 동시에 진행될 수 있다 — 막지 않으면 마우스를 뗀 뒤에도 선택이 남아
