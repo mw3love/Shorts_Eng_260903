@@ -1924,6 +1924,12 @@ scroller.addEventListener('pointerdown', (e) => {
   // 이미 선택된 텍스트가 있으면(선택 핸들을 드래그하는 중) 스와이프 트래킹 자체를
   // 시작하지 않는다 — 여기서 캡처를 걸면 핸들 드래그가 그 자리에서 끊긴다.
   if (!window.getSelection().isCollapsed) return;
+  // ⚠ 직전 제스처가 pointerup/pointercancel 없이 끊겼을 수 있다(iOS 시스템 제스처가
+  // 터치를 가로채는 경우 등, 2026-09-08 실기기 영상 신고 — peek 패널이 스와이프 후에도
+  // 계속 떠 있고 심지어 내용도 어긋나 보임). 그 경로들이 전부 dragging=false·transform
+  // 초기화를 맡고 있었는데, 그 이벤트 자체가 안 오면 아무도 정리하지 않는다. 새 제스처를
+  // 시작하는 이 시점(반드시 다음 터치의 pointerdown은 옴)에 무조건 한 번 더 정리한다.
+  setDragTransition('none'); resetDragX();
   dragging = false; selectPrimed = false; mode = null;
   sx = e.clientX; sy = e.clientY; dx = 0; dy = 0; startT = e.timeStamp;
   clearTimeout(pressTimer);
