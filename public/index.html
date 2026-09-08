@@ -108,7 +108,16 @@
      내려 실제로는 넓어진다(2026-09-05 라운드6 사용자 판단). 상단도 같은 이유로
      2026-09-06(축3)에 오버레이 → 고정 구역으로 전환 — 하단이 먼저였던 건 라운드6
      당시 스크롤 시 겹침이 상단보다 하단에서 먼저 지적됐을 뿐, 원리는 같다. ── */
-  .stage{position:absolute;top:var(--topbarh);left:0;right:0;bottom:var(--barh)}
+  /* ⚠ clip-path가 이 줄의 핵심이다 — `#app`의 overflow:hidden만으로는 iOS Safari가
+     `.peek`(will-change:transform으로 별도 합성 레이어로 승격됨)를 「안 잘라낸다」.
+     그래서 쉬는 위치(translateX(∓100%) = 앱 박스 바로 바깥)에 얌전히 서 있는 좌우
+     peek 패널이 폰/아이패드에서는 `#app` 양옆 여백에 그대로 드러나 보였다(2026-09-08
+     실기기 영상 신고 → 프레임 픽셀 실측으로 확정: 좌우 슬리버 폭이 208px로 정확히
+     대칭이고 앱 박스 경계와 딱 맞아떨어짐 = 드래그로 밀린 게 아니라 쉬는 위치 그대로).
+     `.scroller`가 상태바 클립에 쓰는 clip-path는 같은 조건에서 실제로 동작하므로
+     (라운드6부터 검증됨) 같은 수단을 stage에도 쓴다 — 합성 레이어까지 확실히 잘린다.
+     PC(크롬)는 overflow:hidden만으로도 잘려서 이 증상이 한 번도 안 보였다. */
+  .stage{position:absolute;top:var(--topbarh);left:0;right:0;bottom:var(--barh);clip-path:inset(0)}
   /* clip-path로 상태바 안전영역 위쪽을 물리적으로 잘라낸다 — apple-mobile-web-app-status-bar-style
      메타태그는 viewport-fit=cover가 걸린 최신 iOS에서 아이콘 색만 바꿀 뿐 레이아웃 공간을
      예약하지 않아서(실기기 스샷으로 확인, 2026-09-05), 긴 제목·본문이 스크롤로 상태바
@@ -133,7 +142,10 @@
     font-size:calc(15.5px * var(--bscale));line-height:1.7;color:var(--body-text);
     will-change:transform;
   }
-  .peek{position:absolute;inset:0;pointer-events:none;will-change:transform;display:flex;flex-direction:column;overflow:hidden;z-index:1}
+  /* visibility:hidden은 위 clip-path와 같은 버그를 두 번째로 막는 안전판이다 — 클리핑이
+     또 어느 브라우저에서 안 먹더라도, 드래그 중이 아닐 땐 아예 안 그려지므로 새어나올
+     수가 없다. 드래그가 시작되면 setDragX가 켜고, 끝나면 resetDragX가 되돌린다. */
+  .peek{position:absolute;inset:0;pointer-events:none;will-change:transform;display:flex;flex-direction:column;overflow:hidden;z-index:1;visibility:hidden}
   .peek-prev{transform:translateX(-100%)}
   .peek-next{transform:translateX(100%)}
   .peek .cardtitle{padding:14px 22px 6px;color:var(--paper)}
@@ -1899,8 +1911,12 @@ function studyNext(){ return studyIdx + 1 < studyCards.length ? studyCards[study
 function setDragX(px){
   content.style.transform = 'translateX(' + px + 'px)'; cardTitleEl.style.transform = 'translateX(' + px + 'px)';
   peekPrev.style.transform = 'translateX(calc(-100% + ' + px + 'px))'; peekNext.style.transform = 'translateX(calc(100% + ' + px + 'px))';
+  peekPrev.style.visibility = peekNext.style.visibility = 'visible';
 }
-function resetDragX(){ content.style.transform = ''; cardTitleEl.style.transform = ''; peekPrev.style.transform = ''; peekNext.style.transform = ''; }
+function resetDragX(){
+  content.style.transform = ''; cardTitleEl.style.transform = ''; peekPrev.style.transform = ''; peekNext.style.transform = '';
+  peekPrev.style.visibility = peekNext.style.visibility = ''; // CSS 기본값(hidden)으로 복귀
+}
 function setDragTransition(t){ content.style.transition = t; cardTitleEl.style.transition = t; peekPrev.style.transition = t; peekNext.style.transition = t; }
 function dragCurve(rawDx, w){
   const amp = rawDx * DRAG_SENS, sign = amp < 0 ? -1 : 1, abs = Math.abs(amp);
@@ -1966,18 +1982,6 @@ scroller.addEventListener('pointermove', (e) => {
   if (!dragging) return;
   dx = mdx; dy = mdy;
   if (mode === null && (Math.abs(dx) > MOVE_TOL || Math.abs(dy) > MOVE_TOL)) mode = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v';
-  // ⚠ 위 판정은 이 터치에서 딱 한 번, 임계값을 처음 넘는 순간의 dx/dy만 본다 — 실제로는
-  // 세로 스크롤인데 그 찰나에 손가락이 살짝 대각선이라 'h'로 고정되면, 손을 안 뗀 채
-  // 스크롤을 계속하는 내내 안 풀렸다(2026-09-08 실기기 영상 — pointerdown 시점 정리
-  // 라운드32로도 못 잡은 이유: 같은 터치 안이라 다음 pointerdown 자체가 없다). dx가
-  // 아직 크게 안 벌어졌는데 dy가 확실히 앞서가면 오판으로 보고 스크롤로 되돌린다 —
-  // 이미 상당히 끌어당긴 뒤(dragW의 15% 이상)라면 진짜 스와이프 의도로 보고 존중한다.
-  if (mode === 'h' && Math.abs(dx) < dragW * 0.15 && Math.abs(dy) > Math.abs(dx) * 1.5){
-    mode = 'v'; dragging = false;
-    setDragTransition('none'); resetDragX();
-    try { scroller.releasePointerCapture(e.pointerId); } catch (err) {}
-    return;
-  }
   if (mode === 'h'){
     // 마우스로 텍스트/이미지 위를 드래그하면 브라우저 네이티브 텍스트선택·이미지드래그가
     // 우리 스와이프와 동시에 진행될 수 있다 — 막지 않으면 마우스를 뗀 뒤에도 선택이 남아
