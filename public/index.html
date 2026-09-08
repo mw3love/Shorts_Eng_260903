@@ -2022,7 +2022,12 @@ function goToPrev(){
 // 공유한다. 드래그 없이 바로 커밋하므로 beginSwipeTracking이 매 스와이프 시작 때 하던
 // 준비(dragW 실측·peek 패널 채우기)를 여기서 직접 한다.
 function navByKey(dir){
-  if (studyCards.length < 2 || examMode || highlightMode || titleEditing) return;
+  // ⚠ highlightMode 자체가 아니라 selectionDragActive(실제 드래그 진행 중)로 막는다 —
+  // 형광펜 "모드"가 켜져 있는 것과 "지금 드래그로 선택 중"인 것은 다르다. 전자로 막으면
+  // 모드를 켜둔 채로는 페이지 넘김 버튼·단축키가 통째로 죽는다(2026-09-08 사용자 지적).
+  // selectionDragActive는 형광펜 응답 레이스 수정(위 doHighlight 참조)에서 이미 만든
+  // "지금 #content/#examBody 안에서 마우스 버튼이 눌려 있는가" 플래그를 그대로 재사용.
+  if (studyCards.length < 2 || examMode || selectionDragActive || titleEditing) return;
   dragW = scroller.offsetWidth || 1;
   const pc = studyPrev(), nc = studyNext();
   $('peekPrevTitle').textContent = pc ? pc.front : ''; $('peekPrevBody').innerHTML = peekBodyHtml(pc);
@@ -2063,7 +2068,9 @@ document.addEventListener('keydown', (e) => {
   const ae = document.activeElement;
   if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.isContentEditable)) return;
   if (isModalOpen()) return;
-  if (highlightMode && (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === 'd' || e.key === 'D' ||
+  // 형광펜 "모드"가 아니라 "지금 드래그 중"만 막는다(navByKey 주석 참조) — 모드만 켜져
+  // 있고 드래그 중이 아니면 페이지 넘김 키도 정상 작동해야 한다(2026-09-08).
+  if (selectionDragActive && (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === 'd' || e.key === 'D' ||
       e.key === 'ArrowLeft' || e.key === 'PageUp' || e.key === 'a' || e.key === 'A')) return;
   if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === 'd' || e.key === 'D'){ e.preventDefault(); navByKey(-1); }
   else if (e.key === 'ArrowLeft' || e.key === 'PageUp' || e.key === 'a' || e.key === 'A'){ e.preventDefault(); navByKey(1); }
