@@ -1129,6 +1129,31 @@ function getHighlightTarget(){
 // 것이 없다. currentCardForHighlight() 재확인은 그 사이 다른 카드로 넘어갔을 때
 // 늦게 도착한 응답이 지금 보이는 다른 카드의 본문을 덮어쓰는 것도 같이 막는다.
 let highlightSeq = 0;
+// ⚠ 형광펜 응답이 도착해 본문을 innerHTML로 통째로 교체하는 순간, 마침 사용자가 다음
+// 드래그로 텍스트를 고르고 있었다면 그 선택의 anchor 노드가 통째로 파괴된다 — 브라우저가
+// 이걸 "선택 시작점을 컨테이너 맨 앞"으로 취급해, 이어지는 드래그가 "본문 맨 위~지금
+// 마우스 위치"라는 훨씬 넓은 범위로 재구성되는 것을 실제로 재현해 확인함(2026-09-08,
+// 격리 테스트: DOM 교체 후 selection.extend()가 컨테이너 시작부터 다시 잡히는 것 확인).
+// 그래서 드래그가 진행 중(selectionDragActive)이면 화면 교체를 pointerup까지 미룬다.
+let selectionDragActive = false, pendingHighlightRender = null;
+document.addEventListener('pointerdown', (e) => {
+  if (e.target.closest('#content, #examBody')) selectionDragActive = true;
+});
+function flushPendingHighlightRender(){
+  if (pendingHighlightRender){ const fn = pendingHighlightRender; pendingHighlightRender = null; fn(); }
+}
+// ⚠ highlightMode가 켜져 있으면 여기서 곧장 flush하지 않는다 — 이 드래그가 만든 새 선택을
+// tryAutoHighlight()(아래 pointerup 리스너, setTimeout(0)으로 다음 틱에 실행)가 아직 못
+// 읽었는데 먼저 본문을 갈아치우면 방금 만든 선택까지 똑같이 붕괴한다. tryAutoHighlight가
+// 그 선택을 다 소비한 뒤(성공/실패 양쪽 경로 끝)에 자기가 flushPendingHighlightRender()를
+// 부른다 — 여긴 "그 사이 highlightMode 자체가 꺼져 tryAutoHighlight가 아예 안 걸릴" 경우의
+// 안전망만 담당한다.
+function endSelectionDrag(){
+  selectionDragActive = false;
+  if (!highlightMode) flushPendingHighlightRender();
+}
+document.addEventListener('pointerup', endSelectionDrag);
+document.addEventListener('pointercancel', endSelectionDrag);
 function doHighlight(blk, start, end){
   const card = currentCardForHighlight();
   if (!card) return;
@@ -1141,8 +1166,12 @@ function doHighlight(blk, start, end){
     if (res && res.ok){
       Object.assign(card, res.card);
       if (currentCardForHighlight() === card){
-        if (!examMode) $('content').innerHTML = cardBodyHtml(card);
-        else { const el = $('examBody'); if (el) el.innerHTML = cardBodyHtml(card); }
+        const render = () => {
+          if (!examMode) $('content').innerHTML = cardBodyHtml(card);
+          else { const el = $('examBody'); if (el) el.innerHTML = cardBodyHtml(card); }
+        };
+        if (selectionDragActive) pendingHighlightRender = render;
+        else render();
       }
     } else toast('Highlight failed');
   }));
@@ -1186,12 +1215,14 @@ function tryAutoHighlight(){
   const t = getHighlightTarget();
   if (!t){
     if (hadRealSelection){ selBefore.removeAllRanges(); toast('Select within a single paragraph'); }
+    flushPendingHighlightRender(); // 이 드래그의 선택은 이미 다 읽었으니 밀려 있던 재렌더를 이제 반영해도 안전하다
     return;
   }
   const sel = window.getSelection();
   const range = sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
   sel.removeAllRanges();
-  applyHighlightToRange(range, t.blk, t.start, t.end);
+  applyHighlightToRange(range, t.blk, t.start, t.end); // range가 옛 DOM을 참조하므로 flush는 이 호출 다음에
+  flushPendingHighlightRender();
 }
 function onHighlightAreaClick(e){
   if (!highlightMode) return;
