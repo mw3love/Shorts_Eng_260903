@@ -297,6 +297,19 @@
   }
   .lgquiz svg{width:13px;height:13px;stroke:currentColor}
   .lgquiz:active{transform:scale(.9)}
+  /* 중간시험 행(2026-09-16) — 소챕터 폴더 5개 「다음 줄」에 끼운다(종합시험 행이 그룹
+     마지막 챕터 다음 줄에 들어가는 것과 대칭). 행 전체가 시험 진입 — 폴더 헤더와 달리
+     펼칠 목록이 따로 없다. */
+  .lgmid{
+    display:flex;align-items:center;gap:9px;padding:9px 11px;margin:5px 0;cursor:pointer;
+    background:var(--ink3);border:1px solid color-mix(in srgb,var(--coral) 35%,transparent);border-radius:10px;
+  }
+  .lgmid:active{background:var(--ink4)}
+  .lgmid b{flex:1;font-family:var(--serif);font-weight:500;font-size:14px;color:var(--coral)}
+  .lgmid .lgmsub{font-family:var(--sans);font-size:11px;color:color-mix(in srgb,var(--coral) 60%,var(--muted))}
+  .lgmid .lgcount{font-family:var(--mono);font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .lgmid .lgbest{display:flex;align-items:center;gap:3px;flex:none;font-family:var(--mono);font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .lgmid .lgbest svg{width:11px;height:11px;stroke:currentColor;flex:none}
 
   /* 2026-09-06 라운드18: 챕터 완주 넛지 배너(.chapnudge) 폐기 — 시험 진입은 챕터 시트의
      종합시험 행이 상시로 맡는다(사용자 요청: "제안하지 말고 그냥 챕터행을 하나 더"). */
@@ -912,7 +925,7 @@ function toast(msg){
 /* ── API ── */
 async function apiChapters(){ const r = await fetch('/api/chapters'); return r.json(); }
 async function apiSubchapter(id, mode){ const r = await fetch('/api/subchapter?id=' + encodeURIComponent(id) + '&mode=' + mode); return r.json(); }
-async function apiChapterExam(id, light){ const r = await fetch('/api/chapterexam?id=' + encodeURIComponent(id) + (light ? '&light=1' : '')); return r.json(); }
+async function apiChapterExam(id, light, half){ const r = await fetch('/api/chapterexam?id=' + encodeURIComponent(id) + (light ? '&light=1' : '') + (half == null ? '' : '&half=' + half)); return r.json(); }
 async function apiMegaExam(id){ const r = await fetch('/api/megaexam?id=' + encodeURIComponent(id)); return r.json(); }
 function apiAnswer(subId, key, know, pageId){
   return fetch('/api/answer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subId, key, know, pageId }) })
@@ -2142,10 +2155,17 @@ function shuffle(arr){
   for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
   return a;
 }
-let examScope = 'sub', examCards = [], examIdx = 0, examResults = {}, examLastSub = null, examLastChap = null, examLastMega = null;
+let examScope = 'sub', examCards = [], examIdx = 0, examResults = {}, examLastSub = null, examLastChap = null, examLastMega = null, examLastHalf = null, examDirty = false;
 
 function enterExamMode(){ examMode = true; $('readRoot').hidden = true; $('examView').hidden = false; }
-function exitExamMode(){ examMode = false; $('examView').hidden = true; $('readRoot').hidden = false; clearRetitleContext(); setRetitleContext(() => studyCards[studyIdx]); }
+function exitExamMode(){
+  examMode = false; $('examView').hidden = true; $('readRoot').hidden = false;
+  clearRetitleContext(); setRetitleContext(() => studyCards[studyIdx]);
+  // 시험에서 "몰랐음"을 누르면 체크가 실제로 풀리는데(서버가 known KV·Notion을 되돌린다),
+  // 예전엔 읽기화면의 카드 객체·필터 목록이 그대로라 초록 배지와 n/전체가 낡은 채 남았다
+  // (2026-09-16). judgeCard가 로컬에도 반영해 두므로 여기선 목록만 다시 적용한다.
+  if (examDirty){ examDirty = false; if (subchapterAll.length) applyFilter(); }
+}
 $('examBack').addEventListener('click', exitExamMode);
 
 // 2026-09-06 라운드14: "1-1" 칩 탭이 시험에서 "이 소챕터 카드 목록"으로 바뀌었다 —
@@ -2183,6 +2203,20 @@ async function enterChapterExam(cId){
   examCards = shuffle(pool);
   startExam('Chapter ' + (Number(cId.slice(1)) + 1) + ' Full Quiz');
 }
+/* 중간시험(2026-09-16) — 대챕터를 소챕터 5개(=50장)씩 둘로 나눈 「전반/후반」. 서버가 그
+   범위에서 보관·휴지통을 걸러 무작위 25장을 뽑아 주므로 여기선 순서만 섞는다(종합시험과
+   같은 구조). 소챕터 10문제와 대챕터 100문제 사이가 비어 있던 자리. */
+async function enterHalfExam(cId, h, label){
+  const t = setTimeout(() => showLoading('Loading', 'Fetching mid quiz questions'), 250);
+  let data;
+  try { data = await apiChapterExam(cId, false, h); }
+  catch (e) { clearTimeout(t); showLoading('Load failed', String(e.message || e)); return; }
+  clearTimeout(t); hideLoading();
+  if (data.error || !data.cards || !data.cards.length){ toast(data.error || 'No cards to test'); return; }
+  examScope = 'half';
+  examCards = shuffle(data.cards);
+  startExam(label || 'Mid quiz');
+}
 /* 종합시험(2026-09-06 라운드18) — 챕터 10개 범위. 서버가 이미 보관·휴지통을 걸러 무작위
    100장을 뽑아 주므로(전량 1,000장은 응답 약 1.5MB라 기각, 사용자 확인) 여기선 순서만 섞는다. */
 async function enterMegaExam(gId, label){
@@ -2197,12 +2231,22 @@ async function enterMegaExam(gId, label){
   startExam(label || 'Combined Quiz');
 }
 function startExam(title){
-  examIdx = 0; examResults = {}; examLastSub = null; examLastChap = null; examLastMega = null;
+  examIdx = 0; examResults = {}; examLastSub = null; examLastChap = null; examLastMega = null; examLastHalf = null;
   $('examTitleBar').textContent = title;
   enterExamMode();
   setRetitleContext(() => examCards[examIdx]);
   renderExamCard();
   $('examJudge').onclick = (e) => { const b = e.target.closest('button'); if (b) judgeCard(b.dataset.k === '1'); };
+}
+/* 시험 중 "이미 확인함" 배지(2026-09-16) — ⚠ 문제 단계(제목만 보이는 상태)에는 절대
+   그리지 않는다. 떠올리기 전에 초록 체크가 보이면 "체크돼 있네, 알았던 거겠지"로 자기평가가
+   앵커링돼, 이 시험의 유일한 가치(정직한 자기평가)가 무너진다. 정답 공개 뒤에만 띄워
+   "체크해놨는데 막상 기억이 안 난다"는 순간을 사용자가 알아채게 한다 — 그 자리에서
+   "Didn't know"를 누르면 체크는 실제로 풀린다(judgeCard → /api/answer know:false).
+   읽기화면 배지와 달리 data-restore를 안 붙인다(여기선 탭이 아니라 채점 버튼이 해제 경로). */
+function examBadgeHtml(c){
+  if (!c || !c.known) return '';
+  return ' <span class="titlebadge known" aria-label="Already checked - choose Did not know to uncheck"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>';
 }
 function renderExamCard(){
   if (examIdx >= examCards.length){ renderExamResult(); return; }
@@ -2212,7 +2256,7 @@ function renderExamCard(){
     + '<button class="examreveal" id="examReveal">Reveal answer</button>';
   $('examJudge').hidden = true;
   $('examReveal').addEventListener('click', () => {
-    $('examCard').innerHTML = '<div class="examtitle" id="examTitle">' + esc(c.front) + '</div>'
+    $('examCard').innerHTML = '<div class="examtitle" id="examTitle">' + esc(c.front) + examBadgeHtml(c) + '</div>'
       + '<div class="content exambody" id="examBody">' + cardBodyHtml(c) + '</div>';
     $('examJudge').hidden = false;
   }, { once: true });
@@ -2220,10 +2264,23 @@ function renderExamCard(){
 async function judgeCard(know){
   const c = examCards[examIdx];
   examResults[c.key] = know;
+  c.known = know;
+  syncKnownLocally(c.key, know);
+  examDirty = true;
   const res = await apiAnswer(c.subId, c.key, know, c.id);
-  if (res && res.ok){ examLastSub = res.sub; examLastChap = res.chap; examLastMega = res.mega; }
+  if (res && res.ok){ examLastSub = res.sub; examLastChap = res.chap; examLastMega = res.mega; examLastHalf = res.half; }
   examIdx++;
   renderExamCard();
+}
+/* 시험 채점을 읽기화면 쪽 카드 객체에도 즉시 반영한다(2026-09-16). examCards는 {...c}
+   스프레드 복사본이라 원본과 다른 객체이고, 시험 종료 경로엔 subCache.clear()도 없어서
+   "몰랐음"으로 푼 체크가 읽기화면에선 계속 켜져 보였다. 캐시를 통째로 비우는 대신 해당
+   키만 고쳐 다시 돌아왔을 때의 재요청을 피한다. */
+function syncKnownLocally(key, know){
+  const touch = (list) => { for (const c of (list || [])) if (c.key === key) c.known = know; };
+  subCache.forEach(touch);
+  touch(subchapterAll);
+  touch(studyCards);
 }
 function renderExamResult(){
   const total = examCards.length;
@@ -2231,8 +2288,9 @@ function renderExamResult(){
   const wrong = examCards.filter((c) => !examResults[c.key]);
   // 종합시험은 출제가 100문제 표본이라 위 점수(n/100)와 최고기록(범위 전체 기준)의 분모가
   // 다르다 — 라벨로 "이 범위"임을 밝혀 둘이 다른 축임을 드러낸다.
-  const best = examScope === 'mega' ? examLastMega : examScope === 'chap' ? examLastChap : examLastSub;
-  const bestLabel = examScope === 'mega' ? 'Best in this range ' : examScope === 'chap' ? 'Best in this chapter ' : 'Best in this subchapter ';
+  const best = examScope === 'mega' ? examLastMega : examScope === 'chap' ? examLastChap : examScope === 'half' ? examLastHalf : examLastSub;
+  const bestLabel = examScope === 'mega' ? 'Best in this range ' : examScope === 'chap' ? 'Best in this chapter '
+    : examScope === 'half' ? 'Best in this half ' : 'Best in this subchapter ';
   const bestLine = best ? bestLabel + best.best + '/' + best.total : '';
   let actions = '<button class="primary" id="examExit">Close</button>';
   if (wrong.length){
@@ -2795,15 +2853,37 @@ function openSubchapterList(){
 /* 챕터 목록(100장)은 소챕터 10개로 접어서 보여준다(2026-09-06 라운드18 사용자 요청).
    기본 전부 접힘 + 지금 보고 있는 소챕터만 펼침 — 100줄 스크롤 대신 "내 위치"부터 잡힌다. */
 const LGQUIZ_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.6" stroke="none" style="fill:var(--coral)"/></svg>';
-function renderGroupedPickList(el, groups, openId){
-  el.innerHTML = groups.map((g) => {
+/* 중간시험 행(2026-09-16) — 소챕터 폴더 다섯 개 「다음 줄」에 끼운다. 폴더 헤더와 달리
+   행 전체가 시험 진입(펼칠 목록이 따로 없다) — 종합시험 행(megaRowHtml)과 같은 규칙. */
+function midRowHtml(m, ci){
+  const s1 = (ci + 1) + '-' + (m.subFrom + 1), s2 = (ci + 1) + '-' + (m.subTo + 1);
+  return '<div class="lgmid" data-mid="' + esc(m.id) + '" data-half="' + m.half + '">'
+    + '<b>' + (m.half === 0 ? 'First-half' : 'Second-half') + ' Quiz'
+    + ' <span class="lgmsub">' + s1 + '–' + s2 + ' · random ' + m.n + '</span></b>'
+    + '<span class="lgcount">' + m.current + '/' + m.total + '</span>'
+    + '<span class="lgbest" title="Best score"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0Z"/><path d="M7 5H4a3 3 0 0 0 3 5"/><path d="M17 5h3a3 3 0 0 1-3 5"/></svg>' + m.best + '</span>'
+    + '</div>';
+}
+function renderGroupedPickList(el, groups, openId, mids, ci){
+  // mids[k] = k번째 소챕터 「다음 줄」에 끼울 중간시험 행. 소챕터가 5개 이하인 짧은
+  // 챕터에선 반=전체라 중복이므로 호출부에서 아예 안 넘긴다.
+  const midAfter = new Map((mids || []).map((m) => [m.subTo, m]));
+  el.innerHTML = groups.map((g, gi) => {
     const done = g.items.filter((it) => it.status !== 'unknown').length;
-    return '<div class="lgroup' + (g.id === openId ? ' open' : '') + '" data-sub="' + esc(g.id) + '">'
+    const row = '<div class="lgroup' + (g.id === openId ? ' open' : '') + '" data-sub="' + esc(g.id) + '">'
       + '<div class="lgrouphead"><span class="lgcar">▶</span><b>' + esc(g.label) + '</b>'
       + '<span class="lgcount">' + done + '/' + g.items.length + '</span>'
       + '<button class="lgquiz" data-act="quiz" aria-label="Quiz this subchapter">' + LGQUIZ_ICON + '</button></div>'
       + '<div class="lgbody"></div></div>';
+    const sub = parseSubIdClient(g.id);
+    return row + (midAfter.has(sub.sub) ? midRowHtml(midAfter.get(sub.sub), ci) : '');
   }).join('');
+  el.querySelectorAll('.lgmid').forEach((row) => {
+    row.addEventListener('click', () => {
+      closeListOv();
+      enterHalfExam('c' + ci, Number(row.dataset.half), 'Chapter ' + (ci + 1) + ' ' + (Number(row.dataset.half) === 0 ? 'First-half' : 'Second-half') + ' Quiz');
+    });
+  });
   el.querySelectorAll('.lgroup').forEach((wrap, i) => {
     renderPickList(wrap.querySelector('.lgbody'), groups[i].items, 'No cards', (it) => { closeListOv(); navigateToCard(it); }, true);
     // 헤더 탭=펼치기/접기, 시험 버튼 탭=그 소챕터 시험 즉시 시작(2026-09-08 사용자 요청) —
@@ -2832,7 +2912,9 @@ async function openChapterList(cId){
     id: sid, label: (ci + 1) + '-' + (parseSubIdClient(sid).sub + 1), items,
   }));
   openListOv('Chapter ' + (ci + 1) + ' List');
-  renderGroupedPickList($('listResults'), groups, ci === chapIdx ? subId() : null);
+  // 소챕터가 5개 이하인 짧은 챕터(마지막 챕터)는 반=전체라 중간시험 행을 안 그린다.
+  const mids = groups.length > 5 ? (data.halves || []) : [];
+  renderGroupedPickList($('listResults'), groups, ci === chapIdx ? subId() : null, mids, ci);
 }
 $('searchInput').addEventListener('input', () => {
   clearTimeout(searchT);

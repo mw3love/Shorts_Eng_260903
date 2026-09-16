@@ -13,7 +13,7 @@
  *   2. GET  /api/chapters         대챕터 전체 개요(현재/최고 점수)
  *   3. GET  /api/chapter?id=cN    대챕터 하나의 소챕터 10개 상세(현재/최고 점수 + 카드 제목·known)
  *   4. GET  /api/subchapter?id=cNsM&mode=all|unknown   소챕터 하나의 카드 전체 본문(학습·시험 공용)
- *   5. GET  /api/chapterexam?id=cN[&light=1]  대챕터 전체(100장) — 카드마다 원래 소속 subId를 붙여
+ *   5. GET  /api/chapterexam?id=cN[&light=1][&half=0|1]  대챕터 전체(100장), half면 반챕터(50장) 중 무작위 25문제
  *          반환. light=1이면 본문(context/hint/detail)을 빼고 목록 렌더에 필요한 필드만 보낸다
  *          (챕터 목록 시트 전용, 2026-09-06 라운드22 — 시험 진입은 light 없이 그대로 본문 포함)
  *   5-b. GET /api/megaexam?id=gN  종합시험(대챕터 10개 범위)용 — 그 범위에서 무작위 100장 표본
@@ -522,6 +522,13 @@ function buildChapters(items) {
    (2026-09-06 사용자 확인). 매번 다시 섞이므로 재도전 가치는 오히려 커진다. */
 const GROUP_SIZE = 10;   // 그룹 하나에 묶이는 대챕터 수
 const MEGA_EXAM_N = 100; // 종합시험 출제 수(무작위 표본)
+/* ── 중간시험(2026-09-16) ──
+   소챕터 10문제와 대챕터 100문제 사이가 비어 있어, 대챕터를 소챕터 5개(=50장)씩 둘로 나눈
+   「전반/후반」 시험을 끼웠다(id는 cNh0 / cNh1). ⚠ 출제는 50장 전량이 아니라 무작위
+   MID_EXAM_N장 표본이다 — 10문제 다음 단계가 곧장 50문제면 완주 체감이 갑자기 무거워지고,
+   표본이면 재도전마다 섞여 반복 가치가 커진다(종합시험과 같은 논리, 사용자 승인). */
+const HALF_SIZE = 5;   // 중간시험 하나에 묶이는 소챕터 수(= 50장)
+const MID_EXAM_N = 25; // 중간시험 출제 수(무작위 표본)
 // 표본이 흩어져 읽어야 할 버킷 수 상한 — Cloudflare 무료 요금제의 「요청당 서브요청 50회」를
 // 넘기지 않기 위한 방어선이다(KV get도 이 예산에 포함). 카드가 지금(약 1,400장)의 몇 배로
 // 늘어나면 100장 표본이 100개 버킷에 흩어질 수 있어, 그때 조용히 죽지 않도록 미리 건다.
@@ -540,6 +547,13 @@ function parseGroupId(id) {
   const m = /^g(\d+)$/.exec(String(id || ''));
   return m ? Number(m[1]) : null;
 }
+/* 반챕터(중간시험) 범위 — 챕터 안 소챕터 배열에서 h번째 5개를 잘라낸다. 소챕터가 5개
+   이하인 짧은 챕터(마지막 챕터)는 h=0 하나만 존재하고, 그 경우 범위가 챕터 전체와
+   같아지므로 진입점 자체를 안 그린다(클라이언트 판단). */
+function halfSubsOf(subsInChap, h) {
+  return subsInChap.slice(h * HALF_SIZE, (h + 1) * HALF_SIZE);
+}
+function halfIdOf(ci, h) { return 'c' + ci + 'h' + h; }
 function knownCountFor(items, known) {
   return items.filter((it) => known[it.key]).length;
 }
@@ -558,6 +572,7 @@ async function loadKnownAndBest(env) {
   if (!best.sub) best.sub = {};
   if (!best.chap) best.chap = {};
   if (!best.mega) best.mega = {}; // 종합시험 그룹 최고기록(2026-09-06 라운드18)
+  if (!best.half) best.half = {}; // 중간시험(반챕터) 최고기록(2026-09-16)
   return { known, best };
 }
 async function loadFlags(env) {
@@ -673,7 +688,7 @@ async function handleSubchapter(env, subId, mode) {
 // 대챕터 전체 시험(100문제) — 소챕터 시험과 같은 화면/로직을 재사용하되, 카드가 10개
 // 소챕터에 걸쳐 섞이므로 각 카드에 원래 소속 subId를 붙여 보낸다. 클라이언트는 카드별로
 // 그 subId로 POST /api/answer를 호출해야 소챕터별 최고기록도 같이 갱신된다.
-async function handleChapterExam(env, chapId, light) {
+async function handleChapterExam(env, chapId, light, half) {
   const ci = parseChapId(chapId);
   if (ci == null) return json({ error: 'bad id' }, 400);
   const idxRaw = await env.KV.get(K_INDEX);
@@ -683,16 +698,31 @@ async function handleChapterExam(env, chapId, light) {
   const subsInChap = chaps[ci];
   if (!subsInChap) return json({ error: 'not found' }, 404);
 
+  // 중간시험(half=0|1)은 이 챕터의 앞/뒤 소챕터 5개(=50장)만 범위로 삼는다.
+  const scopeSubs = half == null ? subsInChap : halfSubsOf(subsInChap, half);
+  const subOffset = half == null ? 0 : half * HALF_SIZE;
+  if (!scopeSubs.length) return json({ error: 'not found' }, 404);
+
+  const { archived, trashed } = await loadFlags(env);
   const byBucket = new Map();
-  const tagged = []; // { it, subId }
-  subsInChap.forEach((items, si) => {
-    const subId = chapId + 's' + si;
+  let tagged = []; // { it, subId }
+  scopeSubs.forEach((items, si) => {
+    const subId = chapId + 's' + (subOffset + si);
     for (const it of items) {
+      // 중간시험은 「표본」이라 보관·휴지통 카드를 뽑기 전에 여기서 걸러낸다 — 뽑고 나서
+      // 클라이언트가 거르면 실제 문제 수가 표본보다 줄어든다(종합시험과 같은 이유).
+      if (half != null && (archived[it.key] || trashed[it.key])) continue;
       tagged.push({ it, subId });
-      if (!byBucket.has(it.bucket)) byBucket.set(it.bucket, []);
-      byBucket.get(it.bucket).push(it.id);
     }
   });
+  if (half != null) {
+    for (let i = tagged.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [tagged[i], tagged[j]] = [tagged[j], tagged[i]]; }
+    tagged = tagged.slice(0, MID_EXAM_N);
+  }
+  for (const { it } of tagged) {
+    if (!byBucket.has(it.bucket)) byBucket.set(it.bucket, []);
+    byBucket.get(it.bucket).push(it.id);
+  }
   // light 모드(목록 렌더 전용)는 본문 버킷을 아예 안 읽는다 — 476KB짜리 100장 응답이
   // front·상태 배지만 쓰는 화면에 전부 낭비였다(2026-09-06 라운드22 실측).
   const byId = new Map();
@@ -703,17 +733,28 @@ async function handleChapterExam(env, chapId, light) {
       for (const c of JSON.parse(raw).cards) if (ids.includes(c.id)) byId.set(c.id, c);
     }
   }
-  const { archived, trashed } = await loadFlags(env);
   // known도 포함(2026-09-06 라운드14) — 챕터 목록 화면(신상 페이지)에서 카드별 상태
   // 배지("확인함" 등)를 보여주려면 필요하다. 시험 풀 계산은 이 필드를 안 봐서 기존 동작엔
   // 영향 없음.
-  const known = JSON.parse((await env.KV.get(K_KNOWN)) || '{}');
+  const { known, best } = await loadKnownAndBest(env);
   const cards = tagged.map(({ it, subId }) => ({
     ...(light ? {} : (byId.get(it.id) || {})), id: it.id, key: it.key, front: it.front, url: it.url, created: it.created, subId,
     known: !!known[it.key], archived: !!archived[it.key], trashed: !!trashed[it.key],
   }));
 
-  return json({ id: chapId, cards });
+  // 목록 화면(light)이 중간시험 행을 그리는 데 필요한 범위별 현황 — 이 응답에 얹어 주면
+  // 아코디언이 추가 요청 없이 그대로 쓴다(진행률은 카드에서 셀 수 있지만 최고기록은
+  // 여기서만 나온다).
+  const halves = light ? [0, 1].map((h) => {
+    const subs = halfSubsOf(subsInChap, h);
+    if (!subs.length) return null;
+    const items = subs.flat();
+    const id = halfIdOf(ci, h);
+    return { id, half: h, subFrom: h * HALF_SIZE, subTo: h * HALF_SIZE + subs.length - 1,
+      total: items.length, current: knownCountFor(items, known), best: best.half[id] || 0, n: MID_EXAM_N };
+  }).filter(Boolean) : undefined;
+
+  return json({ id: chapId, half: half == null ? undefined : half, cards, halves });
 }
 
 /* 종합시험(2026-09-06 라운드18) — 챕터 10개 범위에서 무작위 100장을 뽑아 출제한다.
@@ -809,6 +850,13 @@ async function handleAnswer(env, token, dbId, body, ctx) {
   const groupItems = groupItemsOf(chaps, gi * GROUP_SIZE, Math.min(chaps.length, (gi + 1) * GROUP_SIZE) - 1);
   const groupScore = knownCountFor(groupItems, known);
   best.mega[gId] = Math.max(best.mega[gId] || 0, groupScore);
+  // 중간시험(반챕터)도 같은 규칙으로 따라 오른다 — 소챕터 인덱스에서 바로 유도되므로
+  // (floor(sub/HALF_SIZE)) 어떤 시험을 봐도 항상 최신이다(2026-09-16).
+  const hi = Math.floor(parsed.sub / HALF_SIZE);
+  const halfId = halfIdOf(parsed.chap, hi);
+  const halfItems = halfSubsOf(chaps[parsed.chap], hi).flat();
+  const halfScore = knownCountFor(halfItems, known);
+  best.half[halfId] = Math.max(best.half[halfId] || 0, halfScore);
   await env.KV.put(K_BEST, JSON.stringify(best));
 
   // know:false(시험에서 "몰랐음" / 안다 버튼 취소)도 Notion을 '미확인'으로 되돌린다 —
@@ -830,6 +878,7 @@ async function handleAnswer(env, token, dbId, body, ctx) {
     sub: { id: subId, current: subScore, best: best.sub[subId], total: subItems.length },
     chap: { id: chapId, current: chapScore, best: best.chap[chapId], total: chapItems.length },
     mega: { id: gId, current: groupScore, best: best.mega[gId], total: groupItems.length },
+    half: { id: halfId, current: halfScore, best: best.half[halfId], total: halfItems.length },
   });
 }
 
@@ -1156,7 +1205,10 @@ export default {
     if (url.pathname === '/api/image') return handleImage(env, token, url.searchParams.get('id') || '');
     if (url.pathname === '/api/chapter') return handleChapterDetail(env, url.searchParams.get('id') || '');
     if (url.pathname === '/api/subchapter') return handleSubchapter(env, url.searchParams.get('id') || '', url.searchParams.get('mode') || 'all');
-    if (url.pathname === '/api/chapterexam') return handleChapterExam(env, url.searchParams.get('id') || '', url.searchParams.get('light') === '1');
+    if (url.pathname === '/api/chapterexam') {
+      const h = url.searchParams.get('half');
+      return handleChapterExam(env, url.searchParams.get('id') || '', url.searchParams.get('light') === '1', (h === '0' || h === '1') ? Number(h) : null);
+    }
     if (url.pathname === '/api/megaexam') return handleMegaExam(env, url.searchParams.get('id') || '');
     if (url.pathname === '/api/answer' && request.method === 'POST') {
       try { return await handleAnswer(env, token, dbId, await request.json(), ctx); }
