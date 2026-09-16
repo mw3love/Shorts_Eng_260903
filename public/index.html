@@ -2912,8 +2912,11 @@ async function openChapterList(cId){
     id: sid, label: (ci + 1) + '-' + (parseSubIdClient(sid).sub + 1), items,
   }));
   openListOv('Chapter ' + (ci + 1) + ' List');
-  // 소챕터가 5개 이하인 짧은 챕터(마지막 챕터)는 반=전체라 중간시험 행을 안 그린다.
-  const mids = groups.length > 5 ? (data.halves || []) : [];
+  // ⚠ 중간시험 행은 소챕터가 8개 이상인 챕터에만 그린다 — 그래야 후반도 소챕터 3개(30장)
+  // 이상이 되어 표본 25문제가 성립한다. 실측(2026-09-16 프로덕션): 마지막 챕터 c14는
+  // 소챕터 6개(54장)라 후반이 카드 4장짜리 "Second-half Quiz"가 됐다. 그런 짧은 챕터는
+  // 챕터 전체시험 하나로 충분하다(소챕터 5개 이하면 반=전체라 애초에 중복이기도 하다).
+  const mids = groups.length >= 8 ? (data.halves || []) : [];
   renderGroupedPickList($('listResults'), groups, ci === chapIdx ? subId() : null, mids, ci);
 }
 $('searchInput').addEventListener('input', () => {
