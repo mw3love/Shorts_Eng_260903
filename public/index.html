@@ -95,8 +95,8 @@
       transform:scale(var(--auto-scale));transform-origin:center center;
     }
   }
-  #readRoot,#examView{position:absolute;inset:0}
-  #readRoot[hidden],#examView[hidden]{display:none}
+  #readRoot{position:absolute;inset:0}
+  #readRoot[hidden]{display:none}
 
   /* ── 학습(읽기) 화면 — 홈 화면 자체. 본문과 컨트롤을 「세 구역으로 분리」한다:
      본문은 위로는 상단 바 아래에서 시작하고 아래로는 스크러버 바로 위에서 끝나며,
@@ -401,6 +401,10 @@
      .barrow의 justify-content:space-between이 자식 1개일 땐 왼쪽으로 붙여버린다
      (2026-09-06 사용자 지적 — 직접 확인함). 오른쪽(엄지 영역)으로 모은다. */
   .bottombar.reviewbar .barrow{justify-content:flex-end}
+  /* 경계 안내면이 떠 있는 동안 — 안내면은 지금 카드 「위에」 그려지므로 그 카드에
+     작동하는 컨트롤을 눌리지 않게 한다(2026-09-21). 키보드 쪽은 gateActive가 막는다. */
+  .bottombar.gatebar .filtertoggle,.bottombar.gatebar .quickbtn,
+  .bottombar.gatebar .knowbtn,.bottombar.gatebar .scrubber{opacity:.28;pointer-events:none}
   .knowpop{
     position:absolute;left:16px;right:16px;bottom:calc(var(--barh) - 4px);z-index:4;
     background:color-mix(in srgb,var(--ink2) 96%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
@@ -449,25 +453,27 @@
   .loadbox p{margin:0;color:var(--muted);font-size:13px}
   .loadbox button{margin-top:6px;background:var(--ink3);color:var(--paper);border:0;border-radius:8px;padding:9px 16px;font-size:13px;cursor:pointer}
 
-  /* ── 시험(exam) ── */
-  #examView{display:flex;flex-direction:column}
-  .examtop{flex:none;display:flex;align-items:center;gap:10px;padding:calc(env(safe-area-inset-top) + 10px) 16px 6px}
-  .examtop button{width:34px;height:34px;border-radius:50%;border:0;background:var(--ink3);color:var(--muted);cursor:pointer;font-size:16px;flex:none}
-  .examtop .ttl{flex:1;text-align:center;font-family:var(--serif);font-size:15px;color:var(--paper)}
-  .examwrap{flex:1;min-height:0;display:flex;flex-direction:column;padding:0 22px}
-  .examprog{flex:none;font-family:var(--mono);font-size:11px;color:var(--muted);padding:6px 0 0;text-align:center}
-  .examcard{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;gap:18px;overflow-y:auto}
-  .examtitle{font-family:var(--title-font);font-size:clamp(24px,7vw,32px);line-height:1.25;color:var(--paper);text-align:center;text-wrap:balance}
-  .examreveal{align-self:center;background:var(--ink3);color:var(--coral);border:0;border-radius:99px;padding:13px 26px;font-family:var(--sans);font-size:14px;cursor:pointer}
+  /* ── 시험(exam) — 2026-09-21부터 별도 화면이 아니라 「읽기화면의 한 모드」다.
+     예전엔 #examView라는 독립 뷰라 스와이프·하단바·폰트·형광펜이 전부 다르게 동작했는데,
+     본문 렌더러는 이미 같은 것(.content)을 쓰고 있어 차이는 껍데기뿐이었다. 지금은
+     studyCards를 시험 풀로 바꾸고 본문만 리빌 전까지 가린다 — 채점 버튼도 따로 없이
+     하단바의 체크 버튼이 그대로 "유지/취소"를 맡는다(체크 상태가 곧 점수이므로). ── */
+  .examreveal{display:block;margin:28vh auto 0;background:var(--ink3);color:var(--coral);border:0;border-radius:99px;padding:13px 26px;font-family:var(--sans);font-size:14px;cursor:pointer}
   .examreveal:active{background:var(--ink4)}
-  .exambody{min-height:0;max-height:44vh;overflow-y:auto;-webkit-user-select:text;user-select:text}
-  .examjudge{display:flex;gap:10px;padding:6px 0 22px;flex:none}
-  .examjudge[hidden]{display:none}
-  .examjudge button{flex:1;border:0;border-radius:12px;padding:14px 8px;font-family:var(--sans);font-size:14px;cursor:pointer}
-  .examjudge .know{background:color-mix(in srgb,var(--know) 20%,var(--ink3));color:var(--know)}
-  .examjudge .dontknow{background:color-mix(in srgb,var(--coral) 16%,var(--ink3));color:var(--coral)}
 
-  .examresult{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;height:100%;padding:0 24px;text-align:center}
+  /* 소챕터 경계의 중간시험 안내면(2026-09-21) — 자동으로 시험이 시작되지 않는다.
+     한 번 더 스와이프하면 그냥 지나간다(강제 게이트 아님, 프로젝트 "게이트 없음" 원칙). */
+  .examgate{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;min-height:70vh;text-align:center;padding:0 10px}
+  .examgate .gt{font-family:var(--serif);font-size:20px;color:var(--paper)}
+  .examgate .gs{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+  .examgate .gactions{display:flex;flex-direction:column;gap:8px;width:100%;max-width:300px;margin-top:6px}
+  .examgate button{background:var(--ink3);color:var(--paper);border:0;border-radius:10px;padding:13px;font-family:var(--sans);font-size:13.5px;cursor:pointer}
+  .examgate button.primary{background:color-mix(in srgb,var(--coral) 20%,var(--ink3));color:var(--coral)}
+  .examgate .ghint{font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+
+  /* ⚠ height:100%가 아니라 min-height:70vh — 부모 .content가 min-height:100%(height는 auto)라
+     퍼센트 높이가 auto로 풀려 justify-content:center가 안 먹고 결과가 위로 붙었다. */
+  .examresult{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;min-height:70vh;padding:0 24px;text-align:center}
   .examresult .score{font-family:var(--serif);font-size:34px;color:var(--paper)}
   .examresult .best{font-family:var(--mono);font-size:12px;color:var(--muted)}
   .examresult .actions{display:flex;flex-direction:column;gap:8px;width:100%;margin-top:8px}
@@ -609,6 +615,9 @@
              하단 "안다" 버튼과 같은 체크 모티프라 겹쳐 보이던 문제를 해결. 가운데 점만
              코랄로 고정해 "적중" 느낌을 살림(사용자 피드백 반영). -->
         <button class="examtopbtn" id="subExamBtn" aria-label="Quiz this subchapter"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.6" stroke="none" style="fill:var(--coral)"/></svg></button>
+        <!-- 시험 모드에서만 나타나는 나가기(2026-09-21) — 시험이 읽기화면의 한 모드가
+             되면서 예전 #examView의 ✕ 자리를 대신한다. subExamBtn과 배타로 토글. -->
+        <button class="examtopbtn" id="examExitBtn" hidden aria-label="Exit quiz">&#10005;</button>
       </div>
       <div class="subpos"><button class="subpos-chip" id="subPosChip" aria-label="This subchapter's card list"><span id="subPos">1-1</span><span class="subpos-dots" id="subPosDots"><i></i><i></i><i></i><i></i><i></i></span></button></div>
       <div class="topbar-right">
@@ -710,14 +719,6 @@
     </div>
 
     <div class="loadbox" id="loading"><h2 id="loadTitle">Loading</h2><p id="loadMsg">Fetching cards from Notion</p></div>
-  </div>
-
-  <div id="examView" hidden>
-    <div class="examtop"><button id="examBack" aria-label="Close">&#10005;</button><div class="ttl" id="examTitleBar">Quiz</div><button id="examHlBtn" aria-label="Highlight">&#128397;</button></div>
-    <div class="examwrap"><div class="examprog" id="examProg"></div>
-      <div class="examcard" id="examCard"></div>
-      <div class="examjudge" id="examJudge" hidden><button class="dontknow" data-k="0">Didn't know</button><button class="know" data-k="1">Knew it</button></div>
-    </div>
   </div>
 
   <div class="toast" id="toast"></div>
@@ -906,6 +907,10 @@ function cardBodyHtml(c){
   return preHtml(c) + (hintIsImage ? imageHtml(c.hint) : '') + (h ? '<p class="lhint" data-blk="hint">' + h + '</p>' : '') + detailHtml(c)
     + (c.url ? '<a class="src" href="' + esc(c.url) + '" target="_blank" rel="noopener">Original video &#8599;</a>' : '');
 }
+// ⚠ 시험 중 「아직 안 연 문제」는 미리보기에도 본문을 그리지 않는다 — 스와이프하는
+// 동안 다음 문제의 답이 옆 패널에 먼저 보이면 시험이 성립하지 않는다(#examView엔 peek
+// 자체가 없어 통합하면서 새로 생긴 구멍, 2026-09-21 독립 검토에서 발견).
+function peekBodyFor(c){ return (examMode && c && !examRevealed.has(c.key)) ? '' : peekBodyHtml(c); }
 function peekBodyHtml(c){
   if (!c) return '';
   const h = hintHtml(c);
@@ -925,7 +930,7 @@ function toast(msg){
 /* ── API ── */
 async function apiChapters(){ const r = await fetch('/api/chapters'); return r.json(); }
 async function apiSubchapter(id, mode){ const r = await fetch('/api/subchapter?id=' + encodeURIComponent(id) + '&mode=' + mode); return r.json(); }
-async function apiChapterExam(id, light, half){ const r = await fetch('/api/chapterexam?id=' + encodeURIComponent(id) + (light ? '&light=1' : '') + (half == null ? '' : '&half=' + half)); return r.json(); }
+async function apiChapterExam(id, light, half, unknownOnly){ const r = await fetch('/api/chapterexam?id=' + encodeURIComponent(id) + (light ? '&light=1' : '') + (half == null ? '' : '&half=' + half) + (unknownOnly ? '&unknown=1' : '')); return r.json(); }
 async function apiMegaExam(id){ const r = await fetch('/api/megaexam?id=' + encodeURIComponent(id)); return r.json(); }
 function apiAnswer(subId, key, know, pageId){
   return fetch('/api/answer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subId, key, know, pageId }) })
@@ -989,13 +994,11 @@ function applyTitleText(text){
   if (!card || !text || text === card.front) return;
   const oldFront = card.front, oldKey = card.key;
   card.front = text;
-  if (!examMode) $('cardTitle').innerHTML = titleHtml(card);
-  else { const el = $('examTitle'); if (el) el.textContent = text; }
+  $('cardTitle').innerHTML = titleHtml(card);
   apiRetitle(card.id, oldKey, text).catch(() => null).then((res) => {
     if (res && res.ok){ card.front = res.front; card.key = res.key; toast('Title updated'); return; }
     card.front = oldFront;
-    if (!examMode) $('cardTitle').innerHTML = titleHtml(card);
-    else { const el = $('examTitle'); if (el) el.textContent = oldFront; }
+    $('cardTitle').innerHTML = titleHtml(card);
     toast('Title update failed');
   });
 }
@@ -1080,7 +1083,6 @@ let highlightMode = false;
 function setHighlightMode(on, btn){
   highlightMode = on;
   $('hlBtn').classList.toggle('active', on);
-  $('examHlBtn').classList.toggle('active', on);
   if (on){
     // 라운드10에서 제목 메뉴·입력창 팝업을 인라인 편집으로 바꾸며 hideTitleMenu()/
     // hideTitleEdit() 정의를 지웠는데 이 호출부만 남아, 형광펜을 켤 때마다
@@ -1101,11 +1103,8 @@ function setHighlightMode(on, btn){
 }
 function toggleHighlightMode(){ setHighlightMode(!highlightMode); }
 $('hlBtn').addEventListener('click', toggleHighlightMode);
-$('examHlBtn').addEventListener('click', toggleHighlightMode);
 
-function currentCardForHighlight(){
-  return !examMode ? studyCards[studyIdx] : examCards[examIdx];
-}
+function currentCardForHighlight(){ return studyCards[studyIdx]; }
 function plainOffsetInBlock(blockEl, node, offset){
   const walker = document.createTreeWalker(blockEl, NodeFilter.SHOW_TEXT);
   let pos = 0;
@@ -1162,7 +1161,7 @@ let highlightSeq = 0;
 // 그래서 드래그가 진행 중(selectionDragActive)이면 화면 교체를 pointerup까지 미룬다.
 let selectionDragActive = false, pendingHighlightRender = null;
 document.addEventListener('pointerdown', (e) => {
-  if (e.target.closest('#content, #examBody')) selectionDragActive = true;
+  if (e.target.closest('#content')) selectionDragActive = true;
 });
 function flushPendingHighlightRender(){
   if (pendingHighlightRender){ const fn = pendingHighlightRender; pendingHighlightRender = null; fn(); }
@@ -1191,9 +1190,12 @@ function doHighlight(blk, start, end){
     if (res && res.ok){
       Object.assign(card, res.card);
       if (currentCardForHighlight() === card){
+        // 시험 모드에서 아직 리빌 안 한 카드는 본문 자체가 안 떠 있으므로 건드리지 않는다.
+        // ⚠ 안내면·결과 화면·아직 안 연 시험 문제 위에는 그리지 않는다 — 늦게 도착한
+        // 응답이 점수판이나 갈림길을 카드 본문으로 덮어쓴다(2026-09-21 독립 검토).
         const render = () => {
-          if (!examMode) $('content').innerHTML = cardBodyHtml(card);
-          else { const el = $('examBody'); if (el) el.innerHTML = cardBodyHtml(card); }
+          if (examDone || gateActive) return;
+          if (!examMode || examRevealed.has(card.key)) $('content').innerHTML = cardBodyHtml(card);
         };
         if (selectionDragActive) pendingHighlightRender = render;
         else render();
@@ -1274,12 +1276,12 @@ function onHighlightAreaClick(e){
 // 안 쏴서 형광펜이 아예 안 먹혔다(2026-09-05 실기기 피드백으로 확인된 버그).
 document.addEventListener('pointerup', (e) => {
   if (!highlightMode) return;
-  if (!e.target.closest('#content, #examBody')) return;
+  if (!e.target.closest('#content')) return;
   setTimeout(tryAutoHighlight, 0);
 });
 document.addEventListener('click', (e) => {
   if (!highlightMode) return;
-  if (!e.target.closest('#content, #examBody')) return;
+  if (!e.target.closest('#content')) return;
   onHighlightAreaClick(e);
 });
 
@@ -1287,9 +1289,17 @@ document.addEventListener('click', (e) => {
 let chapIdx = 0, subIdx = 0;
 let totalChapters = 1;
 let allChaptersData = null; // /api/chapters 결과 캐시(시트에서 씀)
+/* ⚠ 마지막 위치는 localStorage(=기기별)다. 그래서 아이폰에선 이어보기가 되는데 PC에선
+   늘 1-1-1부터 열렸다(2026-09-21 사용자 질문). known은 서버에 있으므로, 이 기기에
+   저장된 위치가 「없을 때」만 서버가 알려준 「아직 체크 안 된 첫 카드」로 연다 —
+   기기가 바뀌어도 진도의 최전선에서 시작된다.
+   ⚠ 저장된 위치가 있으면 그쪽을 존중한다. 앞선 챕터에 미체크가 남아 있다는 이유로
+   읽던 자리에서 뒤로 끌어당기면 그게 더 나쁜 동작이라서다(기기가 이미 "어디까지 봤나"를
+   알고 있고, 소챕터 안에서는 기본 필터가 "미완료만"이라 어차피 첫 미체크부터 보인다). */
+let hasSavedPos = false;
 function loadPos(){
   const p = lsGetJSON('sd_pos', null);
-  if (p && typeof p.chap === 'number' && typeof p.sub === 'number'){ chapIdx = p.chap; subIdx = p.sub; }
+  if (p && typeof p.chap === 'number' && typeof p.sub === 'number'){ chapIdx = p.chap; subIdx = p.sub; hasSavedPos = true; }
 }
 function savePos(){ lsSetJSON('sd_pos', { chap: chapIdx, sub: subIdx }); }
 function subId(){ return 'c' + chapIdx + 's' + subIdx; }
@@ -1303,6 +1313,13 @@ function flashSubPos(){
   setTimeout(() => chip.classList.remove('flash'), 460);
 }
 function updateSubPos(){
+  // 시험 중엔 풀이 이 소챕터가 아니다 — 칩은 진행(Q n/총)만 보여주고, 소챕터 진행 점·
+  // 필터칩(둘 다 subchapterAll 기준)은 아예 숨겨져 있으므로 갱신할 것도 없다.
+  if (examMode){
+    if (!examDone) $('subPos').textContent = 'Q ' + (studyIdx + 1) + '/' + studyCards.length;
+    return;
+  }
+  if (foreignPool){ $('subPos').textContent = '↻ ' + (studyIdx + 1) + '/' + studyCards.length; return; }
   const pos = subId();
   if (lastShownPos && lastShownPos !== pos) flashSubPos();
   lastShownPos = pos;
@@ -1412,7 +1429,12 @@ function prefetchNeighbors(){
 // atEnd — 뒤로 스와이프해서 이전 소챕터로 넘어온 경우엔 첫 카드가 아니라 마지막 카드에
 // 도착해야 이동 방향과 화면이 맞는다(2026-09-05 실기기 피드백).
 async function loadSubchapter(atEnd){
-  if (reviewMode) exitReviewModeUi(); // 실제 챕터로 돌아오는 모든 경로(시트 이동·검색 등)의 공통 관문
+  // 실제 챕터로 돌아오는 모든 경로(시트 이동·검색·뒤로가기)의 공통 관문 — 시험 중에도
+  // ☰(시트)·검색 버튼은 그대로 살아 있어서, 여기서 안 풀면 examMode가 켜진 채로 읽기
+  // 화면에 남는다(칩이 'Done'으로 굳고 경계 안내면도 통째로 막힌다 — 2026-09-21 재현).
+  if (reviewMode) exitReviewModeUi();
+  if (examMode) exitExamUi();
+  if (foreignPool) exitForeignPoolUi();
   const id = subId();
   let cards = subCache.get(id);
   if (!cards){
@@ -1454,6 +1476,8 @@ function applyFilter(atEnd){
 function renderStudyCard(){
   const c = studyCards[studyIdx];
   if (!c) return;
+  gateShownFor = null; // 카드를 다시 그린 순간 "안내면을 지나쳤다"는 1회성 상태는 초기화
+  setGateActive(false);
   // 스와이프 없이 곧장 점프하는 경로(챕터 목록 이동·검색 결과 이동·복습 카드뷰 진입 등)가
   // 여러 곳으로 늘면서, 드래그 도중 상태가 이 경로들과 겹치면 peek 카드의 잔상 transform이
   // 안 지워진 채 남아 엉뚱한 카드가 화면을 덮는 경우가 있었다(2026-09-06 테스트로 발견) —
@@ -1461,7 +1485,12 @@ function renderStudyCard(){
   setDragTransition('none'); resetDragX();
   $('cardTitle').innerHTML = titleHtml(c);
   $('cardTitle').href = c.url || '#';
-  $('content').innerHTML = cardBodyHtml(c);
+  // 시험 모드 — 아직 안 연 카드는 본문 대신 리빌 버튼만. 제목 옆 체크 배지는 그대로
+  // 보인다(2026-09-21 사용자 결정): 이미 아는 카드는 열어보지 않고 그냥 넘긴다.
+  if (examMode && !examRevealed.has(c.key)){
+    $('content').innerHTML = '<button class="examreveal" id="examReveal">Reveal answer</button>';
+    $('examReveal').addEventListener('click', revealExamCard, { once: true });
+  } else $('content').innerHTML = cardBodyHtml(c);
   $('scroller').scrollTop = 0;
   renderStudyScrubber();
   syncCardStateButtons();
@@ -1503,7 +1532,13 @@ function removeCurrentCardFromRotation(){
   // 마지막 소챕터에서 전부 처리하면 갈 곳이 없다(라운드18에서 전역 wrap을 없앤 뒤로는
   // 첫 카드로 되감지 않는다) — 그 자리에 빈 상태만 보여준다(reviewMode의 renderReviewEmpty와 같은 패턴).
   if (!studyCards.length){
-    if (neighborPos(1)){ toast('No more cards here — moving to next subchapter'); advanceSubchapter(); }
+    // ⚠ "미완료만"에서 마지막 미체크 카드를 체크하면 여기로 온다 — 실제로 소챕터 경계에
+    // 닿는 가장 흔한 경로다. 안내면을 여기서도 띄우되, 목록이 비어 스와이프가 죽어 있으므로
+    // (studyCards.length < 2면 스와이프 자체가 막힌다) 「계속」 버튼을 명시적으로 준다.
+    if (neighborPos(1)){
+      if (maybeShowBoundaryGate(true)) return;
+      toast('No more cards here — moving to next subchapter'); advanceSubchapter();
+    }
     else renderStudyEmpty();
     return;
   }
@@ -1534,14 +1569,19 @@ async function markKnown(){
   const wasArchived = c.archived, wasTrashed = c.trashed;
   c.known = true; c.archived = false; c.trashed = false;
   const entry = currentSubEntry(c.key); if (entry){ entry.known = true; entry.archived = false; entry.trashed = false; }
+  syncKnownLocally(c.key, true); // 시험 풀은 읽기화면 카드와 다른 객체다(스프레드 복사본)
   // renderStudyCard()를 통째로 부르면 스크롤이 맨 위로 튀어 읽던 위치를 잃으므로
   // 제목 배지·하단 버튼·진행 표시만 갱신한다.
   refreshCardState(c);
-  const sub = subId();
+  // ⚠ 카드가 자기 소챕터를 알고 있으면(시험 풀·경계 안내면의 미체크 복습 풀처럼 여러
+  // 소챕터에 걸친 목록) 그쪽으로 보낸다 — subId()(지금 보고 있는 소챕터)로 보내면 점수가
+  // 엉뚱한 범위에 붙는다. /api/subchapter 카드엔 이 필드가 없어 평소엔 그대로 subId().
+  const sub = c.subId || subId();
   if (wasArchived) queueFlagApi(() => apiArchiveRestore(c.key, c.id));
   if (wasTrashed) queueFlagApi(() => apiTrashRestore(c.key, c.id));
-  queueFlagApi(() => apiAnswer(sub, c.key, true, c.id));
-  if (studyMode === 'unknown') removeCurrentCardFromRotation();
+  queueFlagApi(() => apiAnswer(sub, c.key, true, c.id).then(captureExamBest));
+  // 시험 중엔 로테이션에서 빼지 않는다 — 지금 이 문제를 계속 보고 있어야 한다.
+  if (!examMode && studyMode === 'unknown') removeCurrentCardFromRotation();
 }
 // "안다" 취소 — 서버는 know:false면 known KV에서 지우고 Notion도 '미확인'으로 되돌린다.
 // (KV만 지우고 Notion은 '확인함'으로 남던 비대칭을 라운드17에서 같이 바로잡았다.)
@@ -1549,11 +1589,19 @@ async function undoKnown(){
   const c = studyCards[studyIdx]; if (!c) return;
   c.known = false;
   const entry = currentSubEntry(c.key); if (entry) entry.known = false;
+  syncKnownLocally(c.key, false);
   refreshCardState(c);
   // subId()는 지금 값을 미리 잡아둔다 — 큐가 실행될 즈음엔 사용자가 이미 다음 소챕터로
   // 넘어가 chapIdx/subIdx가 바뀌어 있을 수 있다(점수가 엉뚱한 소챕터에 붙는다).
-  const sub = subId();
-  queueFlagApi(() => apiAnswer(sub, c.key, false, c.id));
+  const sub = c.subId || subId();
+  queueFlagApi(() => apiAnswer(sub, c.key, false, c.id).then(captureExamBest));
+}
+// /api/answer 응답에 실려 오는 범위별 최고기록을 결과 화면용으로 붙잡아 둔다 — 시험
+// 종류와 무관하게 네 축(소챕터·반챕터·챕터·종합)이 매 채점마다 같이 갱신돼 온다.
+function captureExamBest(res){
+  if (!res || !res.ok) return res;
+  examLastSub = res.sub; examLastChap = res.chap; examLastMega = res.mega; examLastHalf = res.half;
+  return res;
 }
 // 2026-09-06 라운드14부터 이 팝업은 트래시 카드뷰 롱프레스("완전삭제" 확인) 하나만 쓴다
 // — 평소 보관/휴지통 갈림길은 하단바 상시 버튼(trashQuickBtn/archiveQuickBtn)으로 옮겼다.
@@ -1630,9 +1678,11 @@ function currentCardStatus(){
   return (c && !reviewMode) ? cardStatus(c) : null;
 }
 $('trashQuickBtn').addEventListener('click', () => {
+  if (gateActive) return;
   if (currentCardStatus() === 'trash') undoFlag('trash'); else doTrash();
 });
 $('archiveQuickBtn').addEventListener('click', () => {
+  if (gateActive) return;
   if (currentCardStatus() === 'archive') undoFlag('archive'); else doArchive();
 });
 
@@ -1652,6 +1702,7 @@ knowBtn.addEventListener('pointerdown', () => {
 });
 knowBtn.addEventListener('pointerup', () => {
   clearTimeout(knowPressT);
+  if (gateActive) return; // 안내면이 뒤에 숨은 카드를 가리고 있다
   if (reviewMode){ if (!knowLongPressed) doReviewRestore(); return; }
   // 켜져 있으면(=이 카드가 이미 확인함) 다시 탭해서 취소 — 휴지통·완전히앎 버튼과 같은
   // 토글 규칙(2026-09-06 라운드17: "체크버튼 표시는 취소가 안 된다"는 지적).
@@ -1672,6 +1723,8 @@ async function enterReviewMode(kind){
   try { data = await (await fetch(path)).json(); } catch (e) { data = null; }
   clearTimeout(t); hideLoading();
   if (!data || !Array.isArray(data.items) || !data.items.length){ toast('Empty'); return; }
+  if (examMode) exitExamUi(); // 시험 중 시트에서 바로 들어올 수 있다 — 두 모드가 겹치면 크롬이 엉킨다
+  if (foreignPool) exitForeignPoolUi();
   reviewMode = kind;
   knowLongPressed = false;
   studyCards = data.items; studyIdx = 0;
@@ -1772,13 +1825,13 @@ function scrubIndexFromX(clientX){
 }
 let scrubbing = false;
 $('scrubber').addEventListener('pointerdown', (e) => {
-  if (studyCards.length < 2) return;
+  if (studyCards.length < 2 || examDone || gateActive) return;
   scrubbing = true;
   try { $('scrubber').setPointerCapture(e.pointerId); } catch (err) {}
   studyIdx = scrubIndexFromX(e.clientX); renderStudyCard();
 });
 $('scrubber').addEventListener('pointermove', (e) => {
-  if (!scrubbing) return;
+  if (!scrubbing || examDone || gateActive) return;
   const i = scrubIndexFromX(e.clientX);
   if (i !== studyIdx){ studyIdx = i; renderStudyCard(); }
 });
@@ -1919,8 +1972,8 @@ function boundaryCard(dir){
 }
 // reviewMode(완전히 앎/휴지통 카드뷰)에서는 경계 밖이 chapIdx/subIdx와 무관한 별도
 // 풀이라 boundaryCard(실제 챕터 기준)를 부르면 안 맞는 카드가 나온다 — 그냥 없음으로 둔다.
-function studyPrev(){ return studyIdx > 0 ? studyCards[studyIdx - 1] : (reviewMode ? null : boundaryCard(-1)); }
-function studyNext(){ return studyIdx + 1 < studyCards.length ? studyCards[studyIdx + 1] : (reviewMode ? null : boundaryCard(1)); }
+function studyPrev(){ return studyIdx > 0 ? studyCards[studyIdx - 1] : ((reviewMode || examMode || foreignPool) ? null : boundaryCard(-1)); }
+function studyNext(){ return studyIdx + 1 < studyCards.length ? studyCards[studyIdx + 1] : ((reviewMode || examMode || foreignPool) ? null : boundaryCard(1)); }
 function setDragX(px){
   content.style.transform = 'translateX(' + px + 'px)'; cardTitleEl.style.transform = 'translateX(' + px + 'px)';
   peekPrev.style.transform = 'translateX(calc(-100% + ' + px + 'px))'; peekNext.style.transform = 'translateX(calc(100% + ' + px + 'px))';
@@ -1941,11 +1994,11 @@ function beginSwipeTracking(e){
   try { scroller.setPointerCapture(e.pointerId); } catch (err) {}
   setDragTransition('none');
   const pc = studyPrev(), nc = studyNext();
-  $('peekPrevTitle').textContent = pc ? pc.front : ''; $('peekPrevBody').innerHTML = peekBodyHtml(pc);
-  $('peekNextTitle').textContent = nc ? nc.front : ''; $('peekNextBody').innerHTML = peekBodyHtml(nc);
+  $('peekPrevTitle').textContent = pc ? pc.front : ''; $('peekPrevBody').innerHTML = peekBodyFor(pc);
+  $('peekNextTitle').textContent = nc ? nc.front : ''; $('peekNextBody').innerHTML = peekBodyFor(nc);
 }
 scroller.addEventListener('pointerdown', (e) => {
-  if (studyCards.length < 2 || examMode || highlightMode || titleEditing) return;
+  if ((studyCards.length < 2 && !examMode) || examDone || gateActive || highlightMode || titleEditing) return;
   // 2번째 손가락이 닿는 순간(핀치 시작 후보) — document의 pinch 핸들러가 이 이벤트를
   // 먼저 pinchPointers에 기록하지는 않지만(버블 순서상 여기가 먼저 실행됨), 그 시점에
   // 이미 손가락 1개는 기록돼 있으므로 이 체크로 잡힌다. 스와이프 프라이밍을 건너뛴다.
@@ -1968,7 +2021,7 @@ scroller.addEventListener('pointerdown', (e) => {
 // 핸들로 정교하게 조정하는 단계까지 통째로 네이티브에 맡겨야 안전해서, "가로우세
 // 판정"류 휴리스틱보다 이쪽이 확실하다(2026-09-05 실기기 피드백).
 scroller.addEventListener('pointermove', (e) => {
-  if (studyCards.length < 2 || examMode || highlightMode || titleEditing) return;
+  if ((studyCards.length < 2 && !examMode) || examDone || gateActive || highlightMode || titleEditing) return;
   if (pinchPointers.size >= 2) return; // 핀치 진행 중엔 스와이프 계산 자체를 건너뛴다
   // ⚠ 마우스는 버튼을 안 눌러도 pointermove가 계속 발생한다(터치는 손가락이 닿아있을 때만
   // 발생 — 이 체크가 왜 지금까지 안 걸렸는지의 이유). 이게 없으면 새로고침 직후 sx/sy가
@@ -2041,7 +2094,11 @@ function goToNext(){
     setDragTransition('none'); resetDragX();
     // reviewMode에선 소챕터 경계가 없다 — 마지막 카드에서 그냥 멈춘다(advanceSubchapter는
     // chapIdx/subIdx 기준 실제 챕터로 튀어버려 복습 풀을 이탈시킨다).
-    if (studyIdx + 1 >= studyCards.length) { if (reviewMode) toast('Last card'); else advanceSubchapter(); }
+    if (studyIdx + 1 >= studyCards.length) {
+      if (examMode) finishExam();
+      else if (reviewMode) toast('Last card');
+      else if (!maybeShowBoundaryGate()) advanceSubchapter();
+    }
     else { studyIdx++; renderStudyCard(); }
   });
 }
@@ -2049,10 +2106,102 @@ function goToPrev(){
   setDragX(dragW);
   afterCardTransition(() => {
     setDragTransition('none'); resetDragX();
-    if (studyIdx - 1 < 0) { if (reviewMode) toast('First card'); else retreatSubchapter(); }
+    if (studyIdx - 1 < 0) { if (examMode) toast('First question'); else if (reviewMode) toast('First card'); else retreatSubchapter(); }
     else { studyIdx--; renderStudyCard(); }
   });
 }
+/* ── 소챕터 경계의 중간시험 안내면(2026-09-21 사용자 제안) ───────────────────────
+   1-5의 마지막 카드에서 1-6으로 넘어가는 자리엔 중간시험(반챕터)이 걸려 있는데, 그 존재를
+   알 방법이 챕터 시트를 여는 것뿐이었다. 그렇다고 경계에서 시험을 「자동 시작」하지는
+   않는다 — 라운드18에서 챕터 완주 넛지 배너를 폐기하고 상시 행으로 바꾼 판례(제안이
+   무마찰 흐름에 끼어들면 안 된다)와 정면으로 부딪히기 때문. 대신 카드 한 장짜리 갈림길을
+   끼우고, 한 번 더 스와이프하면 그냥 지나간다(게이트 아님 — 이 앱의 "진도 잠금 없음"
+   원칙 유지, 사용자 확인).
+   미체크가 남아 있으면 「그것만 먼저 복습」이라는 갈래가 하나 더 생긴다(사용자 제안). */
+let gateShownFor = null;
+// gateActive — 경계 안내면이 떠 있는 동안. 안내면은 「지금 카드 위에」 그려지므로,
+// 그대로 두면 체크·휴지통·보관·스크러버가 전부 뒤에 숨은 카드에 작동한다(안내면이
+// 사라지고 카드가 튀어나오거나, gateShownFor가 리셋돼 안내면이 두 번 뜬다).
+// foreignPool — 지금 studyCards가 이 소챕터가 아닌 목록일 때(미체크 복습 풀·오답 복습 풀).
+// n/전체 칩은 subchapterAll 기준이라 숫자가 거짓말이고, 탭하면 applyFilter가 풀을 통째로
+// 날려버린다. 둘 다 2026-09-21 독립 검토에서 발견.
+let gateActive = false, foreignPool = false;
+function setGateActive(on){
+  gateActive = on;
+  $('bottombar').classList.toggle('gatebar', on);
+}
+function enterForeignPool(cards, label){
+  foreignPool = true;
+  $('filterToggle').hidden = true;
+  $('subPosDots').hidden = true;
+  studyCards = cards; studyIdx = 0;
+  setRetitleContext(() => studyCards[studyIdx]);
+  renderStudyCard();
+  toast(label);
+}
+function exitForeignPoolUi(){
+  foreignPool = false;
+  $('filterToggle').hidden = false;
+  $('subPosDots').hidden = false;
+}
+function halfAtBoundary(){
+  const ch = allChaptersData && allChaptersData.chapters && allChaptersData.chapters[chapIdx];
+  // halves는 소챕터 8개 이상인 챕터에만 실려 온다(서버가 같은 규칙으로 거른다) — 짧은
+  // 챕터는 반=전체라 중간시험 자체가 없다.
+  return ((ch && ch.halves) || []).find((h) => h.subTo === subIdx) || null;
+}
+function maybeShowBoundaryGate(stuck){
+  if (examMode || reviewMode) return false;
+  const h = halfAtBoundary();
+  if (!h) return false;
+  const gid = 'c' + chapIdx + 'h' + h.half;
+  if (gateShownFor === gid){ gateShownFor = null; return false; } // 두 번째 스와이프 = 통과
+  gateShownFor = gid;
+  renderBoundaryGate(h, stuck);
+  // 캐시(allChaptersData)는 부팅·소챕터 이동 때 갱신되므로 방금 체크한 것들이 아직 안
+  // 반영돼 있을 수 있다 — 먼저 그려서 깜빡임을 없애고, 최신 숫자가 오면 그 자리에서
+  // 다시 그린다(그 사이 사용자가 지나쳤으면 gateShownFor가 달라져 건드리지 않는다).
+  refreshChapterMeta().then(() => {
+    if (gateShownFor !== gid) return;
+    const fresh = halfAtBoundary();
+    if (fresh) renderBoundaryGate(fresh, stuck);
+  });
+  return true;
+}
+function renderBoundaryGate(h, stuck){
+  setDragTransition('none'); resetDragX();
+  const label = (h.half === 0 ? 'First-half' : 'Second-half') + ' Quiz';
+  const left = Math.max(0, h.total - h.current);
+  const range = (chapIdx + 1) + '-' + (h.subFrom + 1) + ' – ' + (chapIdx + 1) + '-' + (h.subTo + 1);
+  let actions = '';
+  if (left) actions += '<button id="gateReview">Review ' + left + ' unchecked first</button>';
+  actions += '<button class="primary" id="gateQuiz">Take the quiz (' + h.n + ' random)</button>';
+  if (stuck) actions += '<button id="gateContinue">Continue to next subchapter</button>';
+  setGateActive(true);
+  $('cardTitle').innerHTML = ''; $('cardTitle').removeAttribute('href');
+  $('content').innerHTML = '<div class="examgate"><div class="gt">' + esc(label) + '</div>'
+    + '<div class="gs">' + esc(range) + ' · ' + (left ? left + ' unchecked' : 'all checked')
+    + ' · best ' + h.best + '/' + h.total + '</div>'
+    + '<div class="gactions">' + actions + '</div>'
+    + (stuck ? '' : '<div class="ghint">Swipe again to continue</div>') + '</div>';
+  $('scroller').scrollTop = 0;
+  $('gateQuiz').addEventListener('click', () => enterHalfExam('c' + chapIdx, h.half, 'Chapter ' + (chapIdx + 1) + ' ' + label));
+  const rv = $('gateReview');
+  if (rv) rv.addEventListener('click', () => startHalfReview(chapIdx, h));
+  const go = $('gateContinue');
+  if (go) go.addEventListener('click', () => { gateShownFor = null; advanceSubchapter(); });
+}
+// 「미체크만 먼저 복습」 — 시험이 아니라 읽기 풀이다(표본이 아니라 전량, 순서도 원래대로).
+// 이 풀을 다 넘기면 경계 안내면이 다시 떠서 그 자리에서 시험으로 이어갈 수 있다.
+async function startHalfReview(ci, h){
+  const t = setTimeout(() => showLoading('Loading', 'Fetching unchecked cards'), 250);
+  let data;
+  try { data = await apiChapterExam('c' + ci, false, h.half, true); } catch (e) { data = null; }
+  clearTimeout(t); hideLoading();
+  if (!data || data.error || !data.cards || !data.cards.length){ toast(data && data.error ? data.error : 'Nothing left to review'); return; }
+  enterForeignPool(data.cards, 'Reviewing ' + data.cards.length + ' unchecked');
+}
+
 // PC 내비게이션(2026-09-07, 사용자 요청) — 방향키/PageUp·Down, 그리고 아래 호버 버튼이
 // 공유한다. 드래그 없이 바로 커밋하므로 beginSwipeTracking이 매 스와이프 시작 때 하던
 // 준비(dragW 실측·peek 패널 채우기)를 여기서 직접 한다.
@@ -2061,12 +2210,12 @@ function navByKey(dir){
   // 형광펜 "모드"가 켜져 있는 것과 "지금 드래그로 선택 중"인 것은 다르다. 전자로 막으면
   // 모드를 켜둔 채로는 페이지 넘김 버튼·단축키가 통째로 죽는다(2026-09-08 사용자 지적).
   // selectionDragActive는 형광펜 응답 레이스 수정(위 doHighlight 참조)에서 이미 만든
-  // "지금 #content/#examBody 안에서 마우스 버튼이 눌려 있는가" 플래그를 그대로 재사용.
-  if (studyCards.length < 2 || examMode || selectionDragActive || titleEditing) return;
+  // "지금 #content 안에서 마우스 버튼이 눌려 있는가" 플래그를 그대로 재사용.
+  if ((studyCards.length < 2 && !examMode) || examDone || gateActive || selectionDragActive || titleEditing) return;
   dragW = scroller.offsetWidth || 1;
   const pc = studyPrev(), nc = studyNext();
-  $('peekPrevTitle').textContent = pc ? pc.front : ''; $('peekPrevBody').innerHTML = peekBodyHtml(pc);
-  $('peekNextTitle').textContent = nc ? nc.front : ''; $('peekNextBody').innerHTML = peekBodyHtml(nc);
+  $('peekPrevTitle').textContent = pc ? pc.front : ''; $('peekPrevBody').innerHTML = peekBodyFor(pc);
+  $('peekNextTitle').textContent = nc ? nc.front : ''; $('peekNextBody').innerHTML = peekBodyFor(nc);
   setDragTransition('transform ' + TRANSITION_MS + 'ms cubic-bezier(.2,.7,.3,1)');
   if (dir < 0) goToNext(); else goToPrev();
 }
@@ -2074,7 +2223,7 @@ function navByKey(dir){
 // 않게 카드 내비게이션을 비활성화한다 — 스와이프는 DOM hit-test로 자연히 막히지만
 // keydown은 document 전역이라 여기서 직접 걸러야 한다.
 function isOverlayOpen(){
-  return examMode || highlightMode || titleEditing || !lb.hidden ||
+  return examDone || highlightMode || titleEditing || !lb.hidden ||
     !$('searchOv').hidden || !$('listOv').hidden || $('sheet').classList.contains('on') ||
     !$('fontPop').hidden || !$('knowPop').hidden || !$('resetPop').hidden || !$('titleEditPop').hidden;
 }
@@ -2087,7 +2236,7 @@ function isOverlayOpen(){
 // 만 원래 isOverlayOpen()(highlightMode 포함)을 계속 쓴다 — 형광펜 선택 중 카드가
 // 넘어가면 선택이 끊기는 건 실제 충돌이라 그대로 차단.
 function isModalOpen(){
-  return examMode || titleEditing || !lb.hidden ||
+  return examDone || titleEditing || !lb.hidden ||
     !$('searchOv').hidden || !$('listOv').hidden || $('sheet').classList.contains('on') ||
     !$('fontPop').hidden || !$('knowPop').hidden || !$('resetPop').hidden || !$('titleEditPop').hidden;
 }
@@ -2096,6 +2245,7 @@ function isModalOpen(){
 // 배정(기존 화살표/PageUp·Down은 그대로 유지 — 오른손만 쓰는 사용자와 공존).
 // Space=안다, Q=휴지통, E=완전히 앎, F=형광펜 — 하단 상시 버튼과 1:1 대응.
 function knowShortcut(){
+  if (gateActive) return;
   if (reviewMode){ doReviewRestore(); return; }
   if (currentCardStatus() === 'known') undoKnown(); else markKnown();
 }
@@ -2110,12 +2260,13 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === 'd' || e.key === 'D'){ e.preventDefault(); navByKey(-1); }
   else if (e.key === 'ArrowLeft' || e.key === 'PageUp' || e.key === 'a' || e.key === 'A'){ e.preventDefault(); navByKey(1); }
   else if (e.code === 'Space'){ e.preventDefault(); knowShortcut(); }
-  // Q/E/F는 지금 카드가 studyCards 로테이션에 있는 평소 읽기 흐름 전용 — reviewMode
-  // (완전히앎/휴지통 카드뷰)는 하단 바 자체가 다른 버튼으로 바뀌어 있어 여기서도 뺀다.
-  else if ((e.key === 'q' || e.key === 'Q') && !reviewMode){
+  // Q/E는 지금 카드가 studyCards 로테이션에 있는 평소 읽기 흐름 전용 — reviewMode
+  // (완전히앎/휴지통 카드뷰)와 시험 모드는 그 두 버튼이 하단바에서 아예 숨겨져 있어
+  // 키만 살아 있으면 화면과 어긋난다(2026-09-21 시험 통합 때 같이 맞춤).
+  else if ((e.key === 'q' || e.key === 'Q') && !reviewMode && !examMode && !gateActive){
     e.preventDefault();
     if (currentCardStatus() === 'trash') undoFlag('trash'); else doTrash();
-  } else if ((e.key === 'e' || e.key === 'E') && !reviewMode){
+  } else if ((e.key === 'e' || e.key === 'E') && !reviewMode && !examMode && !gateActive){
     e.preventDefault();
     if (currentCardStatus() === 'archive') undoFlag('archive'); else doArchive();
   } else if ((e.key === 'f' || e.key === 'F') && !reviewMode){
@@ -2155,23 +2306,64 @@ function shuffle(arr){
   for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
   return a;
 }
-let examScope = 'sub', examCards = [], examIdx = 0, examResults = {}, examLastSub = null, examLastChap = null, examLastMega = null, examLastHalf = null, examDirty = false;
+/* ── 시험(exam) — 「읽기화면의 한 모드」(2026-09-21 전면 통합) ────────────────────
+   예전엔 #examView라는 독립 화면이었고 "Didn't know / Knew it" 2버튼으로 채점했다.
+   그런데 서버를 보면 그 두 버튼은 정확히 「체크 해제 / 체크」일 뿐이고(handleAnswer),
+   최고기록(best)조차 시험 점수가 아니라 「그 범위의 현재 체크 수」에서 파생된다 —
+   즉 시험은 처음부터 "체크를 다시 판정하는 도구"였지 별도의 점수판이 아니었다.
+   그래서 프레임을 데이터 모델에 맞췄다(사용자 지적: "Didn't know가 체크 해제 외에
+   다른 의미가 있나"):
+     · 시험 = studyCards를 시험 풀로 바꾼 읽기화면. 스와이프·하단바·폰트·형광펜 그대로.
+     · 본문만 리빌 전까지 가린다. 체크 여부는 제목 옆 배지로 리빌 전에도 보이므로
+       "아는 건 볼 필요도 없이 넘어간다"가 성립한다(사용자 요청 — 라운드34의 "리빌 전엔
+       배지를 숨긴다"를 사용자가 직접 뒤집은 것).
+     · 채점 버튼 없음 — 하단바 체크 버튼이 「유지 / 취소」다. 아무것도 안 누르고
+       스와이프하면 기존 상태가 그대로 유지된다(기본값이 "유지").
+     · 점수 = 끝났을 때 이 풀에서 체크돼 있는 카드 수 = 실제로 저장되는 값과 같은 축. */
+let examScope = 'sub', examRangeId = '', examTitle = '', examRevealed = new Set(), examDone = false;
+let examLastSub = null, examLastChap = null, examLastMega = null, examLastHalf = null;
 
-function enterExamMode(){ examMode = true; $('readRoot').hidden = true; $('examView').hidden = false; }
-function exitExamMode(){
-  examMode = false; $('examView').hidden = true; $('readRoot').hidden = false;
-  clearRetitleContext(); setRetitleContext(() => studyCards[studyIdx]);
-  // 시험에서 "몰랐음"을 누르면 체크가 실제로 풀리는데(서버가 known KV·Notion을 되돌린다),
-  // 예전엔 읽기화면의 카드 객체·필터 목록이 그대로라 초록 배지와 n/전체가 낡은 채 남았다
-  // (2026-09-16). judgeCard가 로컬에도 반영해 두므로 여기선 목록만 다시 적용한다.
-  if (examDirty){ examDirty = false; if (subchapterAll.length) applyFilter(); }
+// 시험 중엔 소챕터 전용 크롬(필터칩·진행 점·보관/휴지통·시험진입)을 숨긴다 —
+// 풀이 이 소챕터가 아니라 시험 범위라 그 숫자들이 전부 딴 얘기가 되기 때문.
+// reviewMode(완전히앎/휴지통 카드뷰)가 쓰는 것과 같은 전환 패턴.
+function enterExamUi(){
+  if (reviewMode) exitReviewModeUi();
+  examMode = true; examDone = false; examRevealed = new Set();
+  $('filterToggle').hidden = true;
+  $('subPosDots').hidden = true;
+  $('trashQuickBtn').hidden = true;
+  $('archiveQuickBtn').hidden = true;
+  $('subExamBtn').hidden = true;
+  $('examExitBtn').hidden = false;
+  $('bottombar').classList.add('reviewbar');
 }
-$('examBack').addEventListener('click', exitExamMode);
+function exitExamUi(){
+  examMode = false; examDone = false; examRevealed = new Set();
+  $('filterToggle').hidden = false;
+  $('subPosDots').hidden = false;
+  $('trashQuickBtn').hidden = false;
+  $('archiveQuickBtn').hidden = false;
+  $('subExamBtn').hidden = false;
+  $('examExitBtn').hidden = true;
+  $('bottombar').classList.remove('reviewbar');
+}
+function exitExamMode(){
+  exitExamUi();
+  clearRetitleContext();
+  // 캐시(subCache/subchapterAll)엔 syncKnownLocally가 이미 최신 체크 상태를 반영해 둬서
+  // 네트워크 없이 즉시 돌아온다 — 목록 필터만 다시 적용되면 된다.
+  loadSubchapter();
+  refreshChapterMeta(); // 시험에서 바뀐 체크가 챕터/반챕터 현황(시트·경계 안내면)에도 반영되게
+}
+$('examExitBtn').addEventListener('click', exitExamMode);
 
 // 2026-09-06 라운드14: "1-1" 칩 탭이 시험에서 "이 소챕터 카드 목록"으로 바뀌었다 —
 // 시험은 좌상단 전용 아이콘(subExamBtn)으로 옮김.
-$('subPosChip').addEventListener('click', () => { if (reviewMode) exitReviewMode(); else openSubchapterList(); });
-$('subExamBtn').addEventListener('click', () => { if (!reviewMode) enterSubchapterExam(); });
+$('subPosChip').addEventListener('click', () => {
+  if (examMode) return; // 시험 중엔 풀이 이 소챕터가 아니라 목록이 안 맞는다
+  if (reviewMode) exitReviewMode(); else openSubchapterList();
+});
+$('subExamBtn').addEventListener('click', () => { if (!reviewMode && !examMode) enterSubchapterExam(); });
 function enterSubchapterExam(){ return enterSubchapterExamFor(subId()); }
 // 챕터 아코디언(openChapterList)의 소챕터 폴더 헤더에서 "지금 안 보고 있는" 소챕터도
 // 바로 시험을 시작할 수 있어야 해서(2026-09-08 사용자 요청) subId를 인자로 받게 일반화 —
@@ -2186,9 +2378,7 @@ async function enterSubchapterExamFor(sId){
   const pool = visibleCards(cards);
   if (!pool.length){ toast('No cards to test (all archived/trashed)'); return; }
   const p = parseSubIdClient(sId);
-  examScope = 'sub';
-  examCards = shuffle(pool.map((c) => ({ ...c, subId: sId })));
-  startExam('Subchapter ' + (p.chap + 1) + '-' + (p.sub + 1) + ' Quiz');
+  startExam(shuffle(pool.map((c) => ({ ...c, subId: sId }))), 'Subchapter ' + (p.chap + 1) + '-' + (p.sub + 1) + ' Quiz', 'sub', sId);
 }
 async function enterChapterExam(cId){
   const t = setTimeout(() => showLoading('Loading', 'Fetching all chapter questions'), 250);
@@ -2199,9 +2389,7 @@ async function enterChapterExam(cId){
   if (data.error || !data.cards.length){ toast(data.error || 'No cards'); return; }
   const pool = visibleCards(data.cards);
   if (!pool.length){ toast('No cards to test (all archived/trashed)'); return; }
-  examScope = 'chap';
-  examCards = shuffle(pool);
-  startExam('Chapter ' + (Number(cId.slice(1)) + 1) + ' Full Quiz');
+  startExam(shuffle(pool), 'Chapter ' + (Number(cId.slice(1)) + 1) + ' Full Quiz', 'chap', cId);
 }
 /* 중간시험(2026-09-16) — 대챕터를 소챕터 5개(=50장)씩 둘로 나눈 「전반/후반」. 서버가 그
    범위에서 보관·휴지통을 걸러 무작위 25장을 뽑아 주므로 여기선 순서만 섞는다(종합시험과
@@ -2213,9 +2401,7 @@ async function enterHalfExam(cId, h, label){
   catch (e) { clearTimeout(t); showLoading('Load failed', String(e.message || e)); return; }
   clearTimeout(t); hideLoading();
   if (data.error || !data.cards || !data.cards.length){ toast(data.error || 'No cards to test'); return; }
-  examScope = 'half';
-  examCards = shuffle(data.cards);
-  startExam(label || 'Mid quiz');
+  startExam(shuffle(data.cards), label || 'Mid quiz', 'half', cId + 'h' + h);
 }
 /* 종합시험(2026-09-06 라운드18) — 챕터 10개 범위. 서버가 이미 보관·휴지통을 걸러 무작위
    100장을 뽑아 주므로(전량 1,000장은 응답 약 1.5MB라 기각, 사용자 확인) 여기선 순서만 섞는다. */
@@ -2226,96 +2412,85 @@ async function enterMegaExam(gId, label){
   catch (e) { clearTimeout(t); showLoading('Load failed', String(e.message || e)); return; }
   clearTimeout(t); hideLoading();
   if (data.error || !data.cards || !data.cards.length){ toast(data.error || 'No cards to test'); return; }
-  examScope = 'mega';
-  examCards = shuffle(data.cards);
-  startExam(label || 'Combined Quiz');
+  startExam(shuffle(data.cards), label || 'Combined Quiz', 'mega', gId);
 }
-function startExam(title){
-  examIdx = 0; examResults = {}; examLastSub = null; examLastChap = null; examLastMega = null; examLastHalf = null;
-  $('examTitleBar').textContent = title;
-  enterExamMode();
-  setRetitleContext(() => examCards[examIdx]);
-  renderExamCard();
-  $('examJudge').onclick = (e) => { const b = e.target.closest('button'); if (b) judgeCard(b.dataset.k === '1'); };
+function startExam(cards, title, scope, rangeId){
+  examScope = scope; examTitle = title; examRangeId = rangeId || '';
+  examLastSub = examLastChap = examLastMega = examLastHalf = null;
+  enterExamUi();
+  studyCards = cards; studyIdx = 0;
+  setRetitleContext(() => studyCards[studyIdx]);
+  toast(title);
+  renderStudyCard();
 }
-/* 시험 중 "이미 확인함" 배지(2026-09-16) — ⚠ 문제 단계(제목만 보이는 상태)에는 절대
-   그리지 않는다. 떠올리기 전에 초록 체크가 보이면 "체크돼 있네, 알았던 거겠지"로 자기평가가
-   앵커링돼, 이 시험의 유일한 가치(정직한 자기평가)가 무너진다. 정답 공개 뒤에만 띄워
-   "체크해놨는데 막상 기억이 안 난다"는 순간을 사용자가 알아채게 한다 — 그 자리에서
-   "Didn't know"를 누르면 체크는 실제로 풀린다(judgeCard → /api/answer know:false).
-   읽기화면 배지와 달리 data-restore를 안 붙인다(여기선 탭이 아니라 채점 버튼이 해제 경로). */
-function examBadgeHtml(c){
-  if (!c || !c.known) return '';
-  return ' <span class="titlebadge known" aria-label="Already checked - choose Did not know to uncheck"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>';
+// 리빌 — 본문을 그 자리에서 채운다(카드 전환이 아니라 같은 카드의 상태 변화라
+// renderStudyCard를 통째로 다시 부를 필요가 없다. 스크롤도 맨 위 그대로가 맞다).
+function revealExamCard(){
+  const c = studyCards[studyIdx]; if (!c) return;
+  examRevealed.add(c.key);
+  $('content').innerHTML = cardBodyHtml(c);
 }
-function renderExamCard(){
-  if (examIdx >= examCards.length){ renderExamResult(); return; }
-  $('examProg').textContent = (examIdx + 1) + ' / ' + examCards.length;
-  const c = examCards[examIdx];
-  $('examCard').innerHTML = '<div class="examtitle" id="examTitle">' + esc(c.front) + '</div>'
-    + '<button class="examreveal" id="examReveal">Reveal answer</button>';
-  $('examJudge').hidden = true;
-  $('examReveal').addEventListener('click', () => {
-    $('examCard').innerHTML = '<div class="examtitle" id="examTitle">' + esc(c.front) + examBadgeHtml(c) + '</div>'
-      + '<div class="content exambody" id="examBody">' + cardBodyHtml(c) + '</div>';
-    $('examJudge').hidden = false;
-  }, { once: true });
+function finishExam(){
+  examDone = true;
+  setDragTransition('none'); resetDragX();
+  const total = studyCards.length;
+  // 점수 = 「지금 체크돼 있는 카드 수」. 서버가 best로 저장하는 값과 같은 축이다
+  // (handleAnswer의 best도 그 범위의 현재 체크 수에서 파생된다).
+  const score = studyCards.filter((c) => c.known).length;
+  const left = studyCards.filter((c) => !c.known);
+  const bestLine = examBestLine();
+  let actions = '<button class="primary" id="examExit">Close</button>';
+  if (left.length){
+    actions = '<button id="examRetryStudy">Review unchecked (' + left.length + ')</button>'
+      + '<button id="examRetryExam">Retest unchecked</button>' + actions;
+  }
+  $('cardTitle').innerHTML = ''; $('cardTitle').removeAttribute('href');
+  $('content').innerHTML = '<div class="examresult"><div class="score">' + score + ' / ' + total + '</div>'
+    + '<div class="best">' + esc(bestLine) + '</div>'
+    + '<div class="actions">' + actions + '</div></div>';
+  $('subPos').textContent = 'Done';
+  renderStudyScrubber();
+  syncCardStateButtons();
+  // 최고기록은 /api/answer 응답에서만 오는데, 아무 카드도 토글 안 하면 그 호출 자체가
+  // 없다(그래도 기록은 이미 옳다 — 체크할 때 올랐다). 캐시로 먼저 그리고, 최신 값이
+  // 오면 그 줄만 다시 쓴다(2026-09-21 독립 검토에서 빈 줄로 남던 것).
+  refreshChapterMeta().then(() => {
+    const el = document.querySelector('.examresult .best');
+    if (el && examDone) el.textContent = examBestLine();
+  });
+  const exit = $('examExit'); if (exit) exit.addEventListener('click', exitExamMode);
+  const rs = $('examRetryStudy'); if (rs) rs.addEventListener('click', () => {
+    exitExamUi(); clearRetitleContext();
+    enterForeignPool(left, 'Reviewing ' + left.length + ' unchecked');
+  });
+  const re = $('examRetryExam'); if (re) re.addEventListener('click', () => startExam(shuffle(left), examTitle, examScope, examRangeId));
 }
-async function judgeCard(know){
-  const c = examCards[examIdx];
-  examResults[c.key] = know;
-  c.known = know;
-  syncKnownLocally(c.key, know);
-  examDirty = true;
-  const res = await apiAnswer(c.subId, c.key, know, c.id);
-  if (res && res.ok){ examLastSub = res.sub; examLastChap = res.chap; examLastMega = res.mega; examLastHalf = res.half; }
-  examIdx++;
-  renderExamCard();
+function examBestLine(){
+  const label = examScope === 'mega' ? 'Best in this range ' : examScope === 'chap' ? 'Best in this chapter '
+    : examScope === 'half' ? 'Best in this half ' : 'Best in this subchapter ';
+  const live = examScope === 'mega' ? examLastMega : examScope === 'chap' ? examLastChap
+    : examScope === 'half' ? examLastHalf : examLastSub;
+  if (live) return label + live.best + '/' + live.total;
+  const d = allChaptersData;
+  if (!d || !examRangeId) return '';
+  let r = null;
+  if (examScope === 'mega') r = (d.groups || []).find((g) => g.id === examRangeId);
+  else if (examScope === 'chap') r = (d.chapters || []).find((c) => c.id === examRangeId);
+  else if (examScope === 'half'){
+    for (const c of (d.chapters || [])){ const h = (c.halves || []).find((x) => x.id === examRangeId); if (h){ r = h; break; } }
+  }
+  // 소챕터 최고기록은 /api/chapters에 없다 — 토글이 한 번도 없었으면 그냥 생략한다.
+  return r ? label + r.best + '/' + r.total : '';
 }
-/* 시험 채점을 읽기화면 쪽 카드 객체에도 즉시 반영한다(2026-09-16). examCards는 {...c}
-   스프레드 복사본이라 원본과 다른 객체이고, 시험 종료 경로엔 subCache.clear()도 없어서
-   "몰랐음"으로 푼 체크가 읽기화면에선 계속 켜져 보였다. 캐시를 통째로 비우는 대신 해당
-   키만 고쳐 다시 돌아왔을 때의 재요청을 피한다. */
+/* 채점을 읽기화면 쪽 카드 객체에도 즉시 반영한다(2026-09-16). 시험 풀은 {...c} 스프레드
+   복사본이라 원본과 다른 객체이고, 시험 종료 경로엔 subCache.clear()도 없어서 "몰랐음"으로
+   푼 체크가 읽기화면에선 계속 켜져 보였다. 캐시를 통째로 비우는 대신 해당 키만 고쳐
+   다시 돌아왔을 때의 재요청을 피한다. */
 function syncKnownLocally(key, know){
   const touch = (list) => { for (const c of (list || [])) if (c.key === key) c.known = know; };
   subCache.forEach(touch);
   touch(subchapterAll);
   touch(studyCards);
-}
-function renderExamResult(){
-  const total = examCards.length;
-  const score = examCards.filter((c) => examResults[c.key]).length;
-  const wrong = examCards.filter((c) => !examResults[c.key]);
-  // 종합시험은 출제가 100문제 표본이라 위 점수(n/100)와 최고기록(범위 전체 기준)의 분모가
-  // 다르다 — 라벨로 "이 범위"임을 밝혀 둘이 다른 축임을 드러낸다.
-  const best = examScope === 'mega' ? examLastMega : examScope === 'chap' ? examLastChap : examScope === 'half' ? examLastHalf : examLastSub;
-  const bestLabel = examScope === 'mega' ? 'Best in this range ' : examScope === 'chap' ? 'Best in this chapter '
-    : examScope === 'half' ? 'Best in this half ' : 'Best in this subchapter ';
-  const bestLine = best ? bestLabel + best.best + '/' + best.total : '';
-  let actions = '<button class="primary" id="examExit">Close</button>';
-  if (wrong.length){
-    actions = '<button id="examRetryStudy">Review wrong answers (' + wrong.length + ')</button>'
-      + '<button id="examRetryExam">Retest wrong answers</button>' + actions;
-  }
-  $('examCard').innerHTML = '';
-  $('examJudge').hidden = true;
-  $('examProg').textContent = '';
-  $('examCard').innerHTML = '<div class="examresult"><div class="score">' + score + ' / ' + total + '</div>'
-    + '<div class="best">' + esc(bestLine) + '</div>'
-    + '<div class="actions">' + actions + '</div></div>';
-  clearRetitleContext();
-  const exit = $('examExit'); if (exit) exit.addEventListener('click', exitExamMode);
-  const rs = $('examRetryStudy'); if (rs) rs.addEventListener('click', () => {
-    exitExamMode();
-    studyCards = wrong; studyIdx = 0;
-    setRetitleContext(() => studyCards[studyIdx]);
-    renderStudyCard();
-    toast('Reviewing ' + wrong.length + ' wrong answers');
-  });
-  const re = $('examRetryExam'); if (re) re.addEventListener('click', () => {
-    examCards = shuffle(wrong);
-    startExam($('examTitleBar').textContent);
-  });
 }
 
 /* ── 챕터 목록(하단 시트) ── */
@@ -2634,7 +2809,7 @@ lb.addEventListener('pointercancel', (e) => {
 document.addEventListener('click', (e) => {
   if (highlightMode || !lb.hidden) return;
   const img = e.target.closest('img.shot');
-  if (!img || !e.target.closest('#content, #examBody')) return;
+  if (!img || !e.target.closest('#content')) return;
   if (Math.abs(dx) > MOVE_TOL) return;
   openLightbox(img.src);
 });
@@ -2647,7 +2822,7 @@ const savedTScale = lsGet('sd_tscale'), savedBScale = lsGet('sd_bscale');
 if (savedTScale) titleScale.value = savedTScale;
 if (savedBScale) bodyScale.value = savedBScale;
 // 인라인이 아니라 :root 변수를 고친다 — peek(다음/이전 카드)도 같은 CSS 규칙을 쓰므로
-// 스와이프 중 기본 크기로 보였다가 튀는 일이 없다. 시험 본문(.exambody)도 같이 따라온다.
+// 스와이프 중 기본 크기로 보였다가 튀는 일이 없다.
 const rootEl = document.documentElement;
 function applyTitleScale(){
   rootEl.style.setProperty('--tscale', titleScale.value);
@@ -2668,7 +2843,7 @@ bodyScale.addEventListener('input', applyBodyScale);
    좁은 영역에서도 자연스럽게 동작해, 방향 판정을 넣으면 복잡도만 늘어남).
    .scroller가 touch-action:pan-y라 브라우저 자체 핀치줌과 안 겹치고(뷰포트 메타도
    maximum-scale=1), document 레벨이라 읽기화면(#content/#cardTitle)·시험화면
-   (#examBody/#examTitle) 둘 다 같은 코드로 커버한다. */
+   둘 다 같은 코드로 커버한다(시험도 이제 #content/#cardTitle을 그대로 쓴다). */
 const pinchPointers = new Map();
 let pinchInput = null, pinchStartDist = 0, pinchStartScale = 1;
 function pinchDist(){
@@ -2676,8 +2851,8 @@ function pinchDist(){
   return Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
 }
 function pinchScaleInput(el){
-  if (el.closest('#cardTitle, #examTitle')) return titleScale;
-  if (el.closest('#content, #examBody')) return bodyScale;
+  if (el.closest('#cardTitle')) return titleScale;
+  if (el.closest('#content')) return bodyScale;
   return null;
 }
 document.addEventListener('pointerdown', (e) => {
@@ -2736,7 +2911,7 @@ function pinchEnd(e){
     // 두 손가락 중 하나만 먼저 떼고 나머지 하나가 화면에 남아 있으면, 핀치 이전(다른
     // 손가락)의 오래된 sx/sy로 스와이프 델타를 계산해 카드가 엉뚱하게 튀는 걸 막기
     // 위해 그 손가락 기준으로 스와이프 프라이밍을 다시 건다(방금 새로 짚은 것처럼).
-    if (pinchPointers.size === 1 && !examMode && !highlightMode && !titleEditing){
+    if (pinchPointers.size === 1 && !examDone && !highlightMode && !titleEditing){
       const p = [...pinchPointers.values()][0];
       dragging = false; selectPrimed = false; mode = null;
       sx = p.x; sy = p.y; dx = 0; dy = 0; startT = e.timeStamp;
@@ -2859,7 +3034,8 @@ function midRowHtml(m, ci){
   const s1 = (ci + 1) + '-' + (m.subFrom + 1), s2 = (ci + 1) + '-' + (m.subTo + 1);
   return '<div class="lgmid" data-mid="' + esc(m.id) + '" data-half="' + m.half + '">'
     + '<b>' + (m.half === 0 ? 'First-half' : 'Second-half') + ' Quiz'
-    + ' <span class="lgmsub">' + s1 + '–' + s2 + ' · random ' + m.n + '</span></b>'
+    + ' <span class="lgmsub">' + s1 + '–' + s2 + ' · random ' + m.n
+    + (m.total - m.current > 0 ? ' · ' + (m.total - m.current) + ' unchecked' : ' · all checked') + '</span></b>'
     + '<span class="lgcount">' + m.current + '/' + m.total + '</span>'
     + '<span class="lgbest" title="Best score"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0Z"/><path d="M7 5H4a3 3 0 0 0 3 5"/><path d="M17 5h3a3 3 0 0 1-3 5"/></svg>' + m.best + '</span>'
     + '</div>';
@@ -2943,8 +3119,24 @@ $('searchInput').addEventListener('input', () => {
     showLoading('Syncing', 'Fetching cards from Notion — try again shortly', async () => { await refreshChapterMeta(); loadSubchapter(); });
     return;
   }
+  if (!hasSavedPos && allChaptersData.firstUnknown){
+    chapIdx = allChaptersData.firstUnknown.chap; subIdx = allChaptersData.firstUnknown.sub;
+    savePos();
+  }
   if (chapIdx >= totalChapters) chapIdx = 0;
   await loadSubchapter();
+  // ⚠ 저장된 위치는 「소챕터를 넘길 때」만 기록된다 — 한 소챕터 안에서만 보다 끝내면
+  // 그 자리가 그대로 남아, 다 끝낸 소챕터를 매번 다시 연다. 열어 보니 미체크가 하나도
+  // 없으면 서버가 알려준 첫 미체크 카드로 한 번 더 옮긴다(2026-09-21 독립 검토에서
+  // "부팅 시 1회성이라 자기교정이 안 된다"로 지적된 부분).
+  const fu = allChaptersData.firstUnknown;
+  if (fu && (fu.chap !== chapIdx || fu.sub !== subIdx) && !visibleCards(subchapterAll).some((c) => !c.known)){
+    chapIdx = fu.chap; subIdx = fu.sub; savePos();
+    // 직전 loadSubchapter가 "여긴 다 알고 있음 → 전체보기"로 필터를 뒤집어 놓는다
+    // (applyFilter의 폴백) — 그대로 두면 옮겨 간 소챕터도 첫 카드부터 열린다.
+    studyMode = 'unknown';
+    await loadSubchapter();
+  }
 })();
 </script>
 </body>

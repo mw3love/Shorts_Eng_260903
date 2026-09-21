@@ -13,7 +13,7 @@
  *   2. GET  /api/chapters         대챕터 전체 개요(현재/최고 점수)
  *   3. GET  /api/chapter?id=cN    대챕터 하나의 소챕터 10개 상세(현재/최고 점수 + 카드 제목·known)
  *   4. GET  /api/subchapter?id=cNsM&mode=all|unknown   소챕터 하나의 카드 전체 본문(학습·시험 공용)
- *   5. GET  /api/chapterexam?id=cN[&light=1][&half=0|1]  대챕터 전체(100장), half면 반챕터(50장) 중 무작위 25문제
+  *   5. GET  /api/chapterexam?id=cN[&light=1][&half=0|1][&unknown=1]  대챕터 전체(100장), half면 반챕터 중 무작위 25문제(unknown=1이면 미체크 전량)
  *          반환. light=1이면 본문(context/hint/detail)을 빼고 목록 렌더에 필요한 필드만 보낸다
  *          (챕터 목록 시트 전용, 2026-09-06 라운드22 — 시험 진입은 light 없이 그대로 본문 포함)
  *   5-b. GET /api/megaexam?id=gN  종합시험(대챕터 10개 범위)용 — 그 범위에서 무작위 100장 표본
@@ -593,6 +593,7 @@ async function handleChapters(env) {
 
   const idx = JSON.parse(idxRaw);
   const { known, best } = await loadKnownAndBest(env);
+  const { archived, trashed } = await loadFlags(env);
   const chaps = buildChapters(idx.items);
 
   let pos = 0;
@@ -601,8 +602,32 @@ async function handleChapters(env) {
     const id = 'c' + ci;
     const start = pos + 1;
     pos += items.length;
-    return { id, start, end: pos, total: items.length, current: knownCountFor(items, known), best: best.chap[id] || 0 };
+    // 중간시험 범위(반챕터) 현황도 같이 내려준다(2026-09-21) — 소챕터 경계에서 뜨는
+    // 안내면이 "미체크 N장"을 추가 요청 없이 바로 그릴 수 있어야 하기 때문. 소챕터 8개
+    // 미만인 짧은 챕터는 반=전체라 애초에 중간시험 자체가 없다(클라이언트 규칙과 동일).
+    const halves = subs.length >= 8 ? [0, 1].map((h) => {
+      const hsubs = halfSubsOf(subs, h);
+      if (!hsubs.length) return null;
+      const hitems = hsubs.flat();
+      const hid = halfIdOf(ci, h);
+      return { id: hid, half: h, subFrom: h * HALF_SIZE, subTo: h * HALF_SIZE + hsubs.length - 1,
+        total: hitems.length, current: knownCountFor(hitems, known), best: best.half[hid] || 0, n: MID_EXAM_N };
+    }).filter(Boolean) : [];
+    return { id, start, end: pos, total: items.length, current: knownCountFor(items, known), best: best.chap[id] || 0, halves };
   });
+
+  // 전체에서 「아직 체크 안 된 첫 카드」의 좌표(2026-09-21). 마지막 위치는 localStorage라
+  // 기기를 건너가지 못했는데(PC에서 늘 1-1-1부터 열리던 원인), known은 서버에 있으므로
+  // 이쪽을 기준으로 열면 기기와 무관하게 같은 자리에서 이어진다.
+  let firstUnknown = null;
+  outer: for (let ci = 0; ci < chaps.length && !firstUnknown; ci++) {
+    for (let si = 0; si < chaps[ci].length; si++) {
+      if (chaps[ci][si].some((it) => !known[it.key] && !archived[it.key] && !trashed[it.key])) {
+        firstUnknown = { chap: ci, sub: si };
+        break outer;
+      }
+    }
+  }
 
   // 종합시험 행(챕터 10개 묶음)도 같이 내려준다 — 시트가 챕터 행 사이에 끼워 그린다.
   const groups = groupRanges(chaps.length).map((g) => {
@@ -610,7 +635,7 @@ async function handleChapters(env) {
     return { ...g, total: items.length, current: knownCountFor(items, known), best: best.mega[g.id] || 0 };
   });
 
-  return json({ chapters, groups, total: idx.items.length, syncing: !!st, builtAt: idx.builtAt });
+  return json({ chapters, groups, firstUnknown, total: idx.items.length, syncing: !!st, builtAt: idx.builtAt });
 }
 
 async function handleChapterDetail(env, chapId) {
@@ -688,7 +713,7 @@ async function handleSubchapter(env, subId, mode) {
 // 대챕터 전체 시험(100문제) — 소챕터 시험과 같은 화면/로직을 재사용하되, 카드가 10개
 // 소챕터에 걸쳐 섞이므로 각 카드에 원래 소속 subId를 붙여 보낸다. 클라이언트는 카드별로
 // 그 subId로 POST /api/answer를 호출해야 소챕터별 최고기록도 같이 갱신된다.
-async function handleChapterExam(env, chapId, light, half) {
+async function handleChapterExam(env, chapId, light, half, unknownOnly) {
   const ci = parseChapId(chapId);
   if (ci == null) return json({ error: 'bad id' }, 400);
   const idxRaw = await env.KV.get(K_INDEX);
@@ -704,6 +729,9 @@ async function handleChapterExam(env, chapId, light, half) {
   if (!scopeSubs.length) return json({ error: 'not found' }, 404);
 
   const { archived, trashed } = await loadFlags(env);
+  // known을 여기서 미리 읽는다 — unknownOnly(경계 안내면의 "미체크만 복습")가 뽑기 「전에」
+  // 걸러야 하기 때문(표본을 뽑고 나서 거르면 개수가 안 맞는 것과 같은 이유).
+  const { known, best } = await loadKnownAndBest(env);
   const byBucket = new Map();
   let tagged = []; // { it, subId }
   scopeSubs.forEach((items, si) => {
@@ -715,7 +743,12 @@ async function handleChapterExam(env, chapId, light, half) {
       tagged.push({ it, subId });
     }
   });
-  if (half != null) {
+  // unknownOnly = 무작위 표본이 아니라 「아직 체크 안 된 카드 전부」(경계 안내면의
+  // "Review N unchecked" 경로). 시험이 아니라 복습 풀이라 섞지도, 잘라내지도 않는다 —
+  // 순서는 원래 카드 순서 그대로가 읽기 흐름에 맞는다. half 없이 와도 그대로 적용된다
+  // (챕터 전체의 미체크 전량) — 예전엔 half 분기 안에 있어 조용히 무시됐다.
+  if (unknownOnly) tagged = tagged.filter(({ it }) => !known[it.key] && !archived[it.key] && !trashed[it.key]);
+  else if (half != null) {
     for (let i = tagged.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [tagged[i], tagged[j]] = [tagged[j], tagged[i]]; }
     tagged = tagged.slice(0, MID_EXAM_N);
   }
@@ -734,9 +767,7 @@ async function handleChapterExam(env, chapId, light, half) {
     }
   }
   // known도 포함(2026-09-06 라운드14) — 챕터 목록 화면(신상 페이지)에서 카드별 상태
-  // 배지("확인함" 등)를 보여주려면 필요하다. 시험 풀 계산은 이 필드를 안 봐서 기존 동작엔
-  // 영향 없음.
-  const { known, best } = await loadKnownAndBest(env);
+  // 배지("확인함" 등)를 보여주려면 필요하다.
   const cards = tagged.map(({ it, subId }) => ({
     ...(light ? {} : (byId.get(it.id) || {})), id: it.id, key: it.key, front: it.front, url: it.url, created: it.created, subId,
     known: !!known[it.key], archived: !!archived[it.key], trashed: !!trashed[it.key],
@@ -1207,7 +1238,8 @@ export default {
     if (url.pathname === '/api/subchapter') return handleSubchapter(env, url.searchParams.get('id') || '', url.searchParams.get('mode') || 'all');
     if (url.pathname === '/api/chapterexam') {
       const h = url.searchParams.get('half');
-      return handleChapterExam(env, url.searchParams.get('id') || '', url.searchParams.get('light') === '1', (h === '0' || h === '1') ? Number(h) : null);
+      return handleChapterExam(env, url.searchParams.get('id') || '', url.searchParams.get('light') === '1',
+        (h === '0' || h === '1') ? Number(h) : null, url.searchParams.get('unknown') === '1');
     }
     if (url.pathname === '/api/megaexam') return handleMegaExam(env, url.searchParams.get('id') || '');
     if (url.pathname === '/api/answer' && request.method === 'POST') {
