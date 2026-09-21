@@ -1998,7 +1998,11 @@ function beginSwipeTracking(e){
   $('peekNextTitle').textContent = nc ? nc.front : ''; $('peekNextBody').innerHTML = peekBodyFor(nc);
 }
 scroller.addEventListener('pointerdown', (e) => {
-  if ((studyCards.length < 2 && !examMode) || examDone || gateActive || highlightMode || titleEditing) return;
+  // ⚠ gateActive는 여기서 막지 않는다 — 경계 안내면의 「Swipe again to skip」이 곧 그
+  // 스와이프다(2026-09-21 실기기 신고: 문구대로 스와이프해도 안 넘어감). 안내면이 막아야
+  // 하는 것은 「뒤에 숨은 카드를 바꾸는 컨트롤」(체크·휴지통·보관·스크러버·Q/E/Space)이고,
+  // 카드 전환은 그 부류가 아니다 — 통과하면 renderStudyCard()가 gateActive를 알아서 끈다.
+  if ((studyCards.length < 2 && !examMode) || examDone || highlightMode || titleEditing) return;
   // 2번째 손가락이 닿는 순간(핀치 시작 후보) — document의 pinch 핸들러가 이 이벤트를
   // 먼저 pinchPointers에 기록하지는 않지만(버블 순서상 여기가 먼저 실행됨), 그 시점에
   // 이미 손가락 1개는 기록돼 있으므로 이 체크로 잡힌다. 스와이프 프라이밍을 건너뛴다.
@@ -2021,7 +2025,7 @@ scroller.addEventListener('pointerdown', (e) => {
 // 핸들로 정교하게 조정하는 단계까지 통째로 네이티브에 맡겨야 안전해서, "가로우세
 // 판정"류 휴리스틱보다 이쪽이 확실하다(2026-09-05 실기기 피드백).
 scroller.addEventListener('pointermove', (e) => {
-  if ((studyCards.length < 2 && !examMode) || examDone || gateActive || highlightMode || titleEditing) return;
+  if ((studyCards.length < 2 && !examMode) || examDone || highlightMode || titleEditing) return; // gateActive 제외 — pointerdown 주석 참조
   if (pinchPointers.size >= 2) return; // 핀치 진행 중엔 스와이프 계산 자체를 건너뛴다
   // ⚠ 마우스는 버튼을 안 눌러도 pointermove가 계속 발생한다(터치는 손가락이 닿아있을 때만
   // 발생 — 이 체크가 왜 지금까지 안 걸렸는지의 이유). 이게 없으면 새로고침 직후 sx/sy가
@@ -2187,7 +2191,7 @@ function renderBoundaryGate(h, stuck){
     + '<div class="gs">' + esc(range) + ' · ' + (left ? left + ' unchecked' : 'all checked')
     + ' · best ' + h.best + '/' + h.total + '</div>'
     + '<div class="gactions">' + actions + '</div>'
-    + (stuck ? '' : '<div class="ghint">Swipe again to continue</div>') + '</div>';
+    + (stuck ? '' : '<div class="ghint">Swipe again to skip</div>') + '</div>';
   $('scroller').scrollTop = 0;
   $('gateQuiz').addEventListener('click', () => enterHalfExam('c' + chapIdx, h.half, 'Chapter ' + (chapIdx + 1) + ' ' + label));
   const rv = $('gateReview');
@@ -2215,7 +2219,7 @@ function navByKey(dir){
   // 모드를 켜둔 채로는 페이지 넘김 버튼·단축키가 통째로 죽는다(2026-09-08 사용자 지적).
   // selectionDragActive는 형광펜 응답 레이스 수정(위 doHighlight 참조)에서 이미 만든
   // "지금 #content 안에서 마우스 버튼이 눌려 있는가" 플래그를 그대로 재사용.
-  if ((studyCards.length < 2 && !examMode) || examDone || gateActive || selectionDragActive || titleEditing) return;
+  if ((studyCards.length < 2 && !examMode) || examDone || selectionDragActive || titleEditing) return; // gateActive 제외 — pointerdown 주석 참조
   dragW = scroller.offsetWidth || 1;
   const pc = studyPrev(), nc = studyNext();
   $('peekPrevTitle').textContent = pc ? pc.front : ''; $('peekPrevBody').innerHTML = peekBodyFor(pc);
