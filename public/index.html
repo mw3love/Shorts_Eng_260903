@@ -2154,6 +2154,10 @@ function maybeShowBoundaryGate(stuck){
   if (examMode || reviewMode) return false;
   const h = halfAtBoundary();
   if (!h) return false;
+  // 전역 마지막 소챕터에선 띄우지 않는다 — 통과해도 advanceSubchapter()가 갈 곳이 없어
+  // 안내면이 화면에 그대로 남고 스와이프할 때마다 다시 그려진다(시트로만 탈출 가능).
+  // removeCurrentCardFromRotation()은 호출부에서 이미 같은 가드를 걸고 있어 무영향.
+  if (!neighborPos(1)) return false;
   const gid = 'c' + chapIdx + 'h' + h.half;
   if (gateShownFor === gid){ gateShownFor = null; return false; } // 두 번째 스와이프 = 통과
   gateShownFor = gid;
