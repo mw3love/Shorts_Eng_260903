@@ -817,7 +817,12 @@ function tableHtml(b){
 // 초창기(AI 도입 전) 메모는 스크린샷을 그대로 붙여넣은 카드가 있다 — Notion 자체 호스팅
 // 이미지는 URL이 만료되므로 /api/image로 매번 새로 받는다(external은 고정 URL 그대로).
 function imageSrc(b){ return b.external || ('/api/image?id=' + encodeURIComponent(b.id)); }
+// data: URI 그림은 그리지 않는다 — AI 답변을 복사할 때 딸려 온 빈 그림판(300×150 완전
+// 투명 PNG)이 이 형태로 저장돼 있고, 노션도 data: 그림은 안 보여준다. 그대로 그리면
+// 화면 폭으로 늘어나 큰 빈칸이 된다(2026-10-05, 전체 3장·15개 실측).
+function isDataImage(b){ return String(b.external || '').startsWith('data:'); }
 function imageHtml(b){
+  if (isDataImage(b)) return '';
   const src = imageSrc(b);
   const cap = (b.caption || []).map((t) => t.t).join('');
   // loading="lazy" 없음 — 이미 우리가 다음/이전 카드일 때만 렌더하므로 브라우저가 또
@@ -836,6 +841,7 @@ function warmImages(c){
   if (Array.isArray(c.pre)) c.pre.forEach((b) => { if (b && b.type === 'image') blocks.push(b); });
   if (Array.isArray(c.detail)) c.detail.forEach((b) => { if (b && b.type === 'image') blocks.push(b); });
   blocks.forEach((b) => {
+    if (isDataImage(b)) return;
     const src = imageSrc(b);
     if (warmedImages.has(src)) return;
     warmedImages.add(src);
