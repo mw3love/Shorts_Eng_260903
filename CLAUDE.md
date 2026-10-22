@@ -29,7 +29,27 @@ Notion DB `3. 영어 DB`에 자동 저장한다. **저장은 되는데 복습이
 때문. **`git push`는 예외** — 전역 규칙 10대로 사용자가 마무리 시점에 직접 판단해서
 한다(이 예외는 push까지 확장하지 않는다).
 
-## 현재 상태 (2026-10-05 라운드36 — 표 아래 큰 빈칸 = 투명 data: 그림) — 여기부터 읽을 것
+## 현재 상태 (2026-10-22 라운드37 — 표 칸 안에서 형광펜) — 여기부터 읽을 것
+
+`Version ID 581bda0a-21ce-4d83-b2d2-ef5d2ae40476` 배포 + `PARSER_VERSION` 7→8 전체 재동기화 완료(1,818장).
+사용자 질문 "표 안에서 형광펜 되는지" — **안 됐다(확인함, 코드 리딩).** `tableHtml()`이 칸에
+`data-blk`를 안 찍어 「Select within a single paragraph」만 떴고, 서버는 표 줄(table_row)
+블록 id를 버리고 있어 노션에 되쓸 방법 자체가 없었다.
+- **수정** — 칸마다 `"p0.r1.c1"`(블록 경로 + `.r줄.c칸`) 주소, `/api/highlight`에 `cell:[줄,칸]`.
+  표 블록에 `rowIds`를 저장(PARSER_VERSION 8). ⚠ **Notion `table_row` PATCH는 `cells` 전체를
+  덮어쓴다** — 칸 하나만 칠해도 그 줄의 모든 칸을 같이 보낸다. `rowIds`가 없는 옛 캐시 카드는
+  주소를 안 찍어 종전 동작(안내 토스트). 여러 칸에 걸친 선택은 문단 경계와 같은 이유로 거절.
+- ✓ 로컬(합성 KV, 실제 마우스 드래그): 칸 칠하기·칠한 칸 탭 해제·칸 넘는 드래그 거절·옛 캐시
+  무주소·일반 문단 회귀. ✓ **프로덕션 노션 왕복**: `to와 in order to 차이` 카드 1행 2칸 「일상적」을
+  칠한 뒤 재동기화로 노션에서 다시 읽어 와 반영 확인 → 해제 후 같은 방법으로 원복 확인(옆 칸 bold 유지).
+  **실기기 터치 미확인.**
+- ⚠ 이 PC(`aros`)엔 `.dev.vars`가 없다 — 로컬 `wrangler dev`는 노션 토큰 없이 돈다(`notionOk:false`,
+  `/api/image` 400). 그리고 `Win32_Process | CommandLine -match 'wrangler'`로 좀비를 죽이면
+  **그 명령을 실행한 셸 자신도 매치돼 같이 죽는다.**
+- ⚠ 전체 재동기화(1,818장)는 수동 `/api/sync` 반복으로 약 20~30분, 중간중간 HTML 오류 응답이
+  섞이지만 재시도하면 진행된다.
+
+## 현재 상태 (2026-10-05 라운드36 — 표 아래 큰 빈칸 = 투명 data: 그림)
 
 `Version ID 542779e3-5066-4b15-8cfe-4bef528db8da` 배포(클라이언트만, 재동기화 불요).
 사용자 신고: 노션엔 없는 빈칸이 표와 다음 문장 사이에 생김(`Your guess is as good as mine,`).
@@ -251,7 +271,8 @@ Notion DB `3. 영어 DB`에 자동 저장한다. **저장은 되는데 복습이
   `surroundContents()`가 서식 경계에서 실패하면 `extractContents()` 폴백(R27후속3·R28).
 - 블록 주소 `data-blk`는 점 구분 경로(`"4.5.0"`, 힌트 앞 블록은 `"p0"`) — 서버
   `resolveBlockPath()`가 `children`을 타고 내려간다. **문단 두 개에 걸친 선택은 미지원**
-  (블록 하나에 PATCH 하나 구조, 토스트로 안내 — R28).
+  (블록 하나에 PATCH 하나 구조, 토스트로 안내 — R28). 표 칸은 끝에 `.r줄.c칸`이 붙고
+  (`"p0.r1.c1"`), 서버는 그 줄(`rowIds[줄]`)의 cells 전체를 PATCH한다 — 칸 두 개에 걸친 선택도 미지원(R37).
 - ⚠ **Notion에 쓸 rich_text의 `annotations`에 `color` 키를 넣지 않는다**(`toNotionRichText`).
   API의 단일 color enum이 노션의 글자색·배경색 두 채널 중 하나를 꺼서 형광펜이 회색으로
   보였다. 이미 회색으로 굳은 옛 스팬은 자동 복구 안 됨(사용자가 수동 처리, R26).
@@ -260,7 +281,7 @@ Notion DB `3. 영어 DB`에 자동 저장한다. **저장은 되는데 복습이
 
 **데이터·서버**
 
-- 본문 파서(`PARSER_VERSION` 7): `splitBody()`가 힌트 앞 블록을 `pre`로 보존하고, 텍스트
+- 본문 파서(`PARSER_VERSION` 8 — 표에 줄 id `rowIds`, R37): `splitBody()`가 힌트 앞 블록을 `pre`로 보존하고, 텍스트
   없는 `divider`·`table`·`image`도 남긴다. 중첩 자식은 깊이 3까지 `children`으로(R16·R26).
 - **DB 질의엔 항상 `DB_SORTS`(created_time 오름차순)** — `created_time`이 분 단위라 동률이
   있고, 정렬 미지정이면 노션 응답 순서가 그대로 남아 카드 순서가 뒤집혔다(R26).
