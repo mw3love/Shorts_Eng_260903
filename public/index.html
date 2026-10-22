@@ -807,11 +807,14 @@ function richHtml(rich){
   if (run !== null) out += '<code class="hl">' + run + '</code>';
   return out;
 }
-function tableHtml(b){
+// 칸마다 "5.r2.c1"(5번 블록 표의 2번 줄 1번 칸) 주소를 찍어 형광펜이 칸 단위로 동작한다.
+// rowIds가 없는 옛 캐시(PARSER_VERSION 7 이하)는 Notion에 되쓸 수 없으니 주소를 안 찍는다.
+function tableHtml(b, i){
   const rows = b.rows || [];
+  const addr = i != null && Array.isArray(b.rowIds);
   return '<table>' + rows.map((row, ri) => {
     const tag = b.headerRow && ri === 0 ? 'th' : 'td';
-    return '<tr>' + row.map((cell) => '<' + tag + '>' + richHtml(cell) + '</' + tag + '>').join('') + '</tr>';
+    return '<tr>' + row.map((cell, ci) => '<' + tag + (addr ? ' data-blk="' + i + '.r' + ri + '.c' + ci + '"' : '') + '>' + richHtml(cell) + '</' + tag + '>').join('') + '</tr>';
   }).join('') + '</table>';
 }
 // 초창기(AI 도입 전) 메모는 스크린샷을 그대로 붙여넣은 카드가 있다 — Notion 자체 호스팅
@@ -871,7 +874,7 @@ function blockHtml(b, i){
     case 'to_do': return '<div>' + (b.checked ? '&#9745; ' : '&#9744; ') + richHtml(b.rich) + childrenHtml(b, i) + '</div>';
     case 'code': return '<pre><code>' + richHtml(b.rich) + '</code></pre>';
     case 'divider': return '<hr>';
-    case 'table': return tableHtml(b);
+    case 'table': return tableHtml(b, i);
     case 'image': return imageHtml(b);
     default: return b.rich ? '<p' + blk + '>' + richHtml(b.rich) + childrenHtml(b, i) + '</p>' : '';
   }
@@ -958,8 +961,8 @@ async function apiRetitle(pageId, oldKey, newTitle){
   const r = await fetch('/api/retitle', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pageId, oldKey, newTitle }) });
   return r.json();
 }
-async function apiHighlight(pageId, field, blockIndex, start, end){
-  const r = await fetch('/api/highlight', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pageId, field, blockIndex, start, end }) });
+async function apiHighlight(pageId, field, blockIndex, start, end, cell){
+  const r = await fetch('/api/highlight', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pageId, field, blockIndex, cell, start, end }) });
   return r.json();
 }
 
@@ -1132,7 +1135,8 @@ function getHighlightTarget(){
   if (!startBlk || !endBlk || startBlk !== endBlk) return null;
   const blk = startBlk.dataset.blk;
   // "3"(top-level), "p0"(pre), "3.0"/"p0.1.2"(중첩 자식 경로, 위 childrenHtml 참조) 전부 허용.
-  if (blk !== 'hint' && !/^p?\d+(\.\d+)*$/.test(blk)) return null;
+  // 표 칸은 끝에 ".r줄.c칸"이 붙는다(tableHtml 참조).
+  if (blk !== 'hint' && !/^p?\d+(\.\d+)*(\.r\d+\.c\d+)?$/.test(blk)) return null;
   const start = plainOffsetInBlock(startBlk, range.startContainer, range.startOffset);
   const end = plainOffsetInBlock(startBlk, range.endContainer, range.endOffset);
   if (start == null || end == null || start >= end) return null;
@@ -1189,9 +1193,12 @@ function doHighlight(blk, start, end){
   if (!card) return;
   const field = blk === 'hint' ? 'hint' : (blk[0] === 'p' ? 'pre' : 'detail');
   // "3.0" 같은 중첩 경로를 [3,0]으로 — 서버가 children을 그 순서대로 순회해 블록을 찾는다.
-  const blockIndex = blk === 'hint' ? null : (blk[0] === 'p' ? blk.slice(1) : blk).split('.').map(Number);
+  const cellM = /\.r(\d+)\.c(\d+)$/.exec(blk);
+  const path = cellM ? blk.slice(0, cellM.index) : blk;
+  const blockIndex = blk === 'hint' ? null : (path[0] === 'p' ? path.slice(1) : path).split('.').map(Number);
+  const cell = cellM ? [Number(cellM[1]), Number(cellM[2])] : undefined;
   const seq = ++highlightSeq;
-  queueFlagApi(() => apiHighlight(card.id, field, blockIndex, start, end).catch(() => null).then((res) => {
+  queueFlagApi(() => apiHighlight(card.id, field, blockIndex, start, end, cell).catch(() => null).then((res) => {
     if (seq !== highlightSeq) return; // 더 최신 형광펜 동작이 이미 시작됨 — 그 응답이 곧 따로 옴, 지금은 화면을 안 건드린다
     if (res && res.ok){
       Object.assign(card, res.card);

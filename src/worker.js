@@ -73,7 +73,7 @@ const K_REVIEW_SCHEMA = 'reviewSchema:v1'; // { prop: string|null } — '복습 
 // UI에서 보이는 순서와 맞춘다.
 const DB_SORTS = [{ timestamp: 'created_time', direction: 'ascending' }];
 const BUCKET_SIZE = 50;             // ⚠ 카드별 개별 KV 저장은 불가 — 무료 쓰기 1,000회/일에 걸린다
-const PARSER_VERSION = 7;           // 포맷을 바꾸면 올릴 것 — 증분 로직이 옛 포맷을 재사용하지 않게
+const PARSER_VERSION = 8;           // 포맷을 바꾸면 올릴 것 — 증분 로직이 옛 포맷을 재사용하지 않게
                                      // (v3, 2026-09-05: 블록에 원본 block.id 추가 — 형광펜 토글을
                                      //  Notion에 되쓰려면 필요 / v4, 같은 날: image 블록 지원 추가 —
                                      //  v5, 같은 날: splitBody()가 image 블록을 "텍스트 없음"으로
@@ -177,7 +177,8 @@ function compactBlock(b) {
     if (!external && !v.file) return null;
     return { type: 'image', id: b.id, external, caption: richText(v.caption) };
   }
-  if (type === 'table') return { type: 'table', width: v.table_width || 0, headerRow: !!v.has_column_header, rows: [] };
+  // rowIds — 표 칸 형광펜을 Notion에 되쓸 때 그 줄(table_row) 블록 id가 필요하다(PARSER_VERSION 8).
+  if (type === 'table') return { type: 'table', id: b.id, width: v.table_width || 0, headerRow: !!v.has_column_header, rows: [], rowIds: [] };
   if (Array.isArray(v.rich_text)) {
     const rich = richText(v.rich_text);
     if (!rich.some((x) => x.t)) return null; // 빈 줄
@@ -251,7 +252,7 @@ async function pageBlocks(token, pageId, budget, depth = 0) {
       await gap();
       const kids = await notion(token, `/blocks/${b.id}/children?page_size=100`, {}, budget);
       for (const k of kids.results || []) {
-        if (k.type === 'table_row') cb.rows.push((k.table_row?.cells || []).map((cell) => richText(cell)));
+        if (k.type === 'table_row') { cb.rows.push((k.table_row?.cells || []).map((cell) => richText(cell))); cb.rowIds.push(k.id); }
       }
     } else if (b.has_children && depth < 3) {
       // 일반 블록(불릿·번호목록·토글·인용 등)의 중첩 자식 — "예시:" 불릿 아래 진짜 예문
@@ -1150,7 +1151,7 @@ function resolveBlockPath(arr, path) {
 // rich-text에서 [start,end) 구간의 code 여부를 뒤집고, KV(버킷)와 Notion 블록(진짜 원본,
 // 미러 아님) 양쪽에 반영한다.
 async function handleHighlight(env, token, body) {
-  const { pageId, field, blockIndex, start, end } = body || {};
+  const { pageId, field, blockIndex, cell, start, end } = body || {};
   if (!pageId || (field !== 'hint' && field !== 'detail' && field !== 'pre') || typeof start !== 'number' || typeof end !== 'number' || start >= end) {
     return json({ error: 'pageId/field/start/end required' }, 400);
   }
@@ -1167,6 +1168,24 @@ async function handleHighlight(env, token, body) {
   if (!card) return json({ error: 'not found' }, 404);
 
   const block = field === 'hint' ? card.hint : resolveBlockPath(field === 'pre' ? card.pre : card.detail, blockIndex);
+  // 표 칸 — cell:[줄, 칸]. Notion은 표를 줄(table_row) 단위로만 고칠 수 있고 PATCH가 그 줄의
+  // cells 전체를 덮어쓰므로, 칸 하나만 칠해도 그 줄의 모든 칸을 함께 보낸다.
+  if (Array.isArray(cell)) {
+    const [r, c] = cell;
+    const row = block && block.type === 'table' && Array.isArray(block.rows) ? block.rows[r] : null;
+    if (!row || !Array.isArray(row[c])) return json({ error: 'This block does not support highlighting' }, 400);
+    row[c] = toggleCodeInRich(row[c], start, end);
+    await env.KV.put(K_BUCKET + item.bucket, JSON.stringify(bucket));
+    let notionOk = false;
+    const rowId = (block.rowIds || [])[r];
+    if (rowId && token) {
+      try {
+        await notion(token, `/blocks/${rowId}`, { method: 'PATCH', body: JSON.stringify({ table_row: { cells: row.map(toNotionRichText) } }) });
+        notionOk = true;
+      } catch (e) { /* 삼키고 notionOk:false로 정직하게 알린다 */ }
+    }
+    return json({ ok: true, card, notionOk });
+  }
   if (!block || !Array.isArray(block.rich)) return json({ error: 'This block does not support highlighting' }, 400);
 
   block.rich = toggleCodeInRich(block.rich, start, end);
