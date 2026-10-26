@@ -149,6 +149,9 @@
   .peek-prev{transform:translateX(-100%)}
   .peek-next{transform:translateX(100%)}
   .peek .cardtitle{padding:14px 22px 6px;color:var(--paper)}
+  /* 경계에서 미리 보이는 카드가 「다른 소챕터」라는 표시(2026-10-26) — 손을 떼기 전에 안다. */
+  .peektag{margin:14px 22px 0;align-self:flex-start;font-family:var(--mono);font-size:13px;font-weight:600;color:var(--ink);background:var(--coral);padding:4px 10px;border-radius:7px}
+  .peektag:empty{display:none}
   /* 아래쪽을 흐리게 하던 마스크는 제거 — 커밋 후 마스크 없는 실제 카드로 바뀌는 순간
      "가려져 있다가 나타나는" 것처럼 보인다는 실기기 피드백(2026-09-05). 처음부터 다
      보이는 쪽이 낫다. */
@@ -229,6 +232,13 @@
      화면을 넣는 대신(무마찰 원칙) 주소 칩만 짧게 튀어 알린다. */
   @keyframes subposflash{0%{transform:scale(1)}35%{transform:scale(1.16)}100%{transform:scale(1)}}
   .subpos-chip.flash{animation:subposflash .42s ease}
+  /* 2026-10-26 — 크기만 튀는 0.42초로는 못 보고 지나쳤다(사용자 신고). 소챕터가 바뀌면 1초간
+     코랄로 칠한다. 코랄 위에선 흰 글씨·코랄 점이 안 보여 그동안만 어두운 색으로 바꾼다. */
+  .subpos-chip{transition:background .25s ease}
+  .subpos-chip.lit{background:var(--coral)}
+  .subpos-chip.lit span#subPos{color:var(--ink)}
+  .subpos-chip.lit .subpos-dots i{background:rgba(11,13,16,.25)}
+  .subpos-chip.lit .subpos-dots i.on{background:var(--ink)}
 
   .searchbtn,.fontbtn-top,.examtopbtn{
     width:32px;height:32px;border-radius:50%;border:0;cursor:pointer;flex:none;
@@ -631,8 +641,8 @@
         <input class="cardtitle cardtitle-input" id="cardTitleInput" type="text" autocomplete="off" hidden>
         <div class="content" id="content"></div>
       </div>
-      <div class="peek peek-prev" id="peekPrev"><div class="cardtitle" id="peekPrevTitle"></div><div class="content peekbody" id="peekPrevBody"></div></div>
-      <div class="peek peek-next" id="peekNext"><div class="cardtitle" id="peekNextTitle"></div><div class="content peekbody" id="peekNextBody"></div></div>
+      <div class="peek peek-prev" id="peekPrev"><div class="peektag" id="peekPrevTag"></div><div class="cardtitle" id="peekPrevTitle"></div><div class="content peekbody" id="peekPrevBody"></div></div>
+      <div class="peek peek-next" id="peekNext"><div class="peektag" id="peekNextTag"></div><div class="cardtitle" id="peekNextTitle"></div><div class="content peekbody" id="peekNextBody"></div></div>
       <!-- PC 마우스 좌우 이동 버튼(2026-09-07) — 호버 가능한 포인터에서만 CSS로 나타남. -->
       <button class="navedge prevedge" id="navPrevBtn" aria-label="Previous card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>
       <button class="navedge nextedge" id="navNextBtn" aria-label="Next card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></button>
@@ -1322,8 +1332,10 @@ function flashSubPos(){
   const chip = $('subPosChip');
   chip.classList.remove('flash');
   void chip.offsetWidth; // 리플로우를 강제해야 같은 애니메이션이 다시 재생된다
-  chip.classList.add('flash');
+  chip.classList.add('flash', 'lit');
   setTimeout(() => chip.classList.remove('flash'), 460);
+  clearTimeout(flashSubPos.t);
+  flashSubPos.t = setTimeout(() => chip.classList.remove('lit'), 1000);
 }
 function updateSubPos(){
   // 시험 중엔 풀이 이 소챕터가 아니다 — 칩은 진행(Q n/총)만 보여주고, 소챕터 진행 점·
@@ -1943,15 +1955,23 @@ async function advanceSubchapter(){
   chapIdx = p.chap; subIdx = p.sub;
   savePos();
   await loadSubchapter();
-  toast(crossed ? 'Moved to chapter ' + (chapIdx + 1) : 'Moved to subchapter ' + (subIdx + 1));
+  toastSubchapter(crossed);
   refreshChapterMeta();
+}
+// 전환 토스트 — 번호만으론 감이 안 와서 「이 소챕터에 남은 미체크」를 같이 보여준다.
+function toastSubchapter(crossed){
+  const left = visibleCards(subchapterAll).filter((c) => !c.known).length;
+  toast((crossed ? 'Chapter ' + (chapIdx + 1) + ' · ' : '') + (chapIdx + 1) + '-' + (subIdx + 1) + ' · '
+    + (left ? left + ' unchecked' : 'all checked'));
 }
 async function retreatSubchapter(){
   const p = neighborPos(-1);
   if (!p){ toast('First card'); return; }
+  const crossed = p.chap !== chapIdx;
   chapIdx = p.chap; subIdx = p.sub;
   savePos();
   await loadSubchapter(true);
+  toastSubchapter(crossed);
   refreshChapterMeta();
 }
 
@@ -1985,6 +2005,14 @@ function boundaryCard(dir){
 }
 // reviewMode(완전히 앎/휴지통 카드뷰)에서는 경계 밖이 chapIdx/subIdx와 무관한 별도
 // 풀이라 boundaryCard(실제 챕터 기준)를 부르면 안 맞는 카드가 나온다 — 그냥 없음으로 둔다.
+// 미리보기 카드가 경계 너머(이웃 소챕터)에서 온 것일 때만 그 소챕터 주소를 붙인다.
+function peekTag(dir, card){
+  if (!card || reviewMode || examMode || foreignPool) return '';
+  if (dir > 0 ? studyIdx + 1 < studyCards.length : studyIdx > 0) return '';
+  const p = neighborPos(dir);
+  if (!p) return '';
+  return (p.chap !== chapIdx ? 'Chapter ' + (p.chap + 1) + ' · ' : '') + (p.chap + 1) + '-' + (p.sub + 1);
+}
 function studyPrev(){ return studyIdx > 0 ? studyCards[studyIdx - 1] : ((reviewMode || examMode || foreignPool) ? null : boundaryCard(-1)); }
 function studyNext(){ return studyIdx + 1 < studyCards.length ? studyCards[studyIdx + 1] : ((reviewMode || examMode || foreignPool) ? null : boundaryCard(1)); }
 function setDragX(px){
@@ -2009,6 +2037,7 @@ function beginSwipeTracking(e){
   const pc = studyPrev(), nc = studyNext();
   $('peekPrevTitle').textContent = pc ? pc.front : ''; $('peekPrevBody').innerHTML = peekBodyFor(pc);
   $('peekNextTitle').textContent = nc ? nc.front : ''; $('peekNextBody').innerHTML = peekBodyFor(nc);
+  $('peekPrevTag').textContent = peekTag(-1, pc); $('peekNextTag').textContent = peekTag(1, nc);
 }
 scroller.addEventListener('pointerdown', (e) => {
   // ⚠ gateActive는 여기서 막지 않는다 — 경계 안내면의 「Swipe again to skip」이 곧 그
@@ -2237,6 +2266,7 @@ function navByKey(dir){
   const pc = studyPrev(), nc = studyNext();
   $('peekPrevTitle').textContent = pc ? pc.front : ''; $('peekPrevBody').innerHTML = peekBodyFor(pc);
   $('peekNextTitle').textContent = nc ? nc.front : ''; $('peekNextBody').innerHTML = peekBodyFor(nc);
+  $('peekPrevTag').textContent = peekTag(-1, pc); $('peekNextTag').textContent = peekTag(1, nc);
   setDragTransition('transform ' + TRANSITION_MS + 'ms cubic-bezier(.2,.7,.3,1)');
   if (dir < 0) goToNext(); else goToPrev();
 }
