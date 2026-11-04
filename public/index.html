@@ -314,9 +314,13 @@
   .aisetbody section{background:var(--ink2);border-radius:12px;padding:12px 14px;margin:0 0 10px}
   .aisetbody h6{margin:0 0 8px;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:500}
   .aisetbody label{display:block;font-size:12px;color:var(--muted);margin:8px 0 0}
-  .aisetbody input{display:block;width:100%;box-sizing:border-box;margin-top:4px;background:var(--ink3);border:1px solid var(--ink4);
+  .aisetbody input,.aisetbody select{display:block;width:100%;box-sizing:border-box;margin-top:4px;background:var(--ink3);border:1px solid var(--ink4);
     border-radius:10px;color:var(--paper);font-family:var(--sans);font-size:16px;padding:10px 12px;outline:none}
-  .aisetbody input:focus{border-color:var(--coral)}
+  /* 드롭다운 화살표 — 위 background 묶음 지정 뒤에 둬야 안 지워진다 */
+  .aisetbody select{-webkit-appearance:none;appearance:none;padding-right:34px;
+    background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);
+    background-position:calc(100% - 18px) 55%,calc(100% - 13px) 55%;background-size:5px 5px;background-repeat:no-repeat}
+  .aisetbody input:focus,.aisetbody select:focus{border-color:var(--coral)}
   .aiseg{display:flex;gap:6px}
   .aiseg button{flex:1;font-family:var(--sans);font-size:13px;color:var(--muted);background:var(--ink3);border:1px solid transparent;border-radius:9px;padding:9px;cursor:pointer;touch-action:manipulation}
   .aiseg button.on{color:var(--paper);border-color:var(--coral)}
@@ -872,15 +876,15 @@
       </section>
       <section data-for="gemini">
         <h6>Gemini</h6>
-        <label>Model<input id="aiGemModel" list="aiGemModels" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
-        <datalist id="aiGemModels"></datalist>
+        <label>Model<select id="aiGemModel"></select></label>
+        <p class="aihint" id="aiGemModelMsg"></p>
         <label>API key<input id="aiGemKey" type="password" autocomplete="off"></label>
       </section>
       <section data-for="mindlogic">
         <h6>Gateway</h6>
         <label>Base URL<input id="aiMlBase" type="url" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
-        <label>Model<input id="aiMlModel" list="aiMlModels" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
-        <datalist id="aiMlModels"></datalist>
+        <label>Model<select id="aiMlModel"></select></label>
+        <p class="aihint" id="aiMlModelMsg"></p>
         <label>API key<input id="aiMlKey" type="password" autocomplete="off"></label>
       </section>
       <section>
@@ -3406,7 +3410,8 @@ async function checkAskConfig(){
 function configuredModel(){
   if (!askConfig || !askConfig.settings) return '';
   const s = askConfig.settings;
-  return s.backend === 'mindlogic' ? s.mindlogic.model : s.gemini.model;
+  const m = s.backend === 'mindlogic' ? s.mindlogic.model : s.gemini.model;
+  return m === 'auto' ? 'newest Gemini Lite (auto)' : m; // 첫 답이 오면 실제로 답한 모델 이름으로 바뀐다
 }
 function syncAskHead(){
   const last = [...askTurns].reverse().find((t) => t.model);
@@ -3534,10 +3539,22 @@ function setAiSeg(b){
   document.querySelectorAll('#aiServer section[data-for]').forEach((s) => s.classList.toggle('off', s.dataset.for !== b));
 }
 $('aiSeg').querySelectorAll('button').forEach((x) => x.addEventListener('click', function(){ this.blur(); setAiSeg(this.dataset.b); }));
-async function fillModelList(backend, listId){
+// 모델 드롭다운 — 서비스의 실시간 목록(설정창을 열 때마다 새로). 맨 위 「Auto」 = 가장 최신 Gemini lite(서버가
+// 매 질문마다 다시 고른다). 고른 모델이 단종돼 목록에서 빠졌으면 「→ 대체 모델」로 표시하고 그대로 남겨 둔다.
+async function fillModelList(backend, selId, msgId){
+  const sel = $(selId), msg = $(msgId);
   const { status, data } = await askCall('/api/ask/models?backend=' + backend);
-  if (status !== 200) return;
-  $(listId).innerHTML = (data.models || []).map((m) => '<option value="' + esc(m) + '">').join('');
+  const chosen = (data && data.chosen) || 'auto';
+  const models = (status === 200 && data.models) || [];
+  let html = '<option value="auto">Auto · newest Gemini Lite' + (data && data.auto ? ' (' + esc(data.auto) + ')' : '') + '</option>';
+  if (chosen !== 'auto' && !models.includes(chosen)) html += '<option value="' + esc(chosen) + '">' + esc(chosen) + ' — retired' + (data.resolved && data.resolved !== chosen ? ' → ' + esc(data.resolved) : '') + '</option>';
+  html += models.map((m) => '<option value="' + esc(m) + '">' + esc(m) + '</option>').join('');
+  sel.innerHTML = html;
+  sel.value = chosen;
+  msg.className = 'aihint' + (data && data.error ? ' err' : '');
+  msg.textContent = data && data.error ? 'Could not load models: ' + data.error
+    : (data && data.resolved && data.resolved !== chosen && chosen !== 'auto') ? 'Retired — now using ' + data.resolved
+    : models.length ? models.length + ' models available' : '';
 }
 async function loadAiSettings(){
   const { status, data } = await askCall('/api/ask/config');
@@ -3553,14 +3570,12 @@ async function loadAiSettings(){
   const s = data.settings;
   $('aiServer').hidden = false;
   setAiSeg(s.backend);
-  $('aiGemModel').value = s.gemini.model || '';
-  $('aiMlModel').value = s.mindlogic.model || '';
   $('aiMlBase').value = s.mindlogic.base || '';
   $('aiGemKey').value = ''; $('aiMlKey').value = ''; $('aiNewPw').value = '';
   $('aiGemKey').placeholder = s.gemini.keyHint ? s.gemini.keyHint + ' saved — blank keeps it' : 'Paste API key';
   $('aiMlKey').placeholder = s.mindlogic.keyHint ? s.mindlogic.keyHint + ' saved — blank keeps it' : 'Paste API key';
-  fillModelList('gemini', 'aiGemModels');
-  fillModelList('mindlogic', 'aiMlModels');
+  fillModelList('gemini', 'aiGemModel', 'aiGemModelMsg');
+  fillModelList('mindlogic', 'aiMlModel', 'aiMlModelMsg');
   return true;
 }
 $('aiSaveBtn').addEventListener('click', async function(){

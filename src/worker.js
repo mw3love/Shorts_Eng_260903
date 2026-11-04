@@ -1301,10 +1301,10 @@ async function loadAskConfig(env) {
     ASK_PASSWORD: st.password || env.ASK_PASSWORD || '',
     backend: st.backend === 'mindlogic' ? 'mindlogic' : 'gemini',
     GEMINI_API_KEY: st.geminiKey || env.GEMINI_API_KEY || '',
-    GEMINI_MODEL: st.geminiModel || env.GEMINI_MODEL || 'gemini-3.5-flash',
+    GEMINI_MODEL: st.geminiModel || env.GEMINI_MODEL || 'auto', // 'auto' = 가장 최신 Gemini lite(resolveModel)
     MINDLOGIC_API_KEY: st.mindlogicKey || env.MINDLOGIC_API_KEY || '',
     MINDLOGIC_BASE_URL: st.mindlogicBase || env.MINDLOGIC_BASE_URL || '',
-    MINDLOGIC_MODEL: st.mindlogicModel || env.MINDLOGIC_MODEL || 'claude-sonnet-4-6',
+    MINDLOGIC_MODEL: st.mindlogicModel || env.MINDLOGIC_MODEL || 'auto',
   };
 }
 const keyHint = (k) => (k ? String(k).slice(0, 4) + '…' : '');
@@ -1327,8 +1327,11 @@ async function handleAskSettings(env, cfg, body) {
   set('mindlogicKey', body.mindlogicKey); set('mindlogicModel', body.mindlogicModel, 120);
   if (body.mindlogicBase !== undefined) {
     const b = String(body.mindlogicBase || '').trim().replace(/\/+$/, '');
-    if (b && !/^https:\/\//.test(b)) return json({ error: 'Base URL must start with https://' }, 400);
-    if (b) st.mindlogicBase = b;
+    // 바뀐 경우에만 검사·저장 — 설정창은 모든 칸을 한꺼번에 보내므로, 손대지 않은 칸이 저장 전체를 막으면 안 된다.
+    if (b && b !== String(cfg.MINDLOGIC_BASE_URL).replace(/\/+$/, '')) {
+      if (!/^https:\/\//.test(b)) return json({ error: 'Base URL must start with https://' }, 400);
+      st.mindlogicBase = b;
+    }
   }
   if (body.newPassword !== undefined && String(body.newPassword).trim()) {
     const p = String(body.newPassword).trim();
@@ -1338,28 +1341,74 @@ async function handleAskSettings(env, cfg, body) {
   await env.KV.put(K_ASK_SETTINGS, JSON.stringify(st));
   return json(askPublicConfig(await loadAskConfig(env)));
 }
-// 모델 목록 — 설정창 드롭다운용. 게이트웨이는 OpenAI 호환 /models(type llm), Gemini는 generateContent 지원 모델.
-async function handleAskModels(cfg, backend) {
-  try {
-    if (backend === 'mindlogic') {
-      if (!cfg.MINDLOGIC_API_KEY || !cfg.MINDLOGIC_BASE_URL) return json({ models: [] });
-      const r = await fetch(String(cfg.MINDLOGIC_BASE_URL).replace(/\/+$/, '') + '/models', { headers: { Authorization: `Bearer ${cfg.MINDLOGIC_API_KEY}` } });
-      if (!r.ok) throw await askHttpError('Gateway', r);
-      const d = await r.json();
-      const models = (d.data || []).filter((m) => (!m.type || m.type === 'llm') && !m.deprecated_at).map((m) => m.id);
-      return json({ models });
-    }
-    if (!cfg.GEMINI_API_KEY) return json({ models: [] });
-    const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200', { headers: { 'x-goog-api-key': cfg.GEMINI_API_KEY } });
-    if (!r.ok) throw await askHttpError('Gemini', r);
+/* 모델 목록·자동 선택(2026-11-04, 사용자 결정) — 두 서비스 모두 모델이 자주 바뀐다.
+   ⓐ 기본값 'auto' = 실시간 목록에서 「gemini-<버전>-flash-lite」 중 버전이 가장 높은 것(사전은 속도가 중요 —
+      확장 youtube_dual_subtitle도 lite를 메인으로 쓴다). 새 lite가 나오면 앱 수정 없이 그걸 쓴다.
+   ⓑ 직접 고른 모델이 단종(게이트웨이 deprecated_at)되면 목록의 replacement를 끝까지 따라가 대신 부른다.
+   목록은 KV `askModels:v1:<backend>`에 하루 캐시(질문마다 목록을 받으면 느려진다). 설정창을 열 때는 새로 받는다. */
+const K_ASK_MODELS = 'askModels:v1:';
+const ASK_MODELS_TTL = 24 * 60 * 60 * 1000;
+const NOT_CHAT_MODEL = /embedding|image|tts|audio|live|banana|transcribe|robotics|computer-use|customtools|omni/;
+async function fetchModelList(cfg, backend) {
+  if (backend === 'mindlogic') {
+    if (!cfg.MINDLOGIC_API_KEY || !cfg.MINDLOGIC_BASE_URL) return [];
+    const r = await fetch(String(cfg.MINDLOGIC_BASE_URL).replace(/\/+$/, '') + '/models', { headers: { Authorization: `Bearer ${cfg.MINDLOGIC_API_KEY}` } });
+    if (!r.ok) throw await askHttpError('Gateway', r);
     const d = await r.json();
-    const models = (d.models || [])
-      .filter((m) => (m.supportedGenerationMethods || []).includes('generateContent'))
-      .map((m) => String(m.name || '').replace(/^models\//, ''))
-      .filter((n) => n.startsWith('gemini') && !/embedding|image|tts|audio|live/.test(n));
-    return json({ models });
+    return (d.data || []).filter((m) => (!m.type || m.type === 'llm') && !NOT_CHAT_MODEL.test(m.id))
+      .map((m) => ({ id: m.id, deprecated: !!m.deprecated_at || m.lifecycle === 'legacy', replacement: m.replacement || null }));
+  }
+  if (!cfg.GEMINI_API_KEY) return [];
+  const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200', { headers: { 'x-goog-api-key': cfg.GEMINI_API_KEY } });
+  if (!r.ok) throw await askHttpError('Gemini', r);
+  const d = await r.json();
+  return (d.models || [])
+    .filter((m) => (m.supportedGenerationMethods || []).includes('generateContent'))
+    .map((m) => String(m.name || '').replace(/^models\//, ''))
+    .filter((n) => n.startsWith('gemini') && !NOT_CHAT_MODEL.test(n))
+    .map((id) => ({ id, deprecated: false, replacement: null }));
+}
+async function getModelList(env, cfg, backend, fresh) {
+  const key = K_ASK_MODELS + backend;
+  let cached = null;
+  try { cached = JSON.parse((await env.KV.get(key)) || 'null'); } catch (e) { cached = null; }
+  if (!fresh && cached && Date.now() - cached.at < ASK_MODELS_TTL) return cached.models;
+  try {
+    const models = await fetchModelList(cfg, backend);
+    if (models.length) await env.KV.put(key, JSON.stringify({ at: Date.now(), models }));
+    return models;
   } catch (e) {
-    return json({ models: [], error: String(e.message || e) });
+    if (cached) return cached.models; // 목록을 못 받아도 어제 목록으로 계속 돈다
+    throw e;
+  }
+}
+function newestGeminiLite(models) {
+  const ver = (id) => { const m = id.match(/^gemini-(\d+(?:\.\d+)?)-flash-lite(-preview)?$/); return m ? { v: parseFloat(m[1]), pre: !!m[2] } : null; };
+  const cands = models.filter((m) => !m.deprecated && ver(m.id))
+    .sort((a, b) => { const x = ver(a.id), y = ver(b.id); return (x.pre - y.pre) || (y.v - x.v); }); // 정식판 먼저, 그다음 높은 버전
+  return cands[0]?.id || null;
+}
+// 실제로 부를 모델 이름. 목록을 못 받았으면 고른 값 그대로(auto면 안전한 기본값).
+function resolveModel(models, chosen) {
+  if (!chosen || chosen === 'auto') return newestGeminiLite(models || []) || 'gemini-3.5-flash-lite';
+  let id = chosen;
+  for (let i = 0; i < 5; i++) {
+    const m = (models || []).find((x) => x.id === id);
+    if (!m || !m.deprecated || !m.replacement) break;
+    id = m.replacement;
+  }
+  return id;
+}
+async function handleAskModels(env, cfg, backend) {
+  const chosen = backend === 'mindlogic' ? cfg.MINDLOGIC_MODEL : cfg.GEMINI_MODEL;
+  try {
+    const list = await getModelList(env, cfg, backend, true);
+    return json({
+      models: list.filter((m) => !m.deprecated).map((m) => m.id),
+      chosen, resolved: resolveModel(list, chosen), auto: resolveModel(list, 'auto'),
+    });
+  } catch (e) {
+    return json({ models: [], chosen, resolved: chosen, auto: null, error: String(e.message || e) });
   }
 }
 
@@ -1691,14 +1740,22 @@ export default {
       const denied = askAuthError(request, cfg);
       if (denied) return denied;
       if (url.pathname === '/api/ask/config') return json(askPublicConfig(cfg));
-      if (url.pathname === '/api/ask/models') return handleAskModels(cfg, url.searchParams.get('backend') === 'mindlogic' ? 'mindlogic' : 'gemini');
+      if (url.pathname === '/api/ask/models') return handleAskModels(env, cfg, url.searchParams.get('backend') === 'mindlogic' ? 'mindlogic' : 'gemini');
       if (url.pathname === '/api/ask/settings' && request.method === 'POST') {
         try { return await handleAskSettings(env, cfg, await request.json()); }
         catch (e) { return json({ error: String(e.message || e) }, 500); }
       }
       if (url.pathname === '/api/ask' && request.method === 'POST') {
         // handleAsk는 env 자리에 cfg(설정이 반영된 같은 이름의 값)를 받는다.
-        try { return await handleAsk(cfg, await request.json()); }
+        try {
+          const body = await request.json();
+          // 실제로 부를 모델을 정한다('auto' → 최신 lite, 단종 → 대체). 목록 조회가 실패해도 질문은 막지 않는다.
+          const be = (body.backend === 'mindlogic' || body.backend === 'gemini') ? body.backend : cfg.backend;
+          const field = be === 'mindlogic' ? 'MINDLOGIC_MODEL' : 'GEMINI_MODEL';
+          let models = null;
+          try { models = await getModelList(env, cfg, be, false); } catch (e) { models = null; }
+          return await handleAsk({ ...cfg, [field]: resolveModel(models, cfg[field]) }, body);
+        }
         catch (e) { return json({ error: String(e.message || e) }, 500); }
       }
       if (url.pathname === '/api/ask/save' && request.method === 'POST') {
