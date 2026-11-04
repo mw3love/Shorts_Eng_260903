@@ -1231,7 +1231,20 @@ async function handleSearch(env, q) {
   const idxRaw = await env.KV.get(K_INDEX);
   if (!idxRaw) return json({ items: [], syncing: true });
   const idx = JSON.parse(idxRaw);
-  const matches = idx.items.filter((it) => it.front.toLowerCase().includes(needle));
+  // 단어 순서 무관(2026-11-04 사용자 요청 — 「i tell can」으로도 「I can tell…」을 찾게, 어림짐작 검색).
+  // 입력의 모든 단어가 제목 어느 단어의 「앞부분」과 맞으면 통과 — 그냥 부분문자열로 보면 `i`가 this·like
+  // 속 i에 걸려 거의 다 나온다. 순서까지 같은(종전 방식) 결과를 먼저 둔다.
+  const WORD_SPLIT = /[^a-z0-9가-힣']+/;
+  const toks = needle.split(WORD_SPLIT).filter(Boolean);
+  const phrase = [], loose = [];
+  for (const it of idx.items) {
+    const f = it.front.toLowerCase();
+    if (f.includes(needle)) { phrase.push(it); continue; }
+    if (!toks.length) continue;
+    const words = f.split(WORD_SPLIT).filter(Boolean);
+    if (toks.every((t) => words.some((w) => w.startsWith(t)))) loose.push(it);
+  }
+  const matches = [...phrase, ...loose];
   if (!matches.length) return json({ items: [], total: 0 });
 
   const sorted = sortedByCreated(idx.items);
@@ -1275,9 +1288,84 @@ const ASK_PROMPT_QUESTION = `너는 나의 언어 학습 도우미야. 앞의 �
 - 정보 전달 외 불필요한 인삿말은 하지 마.`;
 const ASK_MAX_TOKENS = 4096;
 
-function askAuthError(request, env) {
-  if (!env.ASK_PASSWORD) return json({ error: 'ASK_PASSWORD not set on the server', code: 'noPassword' }, 503);
-  if ((request.headers.get('X-Ask-Key') || '') !== env.ASK_PASSWORD) return json({ error: 'Wrong password', code: 'auth' }, 401);
+/* AI 설정(2026-11-04, 사용자 요청 — 「☰ 안의 AI 설정창에서 키·주소·모델·암호를 바꾸게」).
+   앱에서 바꾼 값은 KV `askSettings:v1`에 두고, 비어 있는 항목은 Worker secret/vars가 기본값이 된다.
+   ⚠ 키는 응답으로 절대 돌려보내지 않는다 — 화면엔 앞 4글자(keyHint)만. 바꾸려면 지금 암호가 필요하다.
+   반환 객체는 env와 같은 키 이름이라 askGemini/askMindlogic/askBackends가 그대로 받는다. */
+const K_ASK_SETTINGS = 'askSettings:v1';
+async function loadAskConfig(env) {
+  let st = {};
+  try { st = JSON.parse((await env.KV.get(K_ASK_SETTINGS)) || '{}') || {}; } catch (e) { st = {}; }
+  return {
+    stored: st,
+    ASK_PASSWORD: st.password || env.ASK_PASSWORD || '',
+    backend: st.backend === 'mindlogic' ? 'mindlogic' : 'gemini',
+    GEMINI_API_KEY: st.geminiKey || env.GEMINI_API_KEY || '',
+    GEMINI_MODEL: st.geminiModel || env.GEMINI_MODEL || 'gemini-3.5-flash',
+    MINDLOGIC_API_KEY: st.mindlogicKey || env.MINDLOGIC_API_KEY || '',
+    MINDLOGIC_BASE_URL: st.mindlogicBase || env.MINDLOGIC_BASE_URL || '',
+    MINDLOGIC_MODEL: st.mindlogicModel || env.MINDLOGIC_MODEL || 'claude-sonnet-4-6',
+  };
+}
+const keyHint = (k) => (k ? String(k).slice(0, 4) + '…' : '');
+function askPublicConfig(cfg) {
+  return {
+    ok: true, backends: askBackends(cfg),
+    settings: {
+      backend: cfg.backend,
+      gemini: { keyHint: keyHint(cfg.GEMINI_API_KEY), model: cfg.GEMINI_MODEL },
+      mindlogic: { keyHint: keyHint(cfg.MINDLOGIC_API_KEY), base: cfg.MINDLOGIC_BASE_URL, model: cfg.MINDLOGIC_MODEL },
+    },
+  };
+}
+// 빈 문자열 = 「그대로 둠」(키 입력칸은 늘 비어 있다 — 기존 키를 화면에 안 보여 주므로).
+async function handleAskSettings(env, cfg, body) {
+  const st = { ...cfg.stored };
+  const set = (field, v, max = 500) => { const s = String(v ?? '').trim(); if (s) st[field] = s.slice(0, max); };
+  if (body.backend === 'gemini' || body.backend === 'mindlogic') st.backend = body.backend;
+  set('geminiKey', body.geminiKey); set('geminiModel', body.geminiModel, 120);
+  set('mindlogicKey', body.mindlogicKey); set('mindlogicModel', body.mindlogicModel, 120);
+  if (body.mindlogicBase !== undefined) {
+    const b = String(body.mindlogicBase || '').trim().replace(/\/+$/, '');
+    if (b && !/^https:\/\//.test(b)) return json({ error: 'Base URL must start with https://' }, 400);
+    if (b) st.mindlogicBase = b;
+  }
+  if (body.newPassword !== undefined && String(body.newPassword).trim()) {
+    const p = String(body.newPassword).trim();
+    if (p.length < 4) return json({ error: 'Password must be at least 4 characters' }, 400);
+    st.password = p;
+  }
+  await env.KV.put(K_ASK_SETTINGS, JSON.stringify(st));
+  return json(askPublicConfig(await loadAskConfig(env)));
+}
+// 모델 목록 — 설정창 드롭다운용. 게이트웨이는 OpenAI 호환 /models(type llm), Gemini는 generateContent 지원 모델.
+async function handleAskModels(cfg, backend) {
+  try {
+    if (backend === 'mindlogic') {
+      if (!cfg.MINDLOGIC_API_KEY || !cfg.MINDLOGIC_BASE_URL) return json({ models: [] });
+      const r = await fetch(String(cfg.MINDLOGIC_BASE_URL).replace(/\/+$/, '') + '/models', { headers: { Authorization: `Bearer ${cfg.MINDLOGIC_API_KEY}` } });
+      if (!r.ok) throw await askHttpError('Gateway', r);
+      const d = await r.json();
+      const models = (d.data || []).filter((m) => (!m.type || m.type === 'llm') && !m.deprecated_at).map((m) => m.id);
+      return json({ models });
+    }
+    if (!cfg.GEMINI_API_KEY) return json({ models: [] });
+    const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200', { headers: { 'x-goog-api-key': cfg.GEMINI_API_KEY } });
+    if (!r.ok) throw await askHttpError('Gemini', r);
+    const d = await r.json();
+    const models = (d.models || [])
+      .filter((m) => (m.supportedGenerationMethods || []).includes('generateContent'))
+      .map((m) => String(m.name || '').replace(/^models\//, ''))
+      .filter((n) => n.startsWith('gemini') && !/embedding|image|tts|audio|live/.test(n));
+    return json({ models });
+  } catch (e) {
+    return json({ models: [], error: String(e.message || e) });
+  }
+}
+
+function askAuthError(request, cfg) {
+  if (!cfg.ASK_PASSWORD) return json({ error: 'ASK_PASSWORD not set on the server', code: 'noPassword' }, 503);
+  if ((request.headers.get('X-Ask-Key') || '') !== cfg.ASK_PASSWORD) return json({ error: 'Wrong password', code: 'auth' }, 401);
   return null;
 }
 function askBackends(env) {
@@ -1448,7 +1536,8 @@ async function handleAsk(env, body) {
   const text = String(body.text || '').trim().slice(0, 300);
   const context = String(body.context || '').trim().slice(0, 600);
   if (!question && !text) return json({ error: 'Empty question' }, 400);
-  const backend = body.backend === 'mindlogic' ? 'mindlogic' : 'gemini';
+  // 기본은 설정창에서 고른 AI(KV), 요청이 명시하면 그쪽.
+  const backend = (body.backend === 'mindlogic' || body.backend === 'gemini') ? body.backend : env.backend;
   if (!askBackends(env)[backend]) return json({ error: (backend === 'gemini' ? 'Gemini' : 'Gateway') + ' key not set on the server', code: 'noBackend' }, 503);
   // history: [{role:'user'|'model', text}] — 클라이언트가 앞 턴을 그대로 돌려보낸다(서버는 대화를 저장 안 함).
   const history = (Array.isArray(body.history) ? body.history : [])
@@ -1598,11 +1687,18 @@ export default {
     if (url.pathname === '/api/search') return handleSearch(env, url.searchParams.get('q') || '');
 
     if (url.pathname.startsWith('/api/ask')) {
-      const denied = askAuthError(request, env);
+      const cfg = await loadAskConfig(env);
+      const denied = askAuthError(request, cfg);
       if (denied) return denied;
-      if (url.pathname === '/api/ask/config') return json({ ok: true, backends: askBackends(env) });
+      if (url.pathname === '/api/ask/config') return json(askPublicConfig(cfg));
+      if (url.pathname === '/api/ask/models') return handleAskModels(cfg, url.searchParams.get('backend') === 'mindlogic' ? 'mindlogic' : 'gemini');
+      if (url.pathname === '/api/ask/settings' && request.method === 'POST') {
+        try { return await handleAskSettings(env, cfg, await request.json()); }
+        catch (e) { return json({ error: String(e.message || e) }, 500); }
+      }
       if (url.pathname === '/api/ask' && request.method === 'POST') {
-        try { return await handleAsk(env, await request.json()); }
+        // handleAsk는 env 자리에 cfg(설정이 반영된 같은 이름의 값)를 받는다.
+        try { return await handleAsk(cfg, await request.json()); }
         catch (e) { return json({ error: String(e.message || e) }, 500); }
       }
       if (url.pathname === '/api/ask/save' && request.method === 'POST') {

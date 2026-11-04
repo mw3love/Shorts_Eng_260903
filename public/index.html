@@ -280,25 +280,52 @@
   }
   .searchbar button{flex:none;background:none;border:0;color:var(--muted);font-size:18px;cursor:pointer;padding:4px}
   .searchresults{flex:1;overflow-y:auto;padding:2px 14px 24px;-webkit-overflow-scrolling:touch}
-  /* AI에게 묻기(2026-11-04 라운드40) — 검색 오버레이와 같은 뼈대. 입력창은 위쪽에 둔다
-     (아래쪽 고정 입력창은 iOS 키보드에 가려지기 쉽다). 답은 카드 본문과 같은 .content 규칙으로 그린다. */
-  .askrow{border:1px dashed var(--ink4);background:none;cursor:pointer}
-  .askrow .tf{color:var(--coral)}
-  .askbar input{font-size:16px} /* 16px 미만이면 iOS가 포커스 때 화면을 확대한다 */
-  .askbar #askBackBtn{font-size:28px;line-height:1;padding:0 8px 4px 2px}
-  .askseg{flex:none;display:flex;gap:4px;padding:0 14px 6px}
-  .askseg button{font-family:var(--sans);font-size:11.5px;color:var(--muted);background:var(--ink3);border:1px solid transparent;border-radius:7px;padding:4px 9px;cursor:pointer;touch-action:manipulation}
-  .askseg button.on{color:var(--paper);border-color:var(--coral)}
-  .askseg button:disabled{opacity:.35;cursor:default}
-  .askseg .askmodel{margin-left:auto;align-self:center;font-family:var(--mono);font-size:10.5px;color:var(--faint)}
-  .askthread.content{min-height:0;will-change:auto;padding:4px 18px 40px}
-  /* 📖 사전 패널(2026-11-04) — 같은 #askOv를 화면 위쪽에서 내려오는 패널로. 아래쪽 시트로 하면 iOS
-     키보드에 입력창이 가려지기 쉬워 위에 붙였다. 답이 없을 땐 입력줄만(작게), 답이 오면 늘어난다. */
-  #askOv.dictmode{bottom:auto;max-height:72vh;border-bottom:1px solid var(--ink4);border-radius:0 0 16px 16px;box-shadow:0 12px 30px rgba(0,0,0,.5)}
-  #askOv.dictmode #askBackBtn{display:none}
-  #askOv.dictmode .askthread{flex:1 1 auto;padding-bottom:16px}
-  #askOv.dictmode .askthread:empty{display:none}
+  /* AI 사전 패널(2026-11-04 라운드40, 같은 날 2차 — 사용자 요청: 입력창은 아래, 카드와 한눈에 구분).
+     ⚠ 아래쪽에 두면 iOS 키보드가 입력창을 가릴 수 있다 — visualViewport로 키보드 높이(--kb)를 재서
+     그만큼 패널을 올린다(syncKeyboardInset). 카드와 구분: 뒤를 어둡게(.aiback) + 한 단계 밝은 바탕 +
+     위쪽 코랄 띠 + 머리의 「AI」 라벨 + 본문보다 작은 글씨. 답은 카드와 같은 블록 렌더(.content 규칙). */
+  .aiback{position:fixed;inset:0;z-index:11;background:rgba(0,0,0,.5)}
+  .aiback[hidden]{display:none}
+  #askOv.aipanel{
+    position:fixed;left:0;right:0;bottom:var(--kb,0px);z-index:12;
+    max-height:calc(var(--vvh,100vh) * .85);display:flex;flex-direction:column;
+    background:var(--ink2);border-top:2px solid var(--coral);border-radius:18px 18px 0 0;
+    box-shadow:0 -14px 34px rgba(0,0,0,.55);
+  }
+  #askOv.aipanel[hidden]{display:none}
+  @media (hover:hover) and (pointer:fine){ #askOv.aipanel{left:50%;right:auto;width:min(720px,100vw);transform:translateX(-50%)} }
+  .aihead{flex:none;display:flex;align-items:center;gap:8px;padding:10px 12px 6px 16px}
+  .aitag{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--ink);background:var(--coral);border-radius:6px;padding:2px 7px}
+  .aimodel{flex:1;font-family:var(--mono);font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .aihead button{flex:none;background:none;border:0;color:var(--muted);font-size:17px;cursor:pointer;padding:4px 6px;touch-action:manipulation}
+  #askOv .askthread{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;will-change:auto;
+    padding:4px 18px 6px;font-size:calc(14px * var(--bscale));overscroll-behavior:contain}
+  #askOv .askthread:empty{display:none}
+  .aiform{flex:none;display:flex;gap:8px;padding:8px 12px calc(12px + env(safe-area-inset-bottom))}
+  .aiform input{flex:1;min-width:0;background:var(--ink3);border:1px solid var(--ink4);border-radius:12px;color:var(--paper);
+    font-family:var(--sans);font-size:16px;padding:11px 13px;outline:none} /* 16px 미만이면 iOS가 포커스 때 확대 */
+  .aiform input:focus{border-color:var(--coral)}
+  .aiform button{flex:none;width:46px;border:0;border-radius:12px;background:var(--coral);color:var(--ink);cursor:pointer;
+    display:flex;align-items:center;justify-content:center;touch-action:manipulation}
+  .aiform button svg{width:18px;height:18px}
   .askctx{font-size:12.5px;color:var(--muted);margin:-6px 0 10px;line-height:1.5}
+  /* AI 설정창(☰ › AI settings) — 검색 오버레이 뼈대 재사용 */
+  .aisetbody{padding:4px 16px 40px}
+  .aisetbody section{background:var(--ink2);border-radius:12px;padding:12px 14px;margin:0 0 10px}
+  .aisetbody h6{margin:0 0 8px;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:500}
+  .aisetbody label{display:block;font-size:12px;color:var(--muted);margin:8px 0 0}
+  .aisetbody input{display:block;width:100%;box-sizing:border-box;margin-top:4px;background:var(--ink3);border:1px solid var(--ink4);
+    border-radius:10px;color:var(--paper);font-family:var(--sans);font-size:16px;padding:10px 12px;outline:none}
+  .aisetbody input:focus{border-color:var(--coral)}
+  .aiseg{display:flex;gap:6px}
+  .aiseg button{flex:1;font-family:var(--sans);font-size:13px;color:var(--muted);background:var(--ink3);border:1px solid transparent;border-radius:9px;padding:9px;cursor:pointer;touch-action:manipulation}
+  .aiseg button.on{color:var(--paper);border-color:var(--coral)}
+  .aisetbody section.off{opacity:.55}
+  .aihint{font-size:12px;color:var(--muted);margin:6px 2px 0;line-height:1.5}
+  .aihint.err{color:var(--coral)}
+  .aihint.ok{color:var(--know)}
+  .aisave{display:block;width:100%;margin-top:6px;border:0;border-radius:12px;background:var(--coral);color:var(--ink);font-family:var(--sans);font-size:15px;font-weight:600;padding:12px;cursor:pointer}
+  #aiServer[hidden]{display:none}
   .askturn{padding:6px 0 14px;border-bottom:1px solid var(--ink3);margin-bottom:12px}
   .askturn:last-child{border-bottom:0}
   .askq{font-family:var(--serif);font-size:1.12em;color:var(--paper);margin:0 0 10px}
@@ -800,6 +827,7 @@
     <div class="chaplist" id="chapList"></div>
     <div class="trashsec" id="archiveSec"></div>
     <div class="trashsec" id="trashSec"></div>
+    <div class="trashsec"><div class="chaprow" id="aiRow"><div class="chaprow-top"><span class="chaprow-label"><b>🤖 AI settings</b><span class="chaprow-range">Model · keys · password</span></span></div></div></div>
   </div>
 </div>
 
@@ -811,19 +839,58 @@
   <div class="searchresults" id="searchResults"></div>
 </div>
 
-<!-- AI에게 묻기(2026-11-04 라운드40) — 검색 오버레이 위에 겹쳐 연다(뒤로 = 검색으로 복귀). -->
-<div class="searchov" id="askOv" hidden>
-  <form class="searchbar askbar" id="askForm">
-    <button type="button" id="askBackBtn" aria-label="Back to search">&#8249;</button>
-    <input id="askInput" type="text" placeholder="Ask AI..." autocomplete="off" enterkeyhint="send">
+<!-- AI 사전 패널(📖, 2026-11-04 라운드40) — 아래에서 올라온다. 뒤(카드)는 .aiback으로 어둡게. -->
+<div class="aiback" id="askBack" hidden></div>
+<div class="aipanel" id="askOv" hidden>
+  <div class="aihead">
+    <span class="aitag">AI</span><span class="aimodel" id="askModel"></span>
     <button type="button" id="askCloseBtn" aria-label="Close">&#10005;</button>
-  </form>
-  <div class="askseg" id="askSeg">
-    <button type="button" data-b="gemini">Gemini</button>
-    <button type="button" data-b="mindlogic">Gateway</button>
-    <span class="askmodel" id="askModel"></span>
   </div>
-  <div class="searchresults content askthread" id="askThread"></div>
+  <div class="content askthread" id="askThread"></div>
+  <form class="aiform" id="askForm">
+    <input id="askInput" type="text" placeholder="Ask anything about English…" autocomplete="off" enterkeyhint="send">
+    <button type="submit" aria-label="Send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg></button>
+  </form>
+</div>
+
+<!-- AI 설정창(☰ › AI settings) — 키·주소·모델·암호. 키는 서버에만 저장되고 화면엔 앞 4글자만. -->
+<div class="searchov" id="aiSetOv" hidden>
+  <div class="searchbar">
+    <div class="listovtitle">AI settings</div>
+    <button id="aiSetClose" aria-label="Close">&#10005;</button>
+  </div>
+  <div class="searchresults aisetbody">
+    <section>
+      <h6>This device</h6>
+      <label>Password<input id="aiPw" type="password" autocomplete="current-password"></label>
+      <p class="aihint" id="aiPwMsg">Saved on this device only.</p>
+    </section>
+    <div id="aiServer" hidden>
+      <section>
+        <h6>AI to use</h6>
+        <div class="aiseg" id="aiSeg"><button type="button" data-b="gemini">Gemini</button><button type="button" data-b="mindlogic">Gateway</button></div>
+      </section>
+      <section data-for="gemini">
+        <h6>Gemini</h6>
+        <label>Model<input id="aiGemModel" list="aiGemModels" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+        <datalist id="aiGemModels"></datalist>
+        <label>API key<input id="aiGemKey" type="password" autocomplete="off"></label>
+      </section>
+      <section data-for="mindlogic">
+        <h6>Gateway</h6>
+        <label>Base URL<input id="aiMlBase" type="url" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+        <label>Model<input id="aiMlModel" list="aiMlModels" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
+        <datalist id="aiMlModels"></datalist>
+        <label>API key<input id="aiMlKey" type="password" autocomplete="off"></label>
+      </section>
+      <section>
+        <h6>Change password</h6>
+        <label>New password (leave blank to keep)<input id="aiNewPw" type="password" autocomplete="new-password"></label>
+      </section>
+    </div>
+    <button class="aisave" id="aiSaveBtn">Save</button>
+    <p class="aihint" id="aiSaveMsg"></p>
+  </div>
 </div>
 
 <!-- 소챕터/챕터 "제목 리스트" 화면(2026-09-06 라운드14) — 검색 오버레이와 뼈대를 공유. -->
@@ -2375,7 +2442,7 @@ function navByKey(dir){
 // keydown은 document 전역이라 여기서 직접 걸러야 한다.
 function isOverlayOpen(){
   return examDone || highlightMode || titleEditing || !lb.hidden ||
-    !$('searchOv').hidden || !$('askOv').hidden || !$('listOv').hidden || $('sheet').classList.contains('on') ||
+    !$('searchOv').hidden || !$('askOv').hidden || !$('aiSetOv').hidden || !$('listOv').hidden || $('sheet').classList.contains('on') ||
     !$('fontPop').hidden || !$('knowPop').hidden || !$('morePop').hidden || !$('resetPop').hidden || !$('titleEditPop').hidden;
 }
 // isOverlayOpen()에서 highlightMode만 뺀 버전(2026-09-07, 왼손 단축키 실사용 피드백으로
@@ -2388,7 +2455,7 @@ function isOverlayOpen(){
 // 넘어가면 선택이 끊기는 건 실제 충돌이라 그대로 차단.
 function isModalOpen(){
   return examDone || titleEditing || !lb.hidden ||
-    !$('searchOv').hidden || !$('askOv').hidden || !$('listOv').hidden || $('sheet').classList.contains('on') ||
+    !$('searchOv').hidden || !$('askOv').hidden || !$('aiSetOv').hidden || !$('listOv').hidden || $('sheet').classList.contains('on') ||
     !$('fontPop').hidden || !$('knowPop').hidden || !$('morePop').hidden || !$('resetPop').hidden || !$('titleEditPop').hidden;
 }
 // 왼손 단축키(2026-09-07, 사용자 요청 — "오른손 마우스+왼손 키보드" 전제).
@@ -3143,16 +3210,7 @@ function renderPickList(el, items, emptyMsg, onPick, showIndex){
     + '</div>').join('');
   el.querySelectorAll('.trashrow').forEach((row) => row.addEventListener('click', () => onPick(items[Number(row.dataset.i)])));
 }
-function renderSearchResults(items, q){
-  renderPickList($('searchResults'), items, 'No results', (it) => { closeSearch(); navigateToCard(it); });
-  // 「AI에게 묻기」 행 — 결과가 있든 없든 맨 위에 둔다(덱에 비슷한 카드가 있어도 새로 묻고 싶을 수 있다).
-  if (!q) return;
-  const row = document.createElement('div');
-  row.className = 'trashrow askrow';
-  row.innerHTML = '<span class="tf">Ask AI: “' + esc(q) + '”</span>';
-  row.addEventListener('click', () => openAsk(q));
-  $('searchResults').prepend(row);
-}
+function renderSearchResults(items){ renderPickList($('searchResults'), items, 'No results', (it) => { closeSearch(); navigateToCard(it); }); }
 // key로 직접 찾아 위치를 맞춘다 — 로테이션·필터 상태와 무관하게 항상 정확한 카드에 도착.
 // 2026-09-06 실기기 피드백 — 예전엔 휴지통/완전히 앎/확인함 카드를 탭하면 그 카드가 속한
 // 챕터가 아니라 전역 복습뷰(enterReviewMode, 챕터 무관하게 전부 모아놓은 별도 목록)로
@@ -3264,22 +3322,14 @@ $('searchInput').addEventListener('input', () => {
   searchT = setTimeout(async () => {
     const data = await fetch('/api/search?q=' + encodeURIComponent(q)).then((r) => r.json()).catch(() => null);
     if ($('searchInput').value.trim() !== q) return; // 늦게 온 옛 응답이 새 입력의 결과를 덮지 않게
-    renderSearchResults((data && data.items) || [], q);
+    renderSearchResults((data && data.items) || []);
   }, 220);
 });
-// Enter(iOS 「검색」 키) = AI에게 묻기 — 제목 검색은 타이핑하는 동안 이미 돈다.
-$('searchInput').addEventListener('keydown', (e) => {
-  if (e.key !== 'Enter' || e.isComposing) return;
-  const q = $('searchInput').value.trim();
-  if (q){ e.preventDefault(); openAsk(q); }
-});
-
-/* ── AI에게 묻기(2026-11-04 라운드40) ──
+/* ── AI 사전(📖) — 2026-11-04 라운드40 ──
    서버 /api/ask가 확장과 같은 프롬프트로 답하고, /api/ask/save가 `3. 영어 DB`에 저장한다.
-   대화는 서버에 안 남는다 — 앞 턴(userMessage/markdown)을 매번 history로 다시 보낸다.
-   암호는 이 기기 localStorage(sd_askpw)에만 — 지워지면 다시 묻는다(AI 키 자체는 서버에만 있다). */
-let askTurns = [], askBackend = lsGet('sd_askbackend') === 'mindlogic' ? 'mindlogic' : 'gemini';
-let askConfig = null, askLocked = false, askPendingReq = null;
+   대화는 서버에도 기기에도 안 남는다 — 앞 턴(userMessage/markdown)을 매번 history로 다시 보낸다.
+   어떤 AI·모델을 쓸지는 ☰ › AI settings(서버 KV, 모든 기기 공통). 이 기기엔 암호(sd_askpw)만 둔다. */
+let askTurns = [], askConfig = null, askLocked = false, askPendingReq = null;
 function askHeaders(){ return { 'Content-Type': 'application/json', 'X-Ask-Key': lsGet('sd_askpw') || '' }; }
 async function askCall(path, body){
   let r;
@@ -3290,23 +3340,34 @@ async function askCall(path, body){
   return { status: r.status, data };
 }
 // req = { q(화면 제목), question } 또는 { q, text, context }(📖 드래그 — 확장의 「해설」 경로). null이면 입력창만.
-// dict=true면 위쪽 패널(📖), 아니면 검색 위 전체화면.
-function openAsk(req, dict){
+function openAsk(req){
   if (typeof req === 'string') req = { q: req, question: req };
   askTurns = []; askPendingReq = req || null;
-  $('askOv').classList.toggle('dictmode', !!dict);
-  $('askOv').hidden = false;
+  $('askBack').hidden = false; $('askOv').hidden = false;
   $('askInput').value = '';
-  renderAskThread();
+  renderAskThread(); syncAskHead();
   checkAskConfig().then((ok) => { if (ok && req) sendAsk(req); else if (ok) $('askInput').focus(); });
 }
-function closeAsk(){ $('askOv').hidden = true; $('askOv').classList.remove('dictmode'); }
-$('askBackBtn').addEventListener('click', () => { closeAsk(); setTimeout(() => $('searchInput').focus(), 60); });
-$('askCloseBtn').addEventListener('click', () => { closeAsk(); closeSearch(); });
+function closeAsk(){ $('askInput').blur(); $('askOv').hidden = true; $('askBack').hidden = true; }
+$('askCloseBtn').addEventListener('click', closeAsk);
+$('askBack').addEventListener('click', closeAsk);
+// iOS 키보드 — 레이아웃 뷰포트는 그대로라 bottom:0 패널이 키보드 뒤로 숨는다. 보이는 영역
+// (visualViewport)과의 차이만큼 패널을 올린다. 키보드가 없는 브라우저에선 0.
+function syncKeyboardInset(){
+  const vv = window.visualViewport;
+  if (!vv) return;
+  const kb = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+  document.documentElement.style.setProperty('--kb', kb + 'px');
+  document.documentElement.style.setProperty('--vvh', Math.round(vv.height) + 'px');
+}
+if (window.visualViewport){
+  window.visualViewport.addEventListener('resize', syncKeyboardInset);
+  window.visualViewport.addEventListener('scroll', syncKeyboardInset);
+}
+syncKeyboardInset();
 
-/* ── 📖 사전 버튼(2026-11-04 라운드40) ──
-   본문·제목에서 드래그한 뒤 누르면 그 표현을 「그 표현이 든 문장」과 함께 바로 묻는다(확장이 자막
-   문장을 같이 보내는 것과 같은 이유 — 여러 뜻 중 이 문맥의 뜻으로 답하게). 드래그 없이 누르면 입력창만.
+/* 📖 버튼 — 본문·제목에서 드래그한 뒤 누르면 그 표현을 「그 표현이 든 문장」과 함께 바로 묻는다(확장이
+   자막 문장을 같이 보내는 것과 같은 이유 — 여러 뜻 중 이 문맥의 뜻으로 답하게). 드래그 없이 누르면 입력창만.
    iOS는 버튼 탭으로 선택을 지우므로 형광펜과 같은 lastSelRange 기억을 쓴다(라운드39 — 시간 제한 없음). */
 function sentenceAround(full, text){
   const parts = String(full || '').replace(/\s+/g, ' ').trim().match(/[^.?!…。！？]+[.?!…。！？]*["'”’)\]]*\s*/g) || [String(full || '').trim()];
@@ -3333,32 +3394,24 @@ function takeDictSelection(){
 $('dictBtn').addEventListener('click', function(){
   this.blur();
   if (highlightMode) setHighlightMode(false);
-  const req = takeDictSelection();
-  if (req){ openAsk(req, true); return; }
-  if (!$('askOv').hidden && $('askOv').classList.contains('dictmode')){ $('askInput').focus(); return; }
-  openAsk(null, true);
+  openAsk(takeDictSelection());
 });
 async function checkAskConfig(){
   const { status, data } = await askCall('/api/ask/config');
   if (status === 401){ askLocked = true; renderAskThread(); return false; }
-  if (status !== 200){ askLocked = false; askConfig = null; renderAskThread(data.error || 'Ask AI unavailable'); return false; }
-  askLocked = false; askConfig = data.backends || {};
-  if (!askConfig[askBackend]){ const other = askBackend === 'gemini' ? 'mindlogic' : 'gemini'; if (askConfig[other]) askBackend = other; }
-  renderAskSeg();
+  if (status !== 200){ askLocked = false; askConfig = null; renderAskThread(data.error || 'AI unavailable'); return false; }
+  askLocked = false; askConfig = data; syncAskHead();
   return true;
 }
-function renderAskSeg(){
-  $('askSeg').querySelectorAll('button').forEach((b) => {
-    b.classList.toggle('on', b.dataset.b === askBackend);
-    b.disabled = !!askConfig && !askConfig[b.dataset.b];
-  });
-  const last = [...askTurns].reverse().find((t) => t.model);
-  $('askModel').textContent = last ? last.model : '';
+function configuredModel(){
+  if (!askConfig || !askConfig.settings) return '';
+  const s = askConfig.settings;
+  return s.backend === 'mindlogic' ? s.mindlogic.model : s.gemini.model;
 }
-$('askSeg').querySelectorAll('button').forEach((b) => b.addEventListener('click', function(){
-  this.blur();
-  askBackend = this.dataset.b; lsSet('sd_askbackend', askBackend); renderAskSeg();
-}));
+function syncAskHead(){
+  const last = [...askTurns].reverse().find((t) => t.model);
+  $('askModel').textContent = last ? last.model : configuredModel();
+}
 $('askForm').addEventListener('submit', (e) => {
   e.preventDefault();
   const q = $('askInput').value.trim();
@@ -3382,7 +3435,7 @@ async function sendAsk(req){
 }
 async function runAskTurn(turn){
   turn.status = 'loading'; renderAskThread();
-  const { status, data } = await askCall('/api/ask', { question: turn.question || '', text: turn.text || '', context: turn.context || '', backend: askBackend, history: askHistory(askTurns.indexOf(turn)) });
+  const { status, data } = await askCall('/api/ask', { question: turn.question || '', text: turn.text || '', context: turn.context || '', history: askHistory(askTurns.indexOf(turn)) });
   if (!askTurns.includes(turn)) return; // 기다리는 사이 새 대화를 열었다
   if (status === 401){ askLocked = true; turn.status = 'error'; turn.error = 'Password needed'; renderAskThread(); return; }
   if (status === 200 && data.markdown){
@@ -3390,11 +3443,12 @@ async function runAskTurn(turn){
   } else {
     turn.status = 'error'; turn.error = data.error || 'Failed';
   }
-  renderAskThread(); renderAskSeg();
+  renderAskThread(); syncAskHead();
+  scrollAskTo(askTurns.indexOf(turn));
 }
 function scrollAskTo(i){
   const el = $('askThread').querySelectorAll('.askturn')[i];
-  if (el) $('askThread').scrollTop = el.offsetTop - 4;
+  if (el) $('askThread').scrollTop = el.offsetTop - $('askThread').offsetTop - 4;
 }
 function askTurnHtml(t, i){
   let body;
@@ -3413,14 +3467,14 @@ function askTurnHtml(t, i){
 function renderAskThread(msg){
   const el = $('askThread');
   if (askLocked){
-    el.innerHTML = '<div class="asklock"><p>Enter the Ask AI password for this device.</p>'
+    el.innerHTML = '<div class="asklock"><p>Enter the AI password for this device (also in ☰ › AI settings).</p>'
       + '<input id="askPw" type="password" autocomplete="current-password" enterkeyhint="go">'
       + '<button id="askPwBtn">Unlock</button></div>';
     const go = async () => {
       lsSet('sd_askpw', $('askPw').value.trim());
       if (await checkAskConfig()){
         renderAskThread();
-        // 암호 때문에 막혔던 질문을 다시 보낸다(처음 연 질문 포함 — 아직 턴이 없으면 검색어로).
+        // 암호 때문에 막혔던 질문을 다시 보낸다(처음 연 질문 포함 — 아직 턴이 없으면 그 요청으로).
         const pending = askTurns.filter((t) => t.status === 'error');
         if (pending.length) pending.forEach((t) => runAskTurn(t));
         else if (!askTurns.length && askPendingReq) sendAsk(askPendingReq);
@@ -3431,7 +3485,7 @@ function renderAskThread(msg){
     setTimeout(() => $('askPw') && $('askPw').focus(), 60);
     return;
   }
-  if (msg && !askTurns.length){ el.innerHTML = '<p class="askerr" style="padding:16px 0">' + esc(msg) + '</p>'; return; }
+  if (msg && !askTurns.length){ el.innerHTML = '<p class="askerr" style="padding:8px 0">' + esc(msg) + '</p>'; return; }
   el.innerHTML = askTurns.map(askTurnHtml).join('');
 }
 $('askThread').addEventListener('click', async (e) => {
@@ -3444,7 +3498,7 @@ $('askThread').addEventListener('click', async (e) => {
   if (act === 'retry'){ runAskTurn(t); return; }
   if (act === 'open'){
     const res = t.saveRes;
-    closeAsk(); closeSearch();
+    closeAsk();
     subCache.clear(); // 새 카드가 붙은 소챕터의 옛 캐시를 버린다
     await refreshChapterMeta();
     navigateToCard({ subId: res.subId, key: res.key });
@@ -3461,6 +3515,77 @@ $('askThread').addEventListener('click', async (e) => {
     renderAskThread();
   }
 });
+
+/* ── AI 설정창(☰ › AI settings, 2026-11-04) ──
+   키·주소는 서버 KV에 저장되고 다시 내려오지 않는다(앞 4글자 힌트만). 키 칸이 비어 있으면 「그대로 둠」.
+   암호가 맞아야 서버 쪽 칸이 열린다 — 이 기기 암호 칸은 sd_askpw(📖 잠금 화면과 같은 값). */
+let aiSetBackend = 'gemini';
+function openAiSettings(){
+  $('aiSetOv').hidden = false;
+  $('aiPw').value = lsGet('sd_askpw') || '';
+  $('aiSaveMsg').textContent = ''; $('aiSaveMsg').className = 'aihint';
+  loadAiSettings();
+}
+function closeAiSettings(){ $('aiSetOv').hidden = true; }
+$('aiSetClose').addEventListener('click', closeAiSettings);
+function setAiSeg(b){
+  aiSetBackend = b;
+  $('aiSeg').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x.dataset.b === b));
+  document.querySelectorAll('#aiServer section[data-for]').forEach((s) => s.classList.toggle('off', s.dataset.for !== b));
+}
+$('aiSeg').querySelectorAll('button').forEach((x) => x.addEventListener('click', function(){ this.blur(); setAiSeg(this.dataset.b); }));
+async function fillModelList(backend, listId){
+  const { status, data } = await askCall('/api/ask/models?backend=' + backend);
+  if (status !== 200) return;
+  $(listId).innerHTML = (data.models || []).map((m) => '<option value="' + esc(m) + '">').join('');
+}
+async function loadAiSettings(){
+  const { status, data } = await askCall('/api/ask/config');
+  const msg = $('aiPwMsg');
+  if (status !== 200){
+    $('aiServer').hidden = true;
+    msg.className = 'aihint err';
+    msg.textContent = status === 401 ? (lsGet('sd_askpw') ? 'Wrong password.' : 'Enter the password, then Save.') : (data.error || 'Unavailable');
+    return false;
+  }
+  msg.className = 'aihint ok'; msg.textContent = 'Unlocked on this device.';
+  askConfig = data; askLocked = false;
+  const s = data.settings;
+  $('aiServer').hidden = false;
+  setAiSeg(s.backend);
+  $('aiGemModel').value = s.gemini.model || '';
+  $('aiMlModel').value = s.mindlogic.model || '';
+  $('aiMlBase').value = s.mindlogic.base || '';
+  $('aiGemKey').value = ''; $('aiMlKey').value = ''; $('aiNewPw').value = '';
+  $('aiGemKey').placeholder = s.gemini.keyHint ? s.gemini.keyHint + ' saved — blank keeps it' : 'Paste API key';
+  $('aiMlKey').placeholder = s.mindlogic.keyHint ? s.mindlogic.keyHint + ' saved — blank keeps it' : 'Paste API key';
+  fillModelList('gemini', 'aiGemModels');
+  fillModelList('mindlogic', 'aiMlModels');
+  return true;
+}
+$('aiSaveBtn').addEventListener('click', async function(){
+  this.blur();
+  const out = $('aiSaveMsg');
+  const prevPw = lsGet('sd_askpw') || '';
+  lsSet('sd_askpw', $('aiPw').value.trim());
+  // 잠겨 있었거나 암호를 바꿔 넣었으면 먼저 그 암호로 열어 본다(이때는 서버 값을 안 건드린다).
+  if ($('aiServer').hidden || $('aiPw').value.trim() !== prevPw){
+    await loadAiSettings();
+    out.textContent = ''; return;
+  }
+  const newPw = $('aiNewPw').value.trim();
+  const { status, data } = await askCall('/api/ask/settings', {
+    backend: aiSetBackend,
+    geminiModel: $('aiGemModel').value, geminiKey: $('aiGemKey').value,
+    mindlogicBase: $('aiMlBase').value, mindlogicModel: $('aiMlModel').value, mindlogicKey: $('aiMlKey').value,
+    newPassword: newPw,
+  });
+  if (status !== 200){ out.className = 'aihint err'; out.textContent = data.error || 'Save failed'; return; }
+  if (newPw){ lsSet('sd_askpw', newPw); $('aiPw').value = newPw; }
+  out.className = 'aihint ok'; out.textContent = 'Saved ✓';
+  await loadAiSettings();
+});
+$('aiRow').addEventListener('click', () => { closeSheet(); openAiSettings(); });
 
 /* ── 시작 ── */
 (async () => {
