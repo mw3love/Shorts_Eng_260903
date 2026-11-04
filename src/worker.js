@@ -28,7 +28,7 @@
  *  14. GET  /api/sync             Notion → 카드 변환을 "예산만큼만" 진행하고 커서를 남김
  *  15. GET  /api/search?q=        제목 부분일치 검색(인덱스 대상) — 상태(미확인/확인함/완전히 앎/휴지통)와
  *                                  이동 좌표(subId+소챕터 내 순번)를 같이 반환(2026-09-06 라운드13)
- *  16. GET  /api/ask/config       암호 확인 + 쓸 수 있는 AI(Gemini/게이트웨이) 목록 — 헤더 X-Ask-Key 필요
+ *  16. GET  /api/ask/config       암호 확인 + AI 설정(키는 앞 4글자만) — 헤더 X-Ask-Key 필요
  *  17. POST /api/ask              AI 해설·후속 질문(확장과 같은 프롬프트) — 헤더 X-Ask-Key 필요
  *  18. POST /api/ask/save         답을 `3. 영어 DB`에 저장 + 인덱스에 바로 붙임 — 헤더 X-Ask-Key 필요
  *
@@ -1291,7 +1291,9 @@ const ASK_MAX_TOKENS = 4096;
 /* AI 설정(2026-11-04, 사용자 요청 — 「☰ 안의 AI 설정창에서 키·주소·모델·암호를 바꾸게」).
    앱에서 바꾼 값은 KV `askSettings:v1`에 두고, 비어 있는 항목은 Worker secret/vars가 기본값이 된다.
    ⚠ 키는 응답으로 절대 돌려보내지 않는다 — 화면엔 앞 4글자(keyHint)만. 바꾸려면 지금 암호가 필요하다.
-   반환 객체는 env와 같은 키 이름이라 askGemini/askMindlogic/askBackends가 그대로 받는다. */
+   ⚠ AI는 게이트웨이(OpenAI 호환) 하나만 쓴다 — Google Gemini API 직접 경로는 같은 날 뺐다(사용자 결정:
+   같은 lite 모델에서 게이트웨이가 평균 2.7초로 Gemini API 3.9초보다 빠르고 고르게 나왔다, 2026-11-04 PC 실측 5문항).
+   반환 객체는 env와 같은 키 이름이라 askMindlogic이 그대로 받는다. */
 const K_ASK_SETTINGS = 'askSettings:v1';
 async function loadAskConfig(env) {
   let st = {};
@@ -1299,34 +1301,26 @@ async function loadAskConfig(env) {
   return {
     stored: st,
     ASK_PASSWORD: st.password || env.ASK_PASSWORD || '',
-    backend: st.backend === 'mindlogic' ? 'mindlogic' : 'gemini',
-    GEMINI_API_KEY: st.geminiKey || env.GEMINI_API_KEY || '',
-    GEMINI_MODEL: st.geminiModel || env.GEMINI_MODEL || 'auto', // 'auto' = 가장 최신 Gemini lite(resolveModel)
     MINDLOGIC_API_KEY: st.mindlogicKey || env.MINDLOGIC_API_KEY || '',
     MINDLOGIC_BASE_URL: st.mindlogicBase || env.MINDLOGIC_BASE_URL || '',
-    MINDLOGIC_MODEL: st.mindlogicModel || env.MINDLOGIC_MODEL || 'auto',
+    MINDLOGIC_MODEL: st.mindlogicModel || env.MINDLOGIC_MODEL || 'auto', // 'auto' = 가장 최신 Gemini lite(resolveModel)
   };
 }
 const keyHint = (k) => (k ? String(k).slice(0, 4) + '…' : '');
+const askReady = (cfg) => !!(cfg.MINDLOGIC_API_KEY && cfg.MINDLOGIC_BASE_URL);
 function askPublicConfig(cfg) {
   return {
-    ok: true, backends: askBackends(cfg),
-    settings: {
-      backend: cfg.backend,
-      gemini: { keyHint: keyHint(cfg.GEMINI_API_KEY), model: cfg.GEMINI_MODEL },
-      mindlogic: { keyHint: keyHint(cfg.MINDLOGIC_API_KEY), base: cfg.MINDLOGIC_BASE_URL, model: cfg.MINDLOGIC_MODEL },
-    },
+    ok: true, ready: askReady(cfg),
+    settings: { keyHint: keyHint(cfg.MINDLOGIC_API_KEY), base: cfg.MINDLOGIC_BASE_URL, model: cfg.MINDLOGIC_MODEL },
   };
 }
 // 빈 문자열 = 「그대로 둠」(키 입력칸은 늘 비어 있다 — 기존 키를 화면에 안 보여 주므로).
 async function handleAskSettings(env, cfg, body) {
   const st = { ...cfg.stored };
   const set = (field, v, max = 500) => { const s = String(v ?? '').trim(); if (s) st[field] = s.slice(0, max); };
-  if (body.backend === 'gemini' || body.backend === 'mindlogic') st.backend = body.backend;
-  set('geminiKey', body.geminiKey); set('geminiModel', body.geminiModel, 120);
-  set('mindlogicKey', body.mindlogicKey); set('mindlogicModel', body.mindlogicModel, 120);
-  if (body.mindlogicBase !== undefined) {
-    const b = String(body.mindlogicBase || '').trim().replace(/\/+$/, '');
+  set('mindlogicKey', body.key); set('mindlogicModel', body.model, 120);
+  if (body.base !== undefined) {
+    const b = String(body.base || '').trim().replace(/\/+$/, '');
     // 바뀐 경우에만 검사·저장 — 설정창은 모든 칸을 한꺼번에 보내므로, 손대지 않은 칸이 저장 전체를 막으면 안 된다.
     if (b && b !== String(cfg.MINDLOGIC_BASE_URL).replace(/\/+$/, '')) {
       if (!/^https:\/\//.test(b)) return json({ error: 'Base URL must start with https://' }, 400);
@@ -1341,41 +1335,29 @@ async function handleAskSettings(env, cfg, body) {
   await env.KV.put(K_ASK_SETTINGS, JSON.stringify(st));
   return json(askPublicConfig(await loadAskConfig(env)));
 }
-/* 모델 목록·자동 선택(2026-11-04, 사용자 결정) — 두 서비스 모두 모델이 자주 바뀐다.
-   ⓐ 기본값 'auto' = 실시간 목록에서 「gemini-<버전>-flash-lite」 중 버전이 가장 높은 것(사전은 속도가 중요 —
+/* 모델 목록·자동 선택(2026-11-04, 사용자 결정) — 게이트웨이 모델이 자주 바뀐다.
+   ⓐ 기본값 'auto' = 실시간 목록에서 「gemini-<버전>-flash-lite」 중 버전이 가장 높은 정식판(사전은 속도가 중요 —
       확장 youtube_dual_subtitle도 lite를 메인으로 쓴다). 새 lite가 나오면 앱 수정 없이 그걸 쓴다.
-   ⓑ 직접 고른 모델이 단종(게이트웨이 deprecated_at)되면 목록의 replacement를 끝까지 따라가 대신 부른다.
-   목록은 KV `askModels:v1:<backend>`에 하루 캐시(질문마다 목록을 받으면 느려진다). 설정창을 열 때는 새로 받는다. */
-const K_ASK_MODELS = 'askModels:v1:';
+   ⓑ 직접 고른 모델이 단종(deprecated_at·lifecycle legacy)되면 목록의 replacement를 끝까지 따라가 대신 부른다.
+   목록은 KV `askModels:v1:mindlogic`에 하루 캐시(질문마다 목록을 받으면 느려진다). 설정창을 열 때는 새로 받는다. */
+const K_ASK_MODELS = 'askModels:v1:mindlogic';
 const ASK_MODELS_TTL = 24 * 60 * 60 * 1000;
 const NOT_CHAT_MODEL = /embedding|image|tts|audio|live|banana|transcribe|robotics|computer-use|customtools|omni/;
-async function fetchModelList(cfg, backend) {
-  if (backend === 'mindlogic') {
-    if (!cfg.MINDLOGIC_API_KEY || !cfg.MINDLOGIC_BASE_URL) return [];
-    const r = await fetch(String(cfg.MINDLOGIC_BASE_URL).replace(/\/+$/, '') + '/models', { headers: { Authorization: `Bearer ${cfg.MINDLOGIC_API_KEY}` } });
-    if (!r.ok) throw await askHttpError('Gateway', r);
-    const d = await r.json();
-    return (d.data || []).filter((m) => (!m.type || m.type === 'llm') && !NOT_CHAT_MODEL.test(m.id))
-      .map((m) => ({ id: m.id, deprecated: !!m.deprecated_at || m.lifecycle === 'legacy', replacement: m.replacement || null }));
-  }
-  if (!cfg.GEMINI_API_KEY) return [];
-  const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200', { headers: { 'x-goog-api-key': cfg.GEMINI_API_KEY } });
-  if (!r.ok) throw await askHttpError('Gemini', r);
+async function fetchModelList(cfg) {
+  if (!askReady(cfg)) return [];
+  const r = await fetch(String(cfg.MINDLOGIC_BASE_URL).replace(/\/+$/, '') + '/models', { headers: { Authorization: `Bearer ${cfg.MINDLOGIC_API_KEY}` } });
+  if (!r.ok) throw await askHttpError('Gateway', r);
   const d = await r.json();
-  return (d.models || [])
-    .filter((m) => (m.supportedGenerationMethods || []).includes('generateContent'))
-    .map((m) => String(m.name || '').replace(/^models\//, ''))
-    .filter((n) => n.startsWith('gemini') && !NOT_CHAT_MODEL.test(n))
-    .map((id) => ({ id, deprecated: false, replacement: null }));
+  return (d.data || []).filter((m) => (!m.type || m.type === 'llm') && !NOT_CHAT_MODEL.test(m.id))
+    .map((m) => ({ id: m.id, deprecated: !!m.deprecated_at || m.lifecycle === 'legacy', replacement: m.replacement || null }));
 }
-async function getModelList(env, cfg, backend, fresh) {
-  const key = K_ASK_MODELS + backend;
+async function getModelList(env, cfg, fresh) {
   let cached = null;
-  try { cached = JSON.parse((await env.KV.get(key)) || 'null'); } catch (e) { cached = null; }
+  try { cached = JSON.parse((await env.KV.get(K_ASK_MODELS)) || 'null'); } catch (e) { cached = null; }
   if (!fresh && cached && Date.now() - cached.at < ASK_MODELS_TTL) return cached.models;
   try {
-    const models = await fetchModelList(cfg, backend);
-    if (models.length) await env.KV.put(key, JSON.stringify({ at: Date.now(), models }));
+    const models = await fetchModelList(cfg);
+    if (models.length) await env.KV.put(K_ASK_MODELS, JSON.stringify({ at: Date.now(), models }));
     return models;
   } catch (e) {
     if (cached) return cached.models; // 목록을 못 받아도 어제 목록으로 계속 돈다
@@ -1399,10 +1381,10 @@ function resolveModel(models, chosen) {
   }
   return id;
 }
-async function handleAskModels(env, cfg, backend) {
-  const chosen = backend === 'mindlogic' ? cfg.MINDLOGIC_MODEL : cfg.GEMINI_MODEL;
+async function handleAskModels(env, cfg) {
+  const chosen = cfg.MINDLOGIC_MODEL;
   try {
-    const list = await getModelList(env, cfg, backend, true);
+    const list = await getModelList(env, cfg, true);
     return json({
       models: list.filter((m) => !m.deprecated).map((m) => m.id),
       chosen, resolved: resolveModel(list, chosen), auto: resolveModel(list, 'auto'),
@@ -1416,12 +1398,6 @@ function askAuthError(request, cfg) {
   if (!cfg.ASK_PASSWORD) return json({ error: 'ASK_PASSWORD not set on the server', code: 'noPassword' }, 503);
   if ((request.headers.get('X-Ask-Key') || '') !== cfg.ASK_PASSWORD) return json({ error: 'Wrong password', code: 'auth' }, 401);
   return null;
-}
-function askBackends(env) {
-  return {
-    gemini: !!env.GEMINI_API_KEY,
-    mindlogic: !!(env.MINDLOGIC_API_KEY && env.MINDLOGIC_BASE_URL),
-  };
 }
 
 // 429/5xx만 1회 1.5초 뒤 재시도 — 확장 explain.ts의 fetchWithRetry와 같은 규칙.
@@ -1439,26 +1415,8 @@ async function askHttpError(name, res) {
   if (res.status === 429) return new Error(`${name} rate limit — try again shortly`);
   return new Error(`${name} error (HTTP ${res.status}) ${body.slice(0, 200)}`);
 }
-async function askGemini(env, system, history, userMsg) {
-  const model = env.GEMINI_MODEL || 'gemini-3.5-flash';
-  const res = await askFetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: system }] },
-      contents: [...history.map((t) => ({ role: t.role, parts: [{ text: t.text }] })), { role: 'user', parts: [{ text: userMsg }] }],
-      generationConfig: { temperature: 0.3, maxOutputTokens: ASK_MAX_TOKENS },
-    }),
-  });
-  if (!res.ok) throw await askHttpError('Gemini', res);
-  const data = await res.json();
-  const cand = data.candidates?.[0];
-  const text = (cand?.content?.parts || []).map((p) => p.text || '').join('');
-  if (!text.trim()) throw new Error(`Gemini returned no answer (${cand?.finishReason || 'unknown'})`);
-  return { text, model };
-}
 async function askMindlogic(env, system, history, userMsg) {
-  const model = env.MINDLOGIC_MODEL || 'claude-sonnet-4-6';
+  const model = env.MINDLOGIC_MODEL || 'gemini-3.5-flash-lite';
   const base = String(env.MINDLOGIC_BASE_URL).replace(/\/+$/, '');
   const res = await askFetch(`${base}/chat/completions`, {
     method: 'POST',
@@ -1573,11 +1531,22 @@ function notionBlocksToApp(blocks) {
   });
 }
 
-// 확장 notion.ts의 pickNotionTitle과 같은 규칙. 폰엔 자막 문맥이 없어 ① 경로가 없다 —
-// 답의 첫 인라인 백틱 예문(프롬프트가 맨 위에 쓰게 시킨다) → 없으면 질문 그대로.
-function askPickTitle(question, markdown) {
-  const example = String(markdown || '').match(/`([^`\n]+)`/)?.[1]?.trim();
-  return (example || String(question || '').trim() || 'Untitled').slice(0, 2000);
+// 제목 후보 — 확장 notion.ts의 pickNotionTitle(② 답의 백틱 예문 → ③ 표현)을 따르되, 폰엔 자막 문맥이 없어 ①이 없다.
+// ⚠ 제목이 곧 카드 열쇠(cardKey)라 기존 카드와 겹치면 학습 상태를 공유하게 된다. AI는 같은 표현에 같은 예문을
+// 자주 써서 실제로 겹쳤다(2026-11-04 — 1월에 확장으로 저장한 카드와 같은 제목, 사용자는 「Save anyway」로 중복 저장).
+// 그래서 후보를 여러 개 두고 안 겹치는 첫 후보를 쓴다(handleAskSave). 순서: 물어본 표현이 든 예문 → 나머지 예문
+// → 표현/질문 그대로. 「예문」은 영어 3단어 이상만 — 표현 자체(`fall through`)나 단어 코드는 제목감이 아니다.
+function askTitleCandidates(term, markdown) {
+  const t = String(term || '').trim();
+  const english = t.replace(/[^A-Za-z' -]+/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+  const codes = [...new Set([...String(markdown || '').matchAll(/`([^`\n]+)`/g)].map((m) => m[1].trim()).filter(Boolean))];
+  // 「예문」 = 영어가 있고, 문장부호로 끝나는 3단어 이상이거나 5단어 이상 — 표 칸의 표현 자체(`all the way through`)는 뺀다.
+  const words = (x) => x.split(/\s+/).length;
+  const ex = codes.filter((x) => /[A-Za-z]/.test(x) && x.toLowerCase() !== english && x.toLowerCase() !== t.toLowerCase()
+    && ((words(x) >= 3 && /[.?!]["'”’)]*$/.test(x)) || words(x) >= 5));
+  const hasTerm = (x) => english.length > 1 && x.toLowerCase().includes(english);
+  const out = [...ex.filter(hasTerm), ...ex.filter((x) => !hasTerm(x)), t || 'Untitled'];
+  return [...new Set(out.map((x) => x.slice(0, 2000)))].filter((x) => cardKey(x));
 }
 
 async function handleAsk(env, body) {
@@ -1587,8 +1556,7 @@ async function handleAsk(env, body) {
   const context = String(body.context || '').trim().slice(0, 600);
   if (!question && !text) return json({ error: 'Empty question' }, 400);
   // 기본은 설정창에서 고른 AI(KV), 요청이 명시하면 그쪽.
-  const backend = (body.backend === 'mindlogic' || body.backend === 'gemini') ? body.backend : env.backend;
-  if (!askBackends(env)[backend]) return json({ error: (backend === 'gemini' ? 'Gemini' : 'Gateway') + ' key not set on the server', code: 'noBackend' }, 503);
+  if (!askReady(env)) return json({ error: 'Gateway key/base URL not set — ☰ › AI settings', code: 'noBackend' }, 503);
   // history: [{role:'user'|'model', text}] — 클라이언트가 앞 턴을 그대로 돌려보낸다(서버는 대화를 저장 안 함).
   const history = (Array.isArray(body.history) ? body.history : [])
     .filter((t) => t && (t.role === 'user' || t.role === 'model') && typeof t.text === 'string')
@@ -1601,9 +1569,7 @@ async function handleAsk(env, body) {
       ? `아래 문장에서 "${text}" 부분을 설명해줘.\n문장: ${context}`
       : `"${text}"를 설명해줘.`;
   try {
-    const { text, model } = backend === 'mindlogic'
-      ? await askMindlogic(env, system, history, userMessage)
-      : await askGemini(env, system, history, userMessage);
+    const { text, model } = await askMindlogic(env, system, history, userMessage);
     return json({ markdown: text, userMessage, model, blocks: notionBlocksToApp(markdownToBlocks(text)) });
   } catch (e) {
     return json({ error: String(e.message || e) }, 502);
@@ -1693,17 +1659,18 @@ async function handleAskSave(env, token, dbId, body) {
       ? [{ type: 'quote', quote: { rich_text: [{ type: 'text', text: { content: context.slice(0, 2000) } }] } }, { type: 'divider', divider: {} }]
       : []);
   const children = [...prefix, ...answerBlocks].slice(0, 100);
-  const title = askPickTitle(question || text, answer);
-  const key = cardKey(title);
-
   const idxRaw = await env.KV.get(K_INDEX);
   const idx = idxRaw ? JSON.parse(idxRaw) : null;
   // 제목 컬럼 이름 — 인덱스에 동기화 때 찾은 값이 있으면 쓰고, 없으면 노션에 한 번 묻는다(하드코딩 금지).
   const titleProp = idx?.schema?.title || (await discoverSchema(token, dbId, null)).title;
   if (!idx) return json({ error: 'Deck is still syncing — try again shortly' }, 503);
-  // 같은 cardKey가 이미 있으면 먼저 알린다(학습 상태가 키로 공유돼 사실상 같은 카드가 된다).
-  const dup = idx.items.find((it) => it.key === key);
-  if (dup && !body.force) return json({ duplicate: true, key: dup.key, front: dup.front, ...cardCoords(idx.items, dup.id) }, 409);
+  // 안 겹치는 첫 후보를 제목으로(묻지 않는다 — 사용자 결정). 첫 후보가 겹쳤으면 그 카드를 「비슷한 카드」로 알려 준다.
+  const keys = new Map(idx.items.map((it) => [it.key, it]));
+  const cands = askTitleCandidates(question || text, answer);
+  const title = cands.find((c) => !keys.has(cardKey(c))) || cands[0];
+  const key = cardKey(title);
+  const firstHit = keys.get(cardKey(cands[0]));
+  const similar = firstHit && firstHit.key !== key ? { key: firstHit.key, front: firstHit.front, ...cardCoords(idx.items, firstHit.id) } : null;
 
   const page = await notion(token, '/pages', {
     method: 'POST',
@@ -1736,9 +1703,9 @@ async function handleAskSave(env, token, dbId, body) {
     // (앞의 「질문:」/인용·구분선은 뺀다). 개수가 어긋나면 null — 그때는 카드에서 칠하라고 안내한다.
     const rest = blocks.slice(prefix.length);
     const answerIds = rest.length === answerBlocks.length ? rest.map((b) => ({ id: b.id, rowIds: b.rowIds || null })) : null;
-    return json({ ok: true, indexed: true, key, front: title, pageId: page.id, pageUrl: page.url, answerIds, ...cardCoords(fresh.items, page.id) });
+    return json({ ok: true, indexed: true, key, front: title, pageId: page.id, pageUrl: page.url, answerIds, similar, ...cardCoords(fresh.items, page.id) });
   } catch (e) {
-    return json({ ok: true, indexed: false, key, front: title, pageUrl: page.url, error: String(e.message || e) });
+    return json({ ok: true, indexed: false, key, front: title, pageUrl: page.url, similar, error: String(e.message || e) });
   }
 }
 
@@ -1801,7 +1768,7 @@ export default {
       const denied = askAuthError(request, cfg);
       if (denied) return denied;
       if (url.pathname === '/api/ask/config') return json(askPublicConfig(cfg));
-      if (url.pathname === '/api/ask/models') return handleAskModels(env, cfg, url.searchParams.get('backend') === 'mindlogic' ? 'mindlogic' : 'gemini');
+      if (url.pathname === '/api/ask/models') return handleAskModels(env, cfg);
       if (url.pathname === '/api/ask/settings' && request.method === 'POST') {
         try { return await handleAskSettings(env, cfg, await request.json()); }
         catch (e) { return json({ error: String(e.message || e) }, 500); }
@@ -1811,11 +1778,9 @@ export default {
         try {
           const body = await request.json();
           // 실제로 부를 모델을 정한다('auto' → 최신 lite, 단종 → 대체). 목록 조회가 실패해도 질문은 막지 않는다.
-          const be = (body.backend === 'mindlogic' || body.backend === 'gemini') ? body.backend : cfg.backend;
-          const field = be === 'mindlogic' ? 'MINDLOGIC_MODEL' : 'GEMINI_MODEL';
           let models = null;
-          try { models = await getModelList(env, cfg, be, false); } catch (e) { models = null; }
-          return await handleAsk({ ...cfg, [field]: resolveModel(models, cfg[field]) }, body);
+          try { models = await getModelList(env, cfg, false); } catch (e) { models = null; }
+          return await handleAsk({ ...cfg, MINDLOGIC_MODEL: resolveModel(models, cfg.MINDLOGIC_MODEL) }, body);
         }
         catch (e) { return json({ error: String(e.message || e) }, 500); }
       }

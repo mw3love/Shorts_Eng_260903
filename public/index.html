@@ -295,7 +295,6 @@
   #askOv.aipanel[hidden]{display:none}
   @media (hover:hover) and (pointer:fine){ #askOv.aipanel{left:50%;right:auto;width:min(720px,100vw);transform:translateX(-50%)} }
   .aihead{flex:none;display:flex;align-items:center;gap:8px;padding:10px 12px 6px 16px}
-  .aitag{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--ink);background:var(--coral);border-radius:6px;padding:2px 7px}
   .aimodel{flex:1;font-family:var(--mono);font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .aihead button{flex:none;background:none;border:0;color:var(--muted);font-size:17px;cursor:pointer;padding:4px 6px;touch-action:manipulation}
   #askHlBtn{width:34px;height:30px;border-radius:8px;border:1px solid transparent;display:flex;align-items:center;justify-content:center}
@@ -312,6 +311,17 @@
     display:flex;align-items:center;justify-content:center;touch-action:manipulation}
   .aiform button svg{width:18px;height:18px}
   .askctx{font-size:12.5px;color:var(--muted);margin:-6px 0 10px;line-height:1.5}
+  .askqrow{display:flex;align-items:flex-start;gap:8px;margin:0 0 10px}
+  .askqrow .askq{flex:1;min-width:0;margin:0}
+  .asksave{flex:none;width:36px;height:36px;margin:-4px -6px 0 0;border:1px solid transparent;border-radius:10px;background:var(--ink3);color:var(--muted);
+    display:flex;align-items:center;justify-content:center;cursor:pointer;touch-action:manipulation}
+  .asksave svg{width:18px;height:18px}
+  .asksave.on{color:var(--know);border-color:currentColor}
+  .asksave.err{color:var(--coral);border-color:currentColor}
+  .asksave.busy{animation:askpulse 1s ease-in-out infinite}
+  @keyframes askpulse{50%{opacity:.35}}
+  .askact .asknote.err{color:var(--coral)}
+  .askact .asklink{background:none;padding:0 2px;color:var(--coral);text-decoration:underline;font-size:12px}
   /* AI 설정창(☰ › AI settings) — 검색 오버레이 뼈대 재사용 */
   .aisetbody{padding:4px 16px 40px}
   .aisetbody section{background:var(--ink2);border-radius:12px;padding:12px 14px;margin:0 0 10px}
@@ -324,10 +334,6 @@
     background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);
     background-position:calc(100% - 18px) 55%,calc(100% - 13px) 55%;background-size:5px 5px;background-repeat:no-repeat}
   .aisetbody input:focus,.aisetbody select:focus{border-color:var(--coral)}
-  .aiseg{display:flex;gap:6px}
-  .aiseg button{flex:1;font-family:var(--sans);font-size:13px;color:var(--muted);background:var(--ink3);border:1px solid transparent;border-radius:9px;padding:9px;cursor:pointer;touch-action:manipulation}
-  .aiseg button.on{color:var(--paper);border-color:var(--coral)}
-  .aisetbody section.off{opacity:.55}
   .aihint{font-size:12px;color:var(--muted);margin:6px 2px 0;line-height:1.5}
   .aihint.err{color:var(--coral)}
   .aihint.ok{color:var(--know)}
@@ -850,7 +856,7 @@
 <div class="aiback" id="askBack" hidden></div>
 <div class="aipanel" id="askOv" hidden>
   <div class="aihead">
-    <span class="aitag">AI</span><span class="aimodel" id="askModel"></span>
+    <span class="aimodel" id="askModel"></span>
     <button type="button" id="askHlBtn" aria-label="Highlight in answer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg></button>
     <button type="button" id="askCloseBtn" aria-label="Close">&#10005;</button>
   </div>
@@ -875,17 +881,7 @@
     </section>
     <div id="aiServer" hidden>
       <section>
-        <h6>AI to use</h6>
-        <div class="aiseg" id="aiSeg"><button type="button" data-b="gemini">Gemini</button><button type="button" data-b="mindlogic">Gateway</button></div>
-      </section>
-      <section data-for="gemini">
-        <h6>Gemini</h6>
-        <label>Model<select id="aiGemModel"></select></label>
-        <p class="aihint" id="aiGemModelMsg"></p>
-        <label>API key<input id="aiGemKey" type="password" autocomplete="off"></label>
-      </section>
-      <section data-for="mindlogic">
-        <h6>Gateway</h6>
+        <h6>AI gateway</h6>
         <label>Base URL<input id="aiMlBase" type="url" autocomplete="off" autocapitalize="off" spellcheck="false"></label>
         <label>Model<select id="aiMlModel"></select></label>
         <p class="aihint" id="aiMlModelMsg"></p>
@@ -3358,7 +3354,10 @@ function openAsk(req){
   // ⚠ iOS는 「탭한 그 순간(같은 이벤트 안)」의 focus()에만 키보드를 띄운다 — 서버 응답을 기다린 뒤
   // focus()하면 커서만 가고 키보드는 안 열려 입력창을 한 번 더 눌러야 했다(2026-11-04 실기기 신고).
   if (!req) $('askInput').focus();
-  checkAskConfig().then((ok) => { if (ok && req) sendAsk(req); });
+  // 질문은 설정 확인을 기다리지 않고 바로 보낸다(0.2~0.7초 단축, 2026-11-04 실측). 암호가 틀리면 질문 응답의
+  // 401이 잠금 화면을 띄우고, 풀리면 막혔던 질문을 다시 보낸다(renderAskThread의 go). 설정 확인은 머리 모델명용.
+  if (req) sendAsk(req);
+  checkAskConfig();
 }
 function closeAsk(){ $('askInput').blur(); $('askOv').hidden = true; $('askBack').hidden = true; setAskHlMode(false); }
 
@@ -3424,9 +3423,7 @@ function applyAskHighlight(t, turnEl){
   if (!at) return false;
   if (at.row) at.row[at.ci] = hlToggleRich(at.row[at.ci], t.start, t.end);
   else at.b.rich = hlToggleRich(at.b.rich, t.start, t.end);
-  const sc = $('askThread').scrollTop;
-  renderAskThread();
-  $('askThread').scrollTop = sc;
+  rerenderAskKeepScroll();
   // 저장된 답이면 노션 카드 블록도 바로 고친다(요청은 순서대로 — 카드 형광펜의 queueFlagApi와 같은 이유).
   const ids = turn.save === 'saved' && turn.saveRes && turn.saveRes.answerIds;
   if (turn.save === 'saved' && !ids){ toast('Open the card to highlight saved answers'); return true; }
@@ -3437,13 +3434,33 @@ function applyAskHighlight(t, turnEl){
       ? (ref.rowIds && ref.rowIds[at.ri] ? { pageId: turn.saveRes.pageId, rowId: ref.rowIds[at.ri], cells: at.row } : null)
       : { pageId: turn.saveRes.pageId, blockId: ref.id, rich: at.b.rich };
     if (!body){ toast('Open the card to highlight this cell'); return true; }
-    const payload = JSON.parse(JSON.stringify(body)); // 보내는 시점 값으로 고정
-    askHlQueue = askHlQueue.then(() => askCall('/api/ask/highlight', payload)).then(({ status, data }) => {
-      if (status !== 200 || !data.notionOk) toast('Highlight not saved to Notion');
-      subCache.clear(); // 카드 화면이 옛 본문을 들고 있지 않게
-    });
+    pushAskHighlight(turn, JSON.parse(JSON.stringify(body))); // 보내는 시점 값으로 고정
   }
   return true;
+}
+function rerenderAskKeepScroll(){
+  const sc = $('askThread').scrollTop;
+  renderAskThread();
+  $('askThread').scrollTop = sc;
+}
+// 저장 뒤 형광펜 → 노션 반영. 저장 아이콘: 동기화 중(점멸) → 체크 / 실패가 남아 있으면 다시 시도 아이콘.
+// 실패는 블록(또는 표 줄)별로 기억한다 — 블록 A 실패 뒤 블록 B가 성공해도 A는 여전히 미반영이라서.
+// 같은 블록의 나중 요청이 성공하면 그 블록 전체 상태가 반영된 것이므로 실패 기록을 지운다.
+function askSyncState(turn){ return turn.syncFailed && turn.syncFailed.size ? 'error' : turn.syncPending ? 'busy' : 'ok'; }
+function pushAskHighlight(turn, payload){
+  const id = payload.rowId || payload.blockId;
+  turn.syncFailed = turn.syncFailed || new Map();
+  turn.syncPending = (turn.syncPending || 0) + 1;
+  turn.sync = askSyncState(turn);
+  rerenderAskKeepScroll();
+  askHlQueue = askHlQueue.then(() => askCall('/api/ask/highlight', payload)).then(({ status, data }) => {
+    turn.syncPending -= 1;
+    if (status === 200 && data.notionOk) turn.syncFailed.delete(id);
+    else { turn.syncFailed.set(id, payload); toast('Highlight not saved to Notion — tap the icon to retry'); }
+    turn.sync = askSyncState(turn);
+    subCache.clear(); // 카드 화면이 옛 본문을 들고 있지 않게
+    if (askTurns.includes(turn)) rerenderAskKeepScroll();
+  });
 }
 function applyAskHighlightFromSelection(){
   const sel = window.getSelection();
@@ -3535,8 +3552,7 @@ async function checkAskConfig(){
 }
 function configuredModel(){
   if (!askConfig || !askConfig.settings) return '';
-  const s = askConfig.settings;
-  const m = s.backend === 'mindlogic' ? s.mindlogic.model : s.gemini.model;
+  const m = askConfig.settings.model;
   return m === 'auto' ? 'newest Gemini Lite (auto)' : m; // 첫 답이 오면 실제로 답한 모델 이름으로 바뀐다
 }
 function syncAskHead(){
@@ -3581,19 +3597,34 @@ function scrollAskTo(i){
   const el = $('askThread').querySelectorAll('.askturn')[i];
   if (el) $('askThread').scrollTop = el.offsetTop - $('askThread').offsetTop - 4;
 }
+/* 저장 아이콘(질문 줄 오른쪽, 2026-11-04 사용자 요청 — 「매번 맨 아래까지 내려갈 필요 없게」).
+   상태: 저장 전(북마크+) → 저장 중 → 저장됨(체크, 누르면 그 카드로) / 저장 뒤 형광펜 동기화 중(점멸) /
+   동기화 실패(다시 시도). 확장의 「♻ 업데이트」(저장 후 형광펜을 고치면 새 페이지로 갈아끼움)는 앱엔 없다 —
+   저장 뒤 칠한 형광펜은 그 자리에서 노션 블록에 바로 반영되기 때문(applyAskHighlight). */
+const ASK_SAVE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z"/><path d="M12 7v6"/><path d="M9 10h6"/></svg>';
+const ASK_SAVED_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21l-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z"/><path d="m9 10 2 2 4-4"/></svg>';
+const ASK_RETRY_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>';
+function askSaveBtnHtml(t, i){
+  if (t.status !== 'ok') return '';
+  if (t.save === 'saving') return '<button class="asksave busy" disabled aria-label="Saving">' + ASK_SAVE_ICON + '</button>';
+  if (t.save === 'saved'){
+    if (t.sync === 'error') return '<button class="asksave err" data-act="resync" data-i="' + i + '" aria-label="Highlight not synced — retry">' + ASK_RETRY_ICON + '</button>';
+    return '<button class="asksave on' + (t.sync === 'busy' ? ' busy' : '') + '" data-act="open" data-i="' + i + '" aria-label="Saved — open card">' + ASK_SAVED_ICON + '</button>';
+  }
+  return '<button class="asksave' + (t.save === 'error' ? ' err' : '') + '" data-act="save" data-i="' + i + '" aria-label="Save to deck">' + ASK_SAVE_ICON + '</button>';
+}
 function askTurnHtml(t, i){
   let body;
   if (t.status === 'loading') body = '<div class="askwait">Thinking…</div>';
   else if (t.status === 'error') body = '<p class="askerr">' + esc(t.error) + '</p><div class="askact"><button data-act="retry" data-i="' + i + '">Retry</button></div>';
-  else {
-    let act;
-    if (t.save === 'saving') act = '<button disabled>Saving…</button>';
-    else if (t.save === 'saved') act = '<span class="asknote ok">Saved to deck ✓</span>' + (t.saveRes.indexed ? '<button data-act="open" data-i="' + i + '">Open card</button>' : '');
-    else if (t.save === 'dup') act = '<span class="asknote">Already in deck: ' + esc(t.saveRes.front) + '</span><button data-act="open" data-i="' + i + '">Open</button><button data-act="force" data-i="' + i + '">Save anyway</button>';
-    else act = (t.save === 'error' ? '<span class="asknote" style="color:var(--coral)">' + esc(t.saveErr) + '</span>' : '') + '<button data-act="save" data-i="' + i + '">Save to deck</button>';
-    body = blocksHtml(t.blocks) + '<div class="askact">' + act + '</div>';
-  }
-  return '<div class="askturn" data-i="' + i + '"><div class="askq">' + esc(t.q) + '</div>' + (t.context ? '<div class="askctx">' + esc(t.context) + '</div>' : '') + body + '</div>';
+  else body = blocksHtml(t.blocks);
+  const notes = [];
+  if (t.save === 'error') notes.push('<span class="asknote err">' + esc(t.saveErr) + '</span>');
+  // 첫 후보 제목이 기존 카드와 겹쳐 다른 제목으로 저장됐을 때 — 막지 않고 알려만 준다.
+  if (t.save === 'saved' && t.saveRes && t.saveRes.similar) notes.push('<span class="asknote">Similar card in deck: ' + esc(t.saveRes.similar.front) + '</span><button class="asklink" data-act="opensim" data-i="' + i + '">Open</button>');
+  return '<div class="askturn" data-i="' + i + '"><div class="askqrow"><div class="askq">' + esc(t.q) + '</div>' + askSaveBtnHtml(t, i) + '</div>'
+    + (notes.length ? '<div class="askact">' + notes.join('') + '</div>' : '')
+    + (t.context ? '<div class="askctx">' + esc(t.context) + '</div>' : '') + body + '</div>';
 }
 function renderAskThread(msg){
   const el = $('askThread');
@@ -3627,30 +3658,30 @@ $('askThread').addEventListener('click', async (e) => {
   if (!t) return;
   const act = b.dataset.act;
   if (act === 'retry'){ runAskTurn(t); return; }
-  if (act === 'open'){
-    const res = t.saveRes;
+  if (act === 'resync'){ [...(t.syncFailed || new Map()).values()].forEach((p) => pushAskHighlight(t, p)); return; }
+  if (act === 'open' || act === 'opensim'){
+    const res = act === 'opensim' ? t.saveRes.similar : t.saveRes;
+    if (act === 'open' && !t.saveRes.indexed){ toast('Saved to Notion — appears after next sync'); return; }
     closeAsk();
     subCache.clear(); // 새 카드가 붙은 소챕터의 옛 캐시를 버린다
     await refreshChapterMeta();
     navigateToCard({ subId: res.subId, key: res.key });
     return;
   }
-  if (act === 'save' || act === 'force'){
-    t.save = 'saving'; renderAskThread();
-    const { status, data } = await askCall('/api/ask/save', { question: t.question || '', text: t.text || '', context: t.context || '', markdown: t.markdown, blocks: t.blocks, force: act === 'force' });
-    if (status === 409 && data.duplicate){ t.save = 'dup'; t.saveRes = data; }
-    else if (status === 200 && data.ok){
+  if (act === 'save'){
+    t.save = 'saving'; rerenderAskKeepScroll();
+    const { status, data } = await askCall('/api/ask/save', { question: t.question || '', text: t.text || '', context: t.context || '', markdown: t.markdown, blocks: t.blocks });
+    if (status === 200 && data.ok){
       t.save = 'saved'; t.saveRes = data;
-      if (!data.indexed) toast('Saved to Notion — appears after next sync');
+      toast(data.indexed ? 'Saved to deck' : 'Saved to Notion — appears after next sync');
     } else { t.save = 'error'; t.saveErr = data.error || 'Save failed'; }
-    renderAskThread();
+    rerenderAskKeepScroll();
   }
 });
 
 /* ── AI 설정창(☰ › AI settings, 2026-11-04) ──
    키·주소는 서버 KV에 저장되고 다시 내려오지 않는다(앞 4글자 힌트만). 키 칸이 비어 있으면 「그대로 둠」.
    암호가 맞아야 서버 쪽 칸이 열린다 — 이 기기 암호 칸은 sd_askpw(📖 잠금 화면과 같은 값). */
-let aiSetBackend = 'gemini';
 function openAiSettings(){
   $('aiSetOv').hidden = false;
   $('aiPw').value = lsGet('sd_askpw') || '';
@@ -3659,17 +3690,11 @@ function openAiSettings(){
 }
 function closeAiSettings(){ $('aiSetOv').hidden = true; }
 $('aiSetClose').addEventListener('click', closeAiSettings);
-function setAiSeg(b){
-  aiSetBackend = b;
-  $('aiSeg').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x.dataset.b === b));
-  document.querySelectorAll('#aiServer section[data-for]').forEach((s) => s.classList.toggle('off', s.dataset.for !== b));
-}
-$('aiSeg').querySelectorAll('button').forEach((x) => x.addEventListener('click', function(){ this.blur(); setAiSeg(this.dataset.b); }));
-// 모델 드롭다운 — 서비스의 실시간 목록(설정창을 열 때마다 새로). 맨 위 「Auto」 = 가장 최신 Gemini lite(서버가
+// 모델 드롭다운 — 게이트웨이 실시간 목록(설정창을 열 때마다 새로). 맨 위 「Auto」 = 가장 최신 Gemini lite(서버가
 // 매 질문마다 다시 고른다). 고른 모델이 단종돼 목록에서 빠졌으면 「→ 대체 모델」로 표시하고 그대로 남겨 둔다.
-async function fillModelList(backend, selId, msgId){
+async function fillModelList(selId, msgId){
   const sel = $(selId), msg = $(msgId);
-  const { status, data } = await askCall('/api/ask/models?backend=' + backend);
+  const { status, data } = await askCall('/api/ask/models');
   const chosen = (data && data.chosen) || 'auto';
   const models = (status === 200 && data.models) || [];
   let html = '<option value="auto">Auto · newest Gemini Lite' + (data && data.auto ? ' (' + esc(data.auto) + ')' : '') + '</option>';
@@ -3695,13 +3720,10 @@ async function loadAiSettings(){
   askConfig = data; askLocked = false;
   const s = data.settings;
   $('aiServer').hidden = false;
-  setAiSeg(s.backend);
-  $('aiMlBase').value = s.mindlogic.base || '';
-  $('aiGemKey').value = ''; $('aiMlKey').value = ''; $('aiNewPw').value = '';
-  $('aiGemKey').placeholder = s.gemini.keyHint ? s.gemini.keyHint + ' saved — blank keeps it' : 'Paste API key';
-  $('aiMlKey').placeholder = s.mindlogic.keyHint ? s.mindlogic.keyHint + ' saved — blank keeps it' : 'Paste API key';
-  fillModelList('gemini', 'aiGemModel', 'aiGemModelMsg');
-  fillModelList('mindlogic', 'aiMlModel', 'aiMlModelMsg');
+  $('aiMlBase').value = s.base || '';
+  $('aiMlKey').value = ''; $('aiNewPw').value = '';
+  $('aiMlKey').placeholder = s.keyHint ? s.keyHint + ' saved — blank keeps it' : 'Paste API key';
+  fillModelList('aiMlModel', 'aiMlModelMsg');
   return true;
 }
 $('aiSaveBtn').addEventListener('click', async function(){
@@ -3716,9 +3738,7 @@ $('aiSaveBtn').addEventListener('click', async function(){
   }
   const newPw = $('aiNewPw').value.trim();
   const { status, data } = await askCall('/api/ask/settings', {
-    backend: aiSetBackend,
-    geminiModel: $('aiGemModel').value, geminiKey: $('aiGemKey').value,
-    mindlogicBase: $('aiMlBase').value, mindlogicModel: $('aiMlModel').value, mindlogicKey: $('aiMlKey').value,
+    base: $('aiMlBase').value, model: $('aiMlModel').value, key: $('aiMlKey').value,
     newPassword: newPw,
   });
   if (status !== 200){ out.className = 'aihint err'; out.textContent = data.error || 'Save failed'; return; }
