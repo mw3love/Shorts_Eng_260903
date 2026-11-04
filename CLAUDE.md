@@ -54,8 +54,17 @@ Notion DB `3. 영어 DB`에 자동 저장한다. **저장은 되는데 복습이
 - ✓ 프록시검증(로컬 `wrangler dev` + **가짜 게이트웨이**, 414px Playwright 실제 클릭·입력): 검색→Ask 행, 잠금 화면
   (틀린 암호 유지·맞는 암호 후 자동 질문), 표·형광펜·굵게·목록 렌더, 후속 질문에 history 4개·질문 프롬프트로 전환,
   중복 409 → Open으로 그 카드 이동, 열려 있는 동안 D·Space 무시, 뒤로 = 검색어 유지. 프로덕션: 키 없이 503 확인.
-  **미확인: 실제 AI 응답, 실제 노션 페이지 생성 + 인덱스 붙이기, 실기기.** (로컬 합성 KV엔 `schema`가 없어 저장 시
-  `discoverSchema`로 제목 컬럼을 찾는 폴백을 넣었다.)
+  (로컬 합성 KV엔 `schema`가 없어 저장 시 `discoverSchema`로 제목 컬럼을 찾는 폴백을 넣었다.)
+- ⚠ **Worker를 서울 근처에 고정했다**(`wrangler.toml` `[placement] region = "gcp:asia-northeast3"`, `Version ID
+  3206632d-f460-424d-9d80-089f46f51bb2`). 한국 접속이 **홍콩(HKG) colo**로 들어가(`/cdn-cgi/trace` 실측) Gemini는
+  `User location is not supported`(400), 게이트웨이는 **401**로 거절했다 — 같은 키가 이 PC에선 200이라 키 문제로
+  오진하기 쉽다(실제로 사용자도 주소 문제로 봤다). placement 후 둘 다 200. 복습 API 지연은 그대로(콜드스타트 뒤 0.2초).
+  무료 요금제에서 placement 힌트가 보장되는지는 문서에 없다 — **AI가 다시 지역 오류를 내면 여기부터 의심.**
+- 지금 secret: `ASK_PASSWORD`, `GEMINI_API_KEY`, `MINDLOGIC_API_KEY` = **학교(JBNU) 키** → `MINDLOGIC_BASE_URL` =
+  `https://factchat-cloud.mindlogic.ai/v1/gateway`(키와 주소 계정이 어긋나면 401).
+- ✓ 프로덕션 실응답(node fetch): Gemini `gemini-3.5-flash` 17.5초, 게이트웨이 `claude-sonnet-4-6` 12.9초, 둘 다 표·헤딩
+  블록 정상. **답이 13~18초 걸린다** — 답답하다는 피드백이 오면 스트리밍이 다음 후보.
+  **미확인: 실제 노션 페이지 생성 + 인덱스 붙이기(사용자가 폰에서 직접 해 보기로), 실기기 전반.**
 
 ## 현재 상태 (2026-11-04 라운드39 — 형광펜 「드래그 먼저 → 버튼」 신뢰성)
 
