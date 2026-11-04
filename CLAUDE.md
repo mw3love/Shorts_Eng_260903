@@ -38,7 +38,7 @@ Notion DB `3. 영어 DB`에 자동 저장한다. **저장은 되는데 복습이
   (`아래 문장에서 "X" 부분을 설명해줘.\n문장: …`)로 바로 물음. 드래그 없이 📖 = 입력줄만. 패널(`#askOv.aipanel`)은
   **아래에서 올라온다**(같은 날 사용자 요청으로 위→아래, `Version ID fa3cd0e3-875d-4868-96fe-846a0dd26245`) — ⚠ iOS 키보드가
   가리지 않게 `visualViewport`로 잰 높이(`--kb`)만큼 올린다(`syncKeyboardInset`, **실기기 미확인**). 카드와 구분: 뒤를
-  어둡게(`.aiback`, 탭하면 닫힘)·한 단계 밝은 바탕·위쪽 코랄 띠·`AI` 라벨+모델명·본문보다 작은 글씨. 「선택 먼저 → 버튼」은 형광펜의 `lastSelRange`를 공유
+  어둡게(`.aiback`, 탭하면 닫힘)·한 단계 밝은 바탕·위쪽 코랄 띠·모델명(`AI` 칩은 같은 날 제거)·본문보다 작은 글씨. 「선택 먼저 → 버튼」은 형광펜의 `lastSelRange`를 공유
   (`pointerdown` 예외에 `#dictBtn` 추가). 드래그 경로 저장 = 문장 인용 + 구분선 + 답, 제목 = 답의 첫 예문(카드 문장을 쓰면
   원래 카드와 같은 cardKey). ⚠ **휴지통·완전히앎은 「…」(`#moreBtn` → `#morePop`) 안으로 옮겼다** — 버튼 id
   (`trashQuickBtn`/`archiveQuickBtn`)는 팝업 안에 그대로라 상태·핸들러 코드는 무변경. 카드가 그 상태면 「…」 자리에 그
@@ -64,15 +64,19 @@ Notion DB `3. 영어 DB`에 자동 저장한다. **저장은 되는데 복습이
   대화는 서버에 안 남는다(클라이언트가 history를 매번 다시 보냄).
 - ⚠ **인증은 AI·저장·설정 엔드포인트(`/api/ask*`)에만** — 헤더 `X-Ask-Key` = 암호. 이 Worker의 나머지 API는 원래대로
   무인증. 폰은 암호만 localStorage `sd_askpw`에 둔다(지워지면 잠금 화면이 다시 뜸).
-- **AI 설정창(☰ › AI settings, `#aiSetOv`)** — 사용할 AI(Gemini/게이트웨이, 모든 기기 공통)·모델(`/api/ask/models` 실시간 목록
-  드롭다운 `select` — 처음엔 datalist 입력칸이었으나 사용자 지적으로 교체)·게이트웨이 base URL·API 키·암호 변경. KV `askSettings:v1`(`backend`·`geminiKey`·`geminiModel`·
-  `mindlogicKey`·`mindlogicBase`·`mindlogicModel`·`password`)에 저장되고, **빈 항목은 Worker secret/vars가 기본값**
-  (`ASK_PASSWORD`, `GEMINI_API_KEY`/`GEMINI_MODEL`, `MINDLOGIC_API_KEY`/`MINDLOGIC_BASE_URL`/`MINDLOGIC_MODEL`) — `loadAskConfig()`.
-  ⚠ **모델 기본값은 두 서비스 모두 `auto` = 실시간 목록의 「gemini-<버전>-flash-lite」 중 최고 정식판**(사용자 결정 — 사전은
+- ⚠ **AI는 게이트웨이(mindlogic, OpenAI 호환) 하나만** — Google Gemini API 직접 경로는 같은 날 제거(사용자 결정,
+  `Version ID 02f7d0ee-1461-4a8c-a78b-05f027a34790`). 근거: 같은 `gemini-3.5-flash-lite`로 PC 실측 5문항 평균 게이트웨이 2.7초(2.6~2.9),
+  Gemini API 3.9초(2.1~7.4로 튐), Worker 경유 추가 지연은 0.1~1.5초로 들쭉날쭉. secret `GEMINI_API_KEY`는 남아 있지만 안 읽는다.
+- **AI 설정창(☰ › AI settings, `#aiSetOv`)** — 모델(`/api/ask/models` 실시간 목록 드롭다운 `select` — 처음엔 datalist 입력칸이었으나
+  사용자 지적으로 교체)·게이트웨이 base URL·API 키·암호 변경. KV `askSettings:v1`(`mindlogicKey`·`mindlogicBase`·`mindlogicModel`·
+  `password`)에 저장되고, **빈 항목은 Worker secret/vars가 기본값**(`ASK_PASSWORD`, `MINDLOGIC_API_KEY`/`MINDLOGIC_BASE_URL`/
+  `MINDLOGIC_MODEL`) — `loadAskConfig()`.
+  ⚠ **모델 기본값 `auto` = 게이트웨이 실시간 목록의 「gemini-<버전>-flash-lite」 중 최고 정식판**(사용자 결정 — 사전은
   속도가 중요, 확장도 lite가 메인. `resolveModel`/`newestGeminiLite`, 매 질문마다 다시 고름 → 새 lite가 나오면 앱 수정 없이 씀).
-  직접 고른 모델이 단종(게이트웨이 `deprecated_at`·`lifecycle:legacy`)되면 목록의 `replacement`를 끝까지 따라가 대신 부른다
-  (예: `claude-sonnet-4-6`은 2026-08-18 legacy → `claude-sonnet-5`). 목록은 KV `askModels:v1:<backend>` 하루 캐시, 설정창을
-  열 때는 새로. 실측(`Version ID b8643bf6-31b7-4df2-9ad5-acd590a01639`): 게이트웨이 lite 3.0초(sonnet 15초), Gemini 직접 8.0초.
+  직접 고른 모델이 단종(`deprecated_at`·`lifecycle:legacy`)되면 목록의 `replacement`를 끝까지 따라가 대신 부른다
+  (예: `claude-sonnet-4-6`은 2026-08-18 legacy → `claude-sonnet-5`). 목록은 KV `askModels:v1:mindlogic` 하루 캐시, 설정창을
+  열 때는 새로.
+- 질문은 `/api/ask/config` 응답을 **기다리지 않고** 바로 보낸다(0.2~0.7초 단축). 401이면 잠금 화면 → 풀리면 막힌 질문 재전송.
   **검토한 대안:** `gemini-flash-lite-latest` 별칭 — 기각(언제 최신을 따라가는지 문서 미확인), preview 우선 — 기각(예고 없이 내려감). ⚠ **키는 응답으로 절대 안 내려간다**(앞 4글자 `keyHint`만),
   키 칸이 비어 있으면 「그대로 둠」, 바꾸려면 지금 암호가 필요. base URL은 `https://`만. 앱에서 암호를 바꾸면 KV 값이
   secret을 덮으므로 **secret `ASK_PASSWORD`를 다시 넣어도 무효** — 되돌리려면 KV `askSettings:v1`의 `password`를 지운다.
@@ -82,7 +86,16 @@ Notion DB `3. 영어 DB`에 자동 저장한다. **저장은 되는데 복습이
 - ⚠ **저장 직후 인덱스에 바로 붙인다** — 페이지를 다시 읽어(`pageBlocks`) 마지막 버킷(꽉 찼으면 새 버킷)과
   `index:v2`에 추가. 안 그러면 cron 신선도(6시간)까지 안 보인다. 새 카드는 생성일 순이라 **마지막 챕터 끝**.
   동기화가 도는 중에 저장하면 그 패스의 최종 인덱스가 덮어써 다음 동기화 때 다시 들어온다(무해).
-- 같은 `cardKey`가 이미 있으면 409 → `Already in deck · Open / Save anyway`.
+- ⚠ **제목이 기존 카드와 겹치면 묻지 않고 다음 후보로**(`askTitleCandidates`, 사용자 결정) — 처음엔 409 → `Save anyway`였는데
+  AI가 같은 표현에 같은 예문을 자주 써서 실제로 1월에 확장으로 저장한 카드와 같은 제목이 생겼다(제목 = cardKey라 학습 상태까지
+  공유). 후보 순서: 물어본 표현이 든 예문 → 나머지 예문 → 표현/질문 그대로. 「예문」 = 문장부호로 끝나는 3단어 이상이거나 5단어
+  이상(표 칸의 표현 자체는 제외). 첫 후보가 겹쳤으면 저장 응답의 `similar`로 `Similar card in deck · Open`만 알린다.
+  그때 생긴 중복 카드(`40e76387…`)는 노션에서 이미 휴지통에 있었다(`in_trash`, 앱 「완전 삭제」 기록 없음 → 추정: 사용자가 노션에서
+  직접 삭제) — 다음 전체 동기화 때 앱에서도 빠진다. ⚠ `/api/retitle`은 옛 키의 known을 새 키로 **옮긴다** — 두 카드가 키를 공유하는
+  상태에서 부르면 다른 카드의 상태가 빠진다.
+- **저장 = 질문 줄 오른쪽 아이콘**(사용자 요청, 맨 아래까지 안 내려가게) — 저장 전/중/됨(누르면 카드로)/저장 후 형광펜 동기화
+  중(점멸)/실패(다시 시도). 실패는 블록별로 기억(`syncFailed`). 확장의 「♻ 업데이트」(저장 후 형광펜을 고치면 새 페이지로 갈아끼움,
+  `explain-ui.ts` 800행)는 **만들지 않았다** — 앱은 저장 후 형광펜이 그 자리에서 노션 블록에 반영된다. 패널 머리의 `AI` 칩은 제거.
 - **검토한 대안:** 폰에 AI 키 저장 + 브라우저 직접 호출 — 기각(iOS 저장소 삭제 시 긴 키 재입력, 노션 저장은 어차피 서버).
   스트리밍 — 1차 제외(블록 변환과 같이 쓰기 까다로움, 대기가 거슬리면 2차).
 - ✓ 프록시검증(로컬 `wrangler dev` + **가짜 게이트웨이**, 414px Playwright 실제 클릭·입력): 검색→Ask 행, 잠금 화면
@@ -94,7 +107,7 @@ Notion DB `3. 영어 DB`에 자동 저장한다. **저장은 되는데 복습이
   `User location is not supported`(400), 게이트웨이는 **401**로 거절했다 — 같은 키가 이 PC에선 200이라 키 문제로
   오진하기 쉽다(실제로 사용자도 주소 문제로 봤다). placement 후 둘 다 200. 복습 API 지연은 그대로(콜드스타트 뒤 0.2초).
   무료 요금제에서 placement 힌트가 보장되는지는 문서에 없다 — **AI가 다시 지역 오류를 내면 여기부터 의심.**
-- 지금 secret: `ASK_PASSWORD`, `GEMINI_API_KEY`, `MINDLOGIC_API_KEY` = **회사(KAIROS) 키** → `MINDLOGIC_BASE_URL` =
+- 지금 secret: `ASK_PASSWORD`, `MINDLOGIC_API_KEY` = **회사(KAIROS) 키**(`GEMINI_API_KEY`는 남아 있으나 미사용) → `MINDLOGIC_BASE_URL` =
   `https://factchat.mindlogic-kr-api.com/v1/gateway`(학교 키면 `https://factchat-cloud.mindlogic.ai/v1/gateway` —
   키와 주소 계정이 어긋나면 401, 홍콩 차단과 증상이 같으니 둘 다 의심).
 - ✓ 프로덕션 실응답(node fetch): Gemini `gemini-3.5-flash` 17.5초, 게이트웨이 `claude-sonnet-4-6` 12.9초, 둘 다 표·헤딩
