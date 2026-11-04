@@ -1444,7 +1444,10 @@ function askPickTitle(question, markdown) {
 
 async function handleAsk(env, body) {
   const question = String(body.question || '').trim();
-  if (!question) return json({ error: 'Empty question' }, 400);
+  // 📖 드래그 경로 — text(고른 표현) + context(그 표현이 든 카드 문장). 확장의 「해설」 경로와 같다.
+  const text = String(body.text || '').trim().slice(0, 300);
+  const context = String(body.context || '').trim().slice(0, 600);
+  if (!question && !text) return json({ error: 'Empty question' }, 400);
   const backend = body.backend === 'mindlogic' ? 'mindlogic' : 'gemini';
   if (!askBackends(env)[backend]) return json({ error: (backend === 'gemini' ? 'Gemini' : 'Gateway') + ' key not set on the server', code: 'noBackend' }, 503);
   // history: [{role:'user'|'model', text}] — 클라이언트가 앞 턴을 그대로 돌려보낸다(서버는 대화를 저장 안 함).
@@ -1453,7 +1456,11 @@ async function handleAsk(env, body) {
     .slice(-20);
   // 첫 질문은 풍부한 해설 프롬프트, 후속은 가벼운 질문 프롬프트 — 확장의 Alt+Q 직접질문(isAsk)과 같은 분기.
   const system = history.length ? ASK_PROMPT_QUESTION : ASK_PROMPT_EXPLAIN;
-  const userMessage = '질문: ' + question; // 확장 msg.question과 같은 모양
+  // 확장 msg.question / msg.explainWithContext / msg.explainPlain과 같은 모양("자막 문장"만 "문장"으로).
+  const userMessage = question ? '질문: ' + question
+    : (context && context.toLowerCase() !== text.toLowerCase())
+      ? `아래 문장에서 "${text}" 부분을 설명해줘.\n문장: ${context}`
+      : `"${text}"를 설명해줘.`;
   try {
     const { text, model } = backend === 'mindlogic'
       ? await askMindlogic(env, system, history, userMessage)
@@ -1477,10 +1484,21 @@ function cardCoords(items, id) {
 async function handleAskSave(env, token, dbId, body) {
   if (!token || !dbId) return json({ error: 'NOTION_TOKEN / NOTION_DB_ID not set' }, 500);
   const question = String(body.question || '').trim();
+  const text = String(body.text || '').trim();
+  const context = String(body.context || '').trim();
   const answer = String(body.markdown || '').trim();
-  if (!question || !answer) return json({ error: 'Nothing to save' }, 400);
-  const md = '질문: ' + question + '\n\n' + answer;
-  const title = askPickTitle(question, answer);
+  if ((!question && !text) || !answer) return json({ error: 'Nothing to save' }, 400);
+  // 본문: 질문 경로는 「질문: …」 + 답, 📖 드래그 경로는 (문장 인용 + 구분선) + 답 — 확장 saveToNotion과 같다.
+  // 제목은 둘 다 답의 첫 예문 우선 — 드래그 경로에서 카드 문장을 제목으로 쓰면 원래 카드와 같은 제목이 된다.
+  const children = question
+    ? markdownToBlocks('질문: ' + question + '\n\n' + answer)
+    : [
+      ...(context && context.toLowerCase() !== text.toLowerCase()
+        ? [{ type: 'quote', quote: { rich_text: [{ type: 'text', text: { content: context.slice(0, 2000) } }] } }, { type: 'divider', divider: {} }]
+        : []),
+      ...markdownToBlocks(answer),
+    ].slice(0, 100);
+  const title = askPickTitle(question || text, answer);
   const key = cardKey(title);
 
   const idxRaw = await env.KV.get(K_INDEX);
@@ -1497,7 +1515,7 @@ async function handleAskSave(env, token, dbId, body) {
     body: JSON.stringify({
       parent: { database_id: dbId },
       properties: { [titleProp]: { title: [{ text: { content: title.slice(0, 2000) } }] } },
-      children: markdownToBlocks(md),
+      children,
     }),
   });
 

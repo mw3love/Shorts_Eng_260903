@@ -292,6 +292,13 @@
   .askseg button:disabled{opacity:.35;cursor:default}
   .askseg .askmodel{margin-left:auto;align-self:center;font-family:var(--mono);font-size:10.5px;color:var(--faint)}
   .askthread.content{min-height:0;will-change:auto;padding:4px 18px 40px}
+  /* 📖 사전 패널(2026-11-04) — 같은 #askOv를 화면 위쪽에서 내려오는 패널로. 아래쪽 시트로 하면 iOS
+     키보드에 입력창이 가려지기 쉬워 위에 붙였다. 답이 없을 땐 입력줄만(작게), 답이 오면 늘어난다. */
+  #askOv.dictmode{bottom:auto;max-height:72vh;border-bottom:1px solid var(--ink4);border-radius:0 0 16px 16px;box-shadow:0 12px 30px rgba(0,0,0,.5)}
+  #askOv.dictmode #askBackBtn{display:none}
+  #askOv.dictmode .askthread{flex:1 1 auto;padding-bottom:16px}
+  #askOv.dictmode .askthread:empty{display:none}
+  .askctx{font-size:12.5px;color:var(--muted);margin:-6px 0 10px;line-height:1.5}
   .askturn{padding:6px 0 14px;border-bottom:1px solid var(--ink3);margin-bottom:12px}
   .askturn:last-child{border-bottom:0}
   .askq{font-family:var(--serif);font-size:1.12em;color:var(--paper);margin:0 0 10px}
@@ -411,6 +418,20 @@
   .barbtn svg{width:18px;height:18px;stroke:currentColor}
   #trashQuickBtn.on{color:var(--trash)}
   #archiveQuickBtn.on{color:var(--mastered)}
+  /* 「…」 버튼 — 평소엔 점 세 개, 카드가 휴지통/완전히앎이면 그 아이콘을 그 색으로(상태 표시 유지). */
+  #moreBtn .mi-trash,#moreBtn .mi-cap{display:none}
+  #moreBtn.st-trash{color:var(--trash);border-color:currentColor}
+  #moreBtn.st-trash .mi-more,#moreBtn.st-archive .mi-more{display:none}
+  #moreBtn.st-trash .mi-trash{display:flex}
+  #moreBtn.st-archive{color:var(--mastered);border-color:currentColor}
+  #moreBtn.st-archive .mi-cap{display:flex}
+  #moreBtn span{display:flex}
+  #dictBtn.busy{color:var(--coral)}
+  #morePop{width:190px} /* .knowpop의 left:16px 그대로 — 「…」 버튼 바로 위에 뜬다 */
+  .morepop .moreitem{display:flex;align-items:center;gap:10px;color:var(--muted)}
+  .morepop .moreitem svg{width:17px;height:17px;flex:none}
+  .morepop .moreitem span{color:var(--paper)}
+  .morepop .moreitem.on{outline:1px solid currentColor}
   #hlBtn.active{color:var(--coral)}
   /* "안다" 퀵버튼 — 원형 아이콘 전용으로 교체(2026-09-05 베이크오프 라운드4 — "초록 체크에
      글씨 없이 깔끔해서 좋음"). 탭=안다/안다 취소, 롱프레스는 reviewMode에서만. */
@@ -676,6 +697,10 @@
 
     <!-- 트래시 카드뷰 롱프레스 전용 "완전삭제" 확인 하나만 남았다(2026-09-06 라운드14 —
          평소 보관/휴지통 갈림길은 하단바 상시 버튼으로 옮겨 이 팝업 자체가 필요 없어짐). -->
+    <div class="knowpop morepop" id="morePop" hidden>
+      <button class="moreitem" id="trashQuickBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg><span>Trash</span></button>
+      <button class="moreitem" id="archiveQuickBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10 12 5 2 10l10 5 10-5Z"/><path d="M6 12v5c0 1.4 2.7 3 6 3s6-1.6 6-3v-5"/></svg><span>Mastered</span></button>
+    </div>
     <div class="knowpop" id="knowPop" hidden>
       <button class="trash" id="reviewDeleteBtn">🗑 Delete permanently (cannot undo)</button>
     </div>
@@ -740,10 +765,12 @@
         <div class="barr-icons">
           <!-- 2026-09-06 라운드14: 롱프레스 메뉴 폐기, 휴지통·완전히앎을 상시 작은 버튼으로
                분리(왼쪽부터 휴지통→완전히앎→안다 — 자주 쓰는 안다가 엄지에 가장 가까움). -->
-          <button class="barbtn quickbtn" id="trashQuickBtn" aria-label="Move to trash"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>
           <!-- 아이콘은 제목 옆 배지와 같은 학사모로 통일(2026-09-06 라운드17 — 배지는
                학사모인데 버튼만 원+체크라 같은 뜻인 게 안 보였다는 지적). -->
-          <button class="barbtn quickbtn" id="archiveQuickBtn" aria-label="Mastered (archive)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10 12 5 2 10l10 5 10-5Z"/><path d="M6 12v5c0 1.4 2.7 3 6 3s6-1.6 6-3v-5"/></svg></button>
+          <!-- 2026-11-04 라운드40: 잘 안 쓰는 휴지통·완전히앎을 「…」 하나로 묶고(탭하면 #morePop),
+               빈 자리에 사전(📖). 카드가 그 상태면 「…」 자리에 그 아이콘이 색으로 뜬다. -->
+          <button class="barbtn quickbtn" id="moreBtn" aria-label="Trash / Mastered"><span class="mi-more"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="5" cy="12" r=".6"/><circle cx="12" cy="12" r=".6"/><circle cx="19" cy="12" r=".6"/></svg></span><span class="mi-trash"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></span><span class="mi-cap"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10 12 5 2 10l10 5 10-5Z"/><path d="M6 12v5c0 1.4 2.7 3 6 3s6-1.6 6-3v-5"/></svg></span></button>
+          <button class="barbtn" id="dictBtn" aria-label="Ask AI dictionary (select text first, or type)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2Z"/><path d="M22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7Z"/></svg></button>
           <button class="knowbtn" id="knowBtn" aria-label="Know (long-press: delete/trash)">
             <svg class="ic-check" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
             <svg class="ic-restore" viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
@@ -1146,7 +1173,7 @@ document.addEventListener('selectionchange', () => {
   if (sel && !sel.isCollapsed && sel.rangeCount) lastSelRange = sel.getRangeAt(0).cloneRange();
 });
 document.addEventListener('pointerdown', (e) => {
-  if (!e.target.closest('#hlBtn')) lastSelRange = null;
+  if (!e.target.closest('#hlBtn') && !e.target.closest('#dictBtn')) lastSelRange = null;
 }, true);
 let highlightMode = false;
 function setHighlightMode(on, btn){
@@ -1597,6 +1624,8 @@ function syncCardStateButtons(){
   const st = (c && !reviewMode) ? cardStatus(c) : null;
   $('trashQuickBtn').classList.toggle('on', st === 'trash');
   $('archiveQuickBtn').classList.toggle('on', st === 'archive');
+  $('moreBtn').classList.toggle('st-trash', st === 'trash');
+  $('moreBtn').classList.toggle('st-archive', st === 'archive');
   $('knowBtn').classList.toggle('on', st === 'known');
 }
 // 카드 상태를 바꾼 직후 화면 반영(제목 배지·하단 버튼·스크러버 점 색·소챕터 진행 표시).
@@ -1763,11 +1792,19 @@ function currentCardStatus(){
   const c = studyCards[studyIdx];
   return (c && !reviewMode) ? cardStatus(c) : null;
 }
+function showMorePop(){ $('morePop').hidden = false; }
+function hideMorePop(){ $('morePop').hidden = true; }
+$('moreBtn').addEventListener('click', function(){ this.blur(); if (gateActive) return; $('morePop').hidden ? showMorePop() : hideMorePop(); });
+document.addEventListener('pointerdown', (e) => {
+  if (!$('morePop').hidden && !e.target.closest('#morePop') && !e.target.closest('#moreBtn')) hideMorePop();
+}, true);
 $('trashQuickBtn').addEventListener('click', () => {
+  hideMorePop();
   if (gateActive) return;
   if (currentCardStatus() === 'trash') undoFlag('trash'); else doTrash();
 });
 $('archiveQuickBtn').addEventListener('click', () => {
+  hideMorePop();
   if (gateActive) return;
   if (currentCardStatus() === 'archive') undoFlag('archive'); else doArchive();
 });
@@ -1818,6 +1855,7 @@ async function enterReviewMode(kind){
   $('subPosDots').hidden = true;
   $('trashQuickBtn').hidden = true;
   $('archiveQuickBtn').hidden = true;
+  $('moreBtn').hidden = true; hideMorePop();
   $('subExamBtn').hidden = true;
   $('bottombar').classList.add('reviewbar');
   knowBtn.classList.add('reviewing');
@@ -1832,6 +1870,7 @@ function exitReviewModeUi(){
   $('subPosDots').hidden = false;
   $('trashQuickBtn').hidden = false;
   $('archiveQuickBtn').hidden = false;
+  $('moreBtn').hidden = false;
   $('subExamBtn').hidden = false;
   $('bottombar').classList.remove('reviewbar');
   knowBtn.classList.remove('reviewing');
@@ -2337,7 +2376,7 @@ function navByKey(dir){
 function isOverlayOpen(){
   return examDone || highlightMode || titleEditing || !lb.hidden ||
     !$('searchOv').hidden || !$('askOv').hidden || !$('listOv').hidden || $('sheet').classList.contains('on') ||
-    !$('fontPop').hidden || !$('knowPop').hidden || !$('resetPop').hidden || !$('titleEditPop').hidden;
+    !$('fontPop').hidden || !$('knowPop').hidden || !$('morePop').hidden || !$('resetPop').hidden || !$('titleEditPop').hidden;
 }
 // isOverlayOpen()에서 highlightMode만 뺀 버전(2026-09-07, 왼손 단축키 실사용 피드백으로
 // 수정) — highlightMode는 "형광펜 모드 on" 자체라 F 토글이 이 조건에 걸리면 껐다 켰다가
@@ -2350,7 +2389,7 @@ function isOverlayOpen(){
 function isModalOpen(){
   return examDone || titleEditing || !lb.hidden ||
     !$('searchOv').hidden || !$('askOv').hidden || !$('listOv').hidden || $('sheet').classList.contains('on') ||
-    !$('fontPop').hidden || !$('knowPop').hidden || !$('resetPop').hidden || !$('titleEditPop').hidden;
+    !$('fontPop').hidden || !$('knowPop').hidden || !$('morePop').hidden || !$('resetPop').hidden || !$('titleEditPop').hidden;
 }
 // 왼손 단축키(2026-09-07, 사용자 요청 — "오른손 마우스+왼손 키보드" 전제).
 // 화살표 키는 키보드 우측 하단이라 왼손 전용 조작엔 안 맞아 A/D를 홈로우에 추가로
@@ -2445,6 +2484,7 @@ function enterExamUi(){
   $('subPosDots').hidden = true;
   $('trashQuickBtn').hidden = true;
   $('archiveQuickBtn').hidden = true;
+  $('moreBtn').hidden = true; hideMorePop();
   $('subExamBtn').hidden = true;
   $('examExitBtn').hidden = false;
   $('bottombar').classList.add('reviewbar');
@@ -2455,6 +2495,7 @@ function exitExamUi(){
   $('subPosDots').hidden = false;
   $('trashQuickBtn').hidden = false;
   $('archiveQuickBtn').hidden = false;
+  $('moreBtn').hidden = false;
   $('subExamBtn').hidden = false;
   $('examExitBtn').hidden = true;
   $('bottombar').classList.remove('reviewbar');
@@ -3238,7 +3279,7 @@ $('searchInput').addEventListener('keydown', (e) => {
    대화는 서버에 안 남는다 — 앞 턴(userMessage/markdown)을 매번 history로 다시 보낸다.
    암호는 이 기기 localStorage(sd_askpw)에만 — 지워지면 다시 묻는다(AI 키 자체는 서버에만 있다). */
 let askTurns = [], askBackend = lsGet('sd_askbackend') === 'mindlogic' ? 'mindlogic' : 'gemini';
-let askConfig = null, askLocked = false, askPendingQ = '';
+let askConfig = null, askLocked = false, askPendingReq = null;
 function askHeaders(){ return { 'Content-Type': 'application/json', 'X-Ask-Key': lsGet('sd_askpw') || '' }; }
 async function askCall(path, body){
   let r;
@@ -3248,16 +3289,55 @@ async function askCall(path, body){
   const data = await r.json().catch(() => ({ error: 'HTTP ' + r.status }));
   return { status: r.status, data };
 }
-function openAsk(q){
-  askTurns = []; askPendingQ = q || '';
+// req = { q(화면 제목), question } 또는 { q, text, context }(📖 드래그 — 확장의 「해설」 경로). null이면 입력창만.
+// dict=true면 위쪽 패널(📖), 아니면 검색 위 전체화면.
+function openAsk(req, dict){
+  if (typeof req === 'string') req = { q: req, question: req };
+  askTurns = []; askPendingReq = req || null;
+  $('askOv').classList.toggle('dictmode', !!dict);
   $('askOv').hidden = false;
   $('askInput').value = '';
   renderAskThread();
-  checkAskConfig().then((ok) => { if (ok && q) sendAsk(q); else if (ok) $('askInput').focus(); });
+  checkAskConfig().then((ok) => { if (ok && req) sendAsk(req); else if (ok) $('askInput').focus(); });
 }
-function closeAsk(){ $('askOv').hidden = true; }
+function closeAsk(){ $('askOv').hidden = true; $('askOv').classList.remove('dictmode'); }
 $('askBackBtn').addEventListener('click', () => { closeAsk(); setTimeout(() => $('searchInput').focus(), 60); });
 $('askCloseBtn').addEventListener('click', () => { closeAsk(); closeSearch(); });
+
+/* ── 📖 사전 버튼(2026-11-04 라운드40) ──
+   본문·제목에서 드래그한 뒤 누르면 그 표현을 「그 표현이 든 문장」과 함께 바로 묻는다(확장이 자막
+   문장을 같이 보내는 것과 같은 이유 — 여러 뜻 중 이 문맥의 뜻으로 답하게). 드래그 없이 누르면 입력창만.
+   iOS는 버튼 탭으로 선택을 지우므로 형광펜과 같은 lastSelRange 기억을 쓴다(라운드39 — 시간 제한 없음). */
+function sentenceAround(full, text){
+  const parts = String(full || '').replace(/\s+/g, ' ').trim().match(/[^.?!…。！？]+[.?!…。！？]*["'”’)\]]*\s*/g) || [String(full || '').trim()];
+  const t = text.toLowerCase();
+  return ((parts.find((x) => x.toLowerCase().includes(t)) || parts[0] || '').trim()).slice(0, 400);
+}
+function takeDictSelection(){
+  const sel = window.getSelection();
+  if ((!sel.rangeCount || sel.isCollapsed) && lastSelRange && document.contains(lastSelRange.startContainer)){
+    try { sel.removeAllRanges(); sel.addRange(lastSelRange); } catch (e) {}
+  }
+  lastSelRange = null;
+  if (!sel.rangeCount || sel.isCollapsed) return null;
+  const range = sel.getRangeAt(0);
+  const text = sel.toString().replace(/\s+/g, ' ').trim();
+  const node = range.startContainer.nodeType === 1 ? range.startContainer : range.startContainer.parentElement;
+  const inCard = node && node.closest('#content, .cardtitle');
+  sel.removeAllRanges();
+  if (!text || !inCard || text.length > 300) return null;
+  const blockEl = node.closest('[data-blk], p, li, td, th, h3, h4, h5, blockquote, .cardtitle') || inCard;
+  const context = sentenceAround(blockEl.textContent, text);
+  return { q: text, text, context: context && context.toLowerCase() !== text.toLowerCase() ? context : '' };
+}
+$('dictBtn').addEventListener('click', function(){
+  this.blur();
+  if (highlightMode) setHighlightMode(false);
+  const req = takeDictSelection();
+  if (req){ openAsk(req, true); return; }
+  if (!$('askOv').hidden && $('askOv').classList.contains('dictmode')){ $('askInput').focus(); return; }
+  openAsk(null, true);
+});
 async function checkAskConfig(){
   const { status, data } = await askCall('/api/ask/config');
   if (status === 401){ askLocked = true; renderAskThread(); return false; }
@@ -3292,8 +3372,9 @@ function askHistory(upto){
   askTurns.slice(0, upto).forEach((t) => { if (t.status === 'ok') h.push({ role: 'user', text: t.userMessage }, { role: 'model', text: t.markdown }); });
   return h;
 }
-async function sendAsk(q){
-  const turn = { q, status: 'loading', save: 'idle' };
+async function sendAsk(req){
+  if (typeof req === 'string') req = { q: req, question: req };
+  const turn = { ...req, status: 'loading', save: 'idle' };
   askTurns.push(turn);
   renderAskThread();
   scrollAskTo(askTurns.length - 1);
@@ -3301,7 +3382,7 @@ async function sendAsk(q){
 }
 async function runAskTurn(turn){
   turn.status = 'loading'; renderAskThread();
-  const { status, data } = await askCall('/api/ask', { question: turn.q, backend: askBackend, history: askHistory(askTurns.indexOf(turn)) });
+  const { status, data } = await askCall('/api/ask', { question: turn.question || '', text: turn.text || '', context: turn.context || '', backend: askBackend, history: askHistory(askTurns.indexOf(turn)) });
   if (!askTurns.includes(turn)) return; // 기다리는 사이 새 대화를 열었다
   if (status === 401){ askLocked = true; turn.status = 'error'; turn.error = 'Password needed'; renderAskThread(); return; }
   if (status === 200 && data.markdown){
@@ -3327,7 +3408,7 @@ function askTurnHtml(t, i){
     else act = (t.save === 'error' ? '<span class="asknote" style="color:var(--coral)">' + esc(t.saveErr) + '</span>' : '') + '<button data-act="save" data-i="' + i + '">Save to deck</button>';
     body = blocksHtml(t.blocks) + '<div class="askact">' + act + '</div>';
   }
-  return '<div class="askturn"><div class="askq">' + esc(t.q) + '</div>' + body + '</div>';
+  return '<div class="askturn"><div class="askq">' + esc(t.q) + '</div>' + (t.context ? '<div class="askctx">' + esc(t.context) + '</div>' : '') + body + '</div>';
 }
 function renderAskThread(msg){
   const el = $('askThread');
@@ -3342,7 +3423,7 @@ function renderAskThread(msg){
         // 암호 때문에 막혔던 질문을 다시 보낸다(처음 연 질문 포함 — 아직 턴이 없으면 검색어로).
         const pending = askTurns.filter((t) => t.status === 'error');
         if (pending.length) pending.forEach((t) => runAskTurn(t));
-        else if (!askTurns.length && askPendingQ) sendAsk(askPendingQ);
+        else if (!askTurns.length && askPendingReq) sendAsk(askPendingReq);
       } else if (askLocked) toast('Wrong password');
     };
     $('askPwBtn').addEventListener('click', go);
@@ -3371,7 +3452,7 @@ $('askThread').addEventListener('click', async (e) => {
   }
   if (act === 'save' || act === 'force'){
     t.save = 'saving'; renderAskThread();
-    const { status, data } = await askCall('/api/ask/save', { question: t.q, markdown: t.markdown, force: act === 'force' });
+    const { status, data } = await askCall('/api/ask/save', { question: t.question || '', text: t.text || '', context: t.context || '', markdown: t.markdown, force: act === 'force' });
     if (status === 409 && data.duplicate){ t.save = 'dup'; t.saveRes = data; }
     else if (status === 200 && data.ok){
       t.save = 'saved'; t.saveRes = data;
