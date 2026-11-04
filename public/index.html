@@ -298,6 +298,9 @@
   .aitag{font-family:var(--mono);font-size:11px;font-weight:600;color:var(--ink);background:var(--coral);border-radius:6px;padding:2px 7px}
   .aimodel{flex:1;font-family:var(--mono);font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .aihead button{flex:none;background:none;border:0;color:var(--muted);font-size:17px;cursor:pointer;padding:4px 6px;touch-action:manipulation}
+  #askHlBtn{width:34px;height:30px;border-radius:8px;border:1px solid transparent;display:flex;align-items:center;justify-content:center}
+  #askHlBtn svg{width:17px;height:17px}
+  #askHlBtn.active{color:var(--coral);border-color:var(--coral)}
   #askOv .askthread{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;will-change:auto;
     padding:4px 18px 6px;font-size:calc(14px * var(--bscale));overscroll-behavior:contain}
   #askOv .askthread:empty{display:none}
@@ -848,6 +851,7 @@
 <div class="aipanel" id="askOv" hidden>
   <div class="aihead">
     <span class="aitag">AI</span><span class="aimodel" id="askModel"></span>
+    <button type="button" id="askHlBtn" aria-label="Highlight in answer"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg></button>
     <button type="button" id="askCloseBtn" aria-label="Close">&#10005;</button>
   </div>
   <div class="content askthread" id="askThread"></div>
@@ -1244,7 +1248,7 @@ document.addEventListener('selectionchange', () => {
   if (sel && !sel.isCollapsed && sel.rangeCount) lastSelRange = sel.getRangeAt(0).cloneRange();
 });
 document.addEventListener('pointerdown', (e) => {
-  if (!e.target.closest('#hlBtn') && !e.target.closest('#dictBtn')) lastSelRange = null;
+  if (!e.target.closest('#hlBtn') && !e.target.closest('#dictBtn') && !e.target.closest('#askHlBtn')) lastSelRange = null;
 }, true);
 let highlightMode = false;
 function setHighlightMode(on, btn){
@@ -3347,6 +3351,7 @@ async function askCall(path, body){
 function openAsk(req){
   if (typeof req === 'string') req = { q: req, question: req };
   askTurns = []; askPendingReq = req || null;
+  setAskHlMode(false);
   $('askBack').hidden = false; $('askOv').hidden = false;
   $('askInput').value = '';
   renderAskThread(); syncAskHead();
@@ -3355,7 +3360,125 @@ function openAsk(req){
   if (!req) $('askInput').focus();
   checkAskConfig().then((ok) => { if (ok && req) sendAsk(req); });
 }
-function closeAsk(){ $('askInput').blur(); $('askOv').hidden = true; $('askBack').hidden = true; }
+function closeAsk(){ $('askInput').blur(); $('askOv').hidden = true; $('askBack').hidden = true; setAskHlMode(false); }
+
+/* ── 패널 안 형광펜(2026-11-04, 사용자 결정 A) ──
+   카드 형광펜과 같은 두 순서(🖍 먼저 → 드래그 / 드래그 먼저 → 🖍)와 「칠한 곳 탭 = 해제」. 위치 계산은 카드와
+   같은 getHighlightTarget/plainOffsetInBlock(어느 화면이든 [data-blk] 기준)을 쓰고, 칠하는 규칙도 서버와 같다
+   (섞인 선택은 「새로 칠하기」, 전부 칠해져 있을 때만 지우기). 저장 전엔 turn.blocks만 고쳐 두고 저장 때 같이
+   노션에 들어간다. 저장 뒤엔 /api/ask/highlight로 그 블록을 바로 고친다(저장 응답의 answerIds). */
+let askHlMode = false, askHlQueue = Promise.resolve();
+function setAskHlMode(on){
+  askHlMode = on;
+  $('askHlBtn').classList.toggle('active', on);
+  if (!on){ lastSelRange = null; return; }
+  const sel = window.getSelection();
+  if ((!sel.rangeCount || sel.isCollapsed) && lastSelRange && $('askThread').contains(lastSelRange.startContainer)){
+    try { sel.removeAllRanges(); sel.addRange(lastSelRange); } catch (e) {}
+  }
+  lastSelRange = null;
+  if (sel.rangeCount && !sel.isCollapsed && $('askThread').contains(sel.anchorNode)){
+    if (!applyAskHighlightFromSelection()){ askHlMode = false; $('askHlBtn').classList.remove('active'); }
+  }
+}
+$('askHlBtn').addEventListener('click', function(){ this.blur(); setAskHlMode(!askHlMode); });
+function hlSliceRich(items, start, end){
+  const before = [], middle = [], after = [];
+  let pos = 0;
+  for (const it of items){
+    const rs = pos, re = pos + it.t.length; pos = re;
+    if (re <= start){ before.push(it); continue; }
+    if (rs >= end){ after.push(it); continue; }
+    const segs = [];
+    if (rs < start) segs.push([rs, start, before]);
+    const ms = Math.max(rs, start), me = Math.min(re, end);
+    if (ms < me) segs.push([ms, me, middle]);
+    if (re > end) segs.push([end, re, after]);
+    for (const [s, e, bucket] of segs){ const txt = it.t.slice(s - rs, e - rs); if (txt) bucket.push({ ...it, t: txt }); }
+  }
+  return { before, middle, after };
+}
+function hlToggleRich(items, start, end){ // 서버 toggleCodeInRich와 같은 규칙
+  const { before, middle, after } = hlSliceRich(items || [], start, end);
+  if (!middle.length) return items;
+  const allCode = middle.every((it) => it.code);
+  const mid = middle.map((it) => (allCode ? { ...it, code: false } : (it.code ? it : { ...it, code: true })));
+  return [...before, ...mid, ...after].filter((it) => it.t.length);
+}
+// 「i」 또는 「i.r줄.c칸」 → 그 블록(또는 표 칸)
+function askBlockAt(turn, blk){
+  const m = /^(\d+)(?:\.r(\d+)\.c(\d+))?$/.exec(blk);
+  const b = m && turn.blocks && turn.blocks[Number(m[1])];
+  if (!b) return null;
+  if (m[2] != null){
+    const row = b.rows && b.rows[Number(m[2])];
+    if (!row) return null;
+    return { b, bi: Number(m[1]), ri: Number(m[2]), ci: Number(m[3]), row };
+  }
+  return { b, bi: Number(m[1]) };
+}
+function applyAskHighlight(t, turnEl){
+  const i = Number(turnEl.dataset.i), turn = askTurns[i];
+  if (!turn || turn.status !== 'ok') return false;
+  const at = askBlockAt(turn, t.blk);
+  if (!at) return false;
+  if (at.row) at.row[at.ci] = hlToggleRich(at.row[at.ci], t.start, t.end);
+  else at.b.rich = hlToggleRich(at.b.rich, t.start, t.end);
+  const sc = $('askThread').scrollTop;
+  renderAskThread();
+  $('askThread').scrollTop = sc;
+  // 저장된 답이면 노션 카드 블록도 바로 고친다(요청은 순서대로 — 카드 형광펜의 queueFlagApi와 같은 이유).
+  const ids = turn.save === 'saved' && turn.saveRes && turn.saveRes.answerIds;
+  if (turn.save === 'saved' && !ids){ toast('Open the card to highlight saved answers'); return true; }
+  if (ids){
+    const ref = ids[at.bi];
+    if (!ref) return true;
+    const body = at.row
+      ? (ref.rowIds && ref.rowIds[at.ri] ? { pageId: turn.saveRes.pageId, rowId: ref.rowIds[at.ri], cells: at.row } : null)
+      : { pageId: turn.saveRes.pageId, blockId: ref.id, rich: at.b.rich };
+    if (!body){ toast('Open the card to highlight this cell'); return true; }
+    const payload = JSON.parse(JSON.stringify(body)); // 보내는 시점 값으로 고정
+    askHlQueue = askHlQueue.then(() => askCall('/api/ask/highlight', payload)).then(({ status, data }) => {
+      if (status !== 200 || !data.notionOk) toast('Highlight not saved to Notion');
+      subCache.clear(); // 카드 화면이 옛 본문을 들고 있지 않게
+    });
+  }
+  return true;
+}
+function applyAskHighlightFromSelection(){
+  const sel = window.getSelection();
+  const had = sel && sel.rangeCount > 0 && !sel.isCollapsed;
+  const t = getHighlightTarget();
+  const el = t && findBlockEl(sel.getRangeAt(0).startContainer);
+  const turnEl = el && el.closest('#askThread .askturn');
+  sel.removeAllRanges();
+  if (!t || !turnEl || !applyAskHighlight(t, turnEl)){
+    if (had) toast('Select within a single paragraph');
+    return false;
+  }
+  return true;
+}
+document.addEventListener('pointerup', (e) => {
+  if (!askHlMode || !e.target.closest('#askThread')) return;
+  setTimeout(() => { const s = window.getSelection(); if (s && s.rangeCount && !s.isCollapsed) applyAskHighlightFromSelection(); }, 0);
+});
+// 칠한 곳 탭 = 그 덩어리 해제(카드의 onHighlightAreaClick과 같은 방식)
+document.addEventListener('click', (e) => {
+  if (!askHlMode) return;
+  const code = e.target.closest('#askThread code.hl');
+  if (!code) return;
+  const cur = window.getSelection();
+  if (cur && cur.rangeCount && !cur.isCollapsed) return; // 드래그로 끝난 클릭 — 드래그 쪽(pointerup)이 처리한다
+  const w = document.createTreeWalker(code, NodeFilter.SHOW_TEXT);
+  let first = null, last = null;
+  while (w.nextNode()){ if (!first) first = w.currentNode; last = w.currentNode; }
+  if (!first) return;
+  const range = document.createRange();
+  range.setStart(first, 0); range.setEnd(last, last.nodeValue.length);
+  const sel = window.getSelection();
+  sel.removeAllRanges(); sel.addRange(range);
+  applyAskHighlightFromSelection();
+});
 $('askCloseBtn').addEventListener('click', closeAsk);
 $('askBack').addEventListener('click', closeAsk);
 // iOS 키보드 — 레이아웃 뷰포트는 그대로라 bottom:0 패널이 키보드 뒤로 숨는다. 보이는 영역
@@ -3470,7 +3593,7 @@ function askTurnHtml(t, i){
     else act = (t.save === 'error' ? '<span class="asknote" style="color:var(--coral)">' + esc(t.saveErr) + '</span>' : '') + '<button data-act="save" data-i="' + i + '">Save to deck</button>';
     body = blocksHtml(t.blocks) + '<div class="askact">' + act + '</div>';
   }
-  return '<div class="askturn"><div class="askq">' + esc(t.q) + '</div>' + (t.context ? '<div class="askctx">' + esc(t.context) + '</div>' : '') + body + '</div>';
+  return '<div class="askturn" data-i="' + i + '"><div class="askq">' + esc(t.q) + '</div>' + (t.context ? '<div class="askctx">' + esc(t.context) + '</div>' : '') + body + '</div>';
 }
 function renderAskThread(msg){
   const el = $('askThread');
@@ -3514,7 +3637,7 @@ $('askThread').addEventListener('click', async (e) => {
   }
   if (act === 'save' || act === 'force'){
     t.save = 'saving'; renderAskThread();
-    const { status, data } = await askCall('/api/ask/save', { question: t.question || '', text: t.text || '', context: t.context || '', markdown: t.markdown, force: act === 'force' });
+    const { status, data } = await askCall('/api/ask/save', { question: t.question || '', text: t.text || '', context: t.context || '', markdown: t.markdown, blocks: t.blocks, force: act === 'force' });
     if (status === 409 && data.duplicate){ t.save = 'dup'; t.saveRes = data; }
     else if (status === 200 && data.ok){
       t.save = 'saved'; t.saveRes = data;

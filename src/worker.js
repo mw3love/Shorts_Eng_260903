@@ -1566,7 +1566,8 @@ function notionBlocksToApp(blocks) {
   return blocks.map((b) => {
     if (b.type === 'divider') return { type: 'divider' };
     if (b.type === 'table') {
-      return { type: 'table', width: b.table.table_width, headerRow: true, rows: b.table.children.map((r) => r.table_row.cells.map(notionRichToApp)) };
+      // rowIds:[] — 실제 id는 없지만 있어야 tableHtml이 칸마다 형광펜 주소(data-blk="i.r줄.c칸")를 찍는다(패널 형광펜용).
+      return { type: 'table', width: b.table.table_width, headerRow: true, rows: b.table.children.map((r) => r.table_row.cells.map(notionRichToApp)), rowIds: [] };
     }
     return { type: b.type, rich: notionRichToApp(b[b.type].rich_text) };
   });
@@ -1614,6 +1615,62 @@ async function handleAsk(env, body) {
    버킷에 바로 붙인다 — 안 그러면 다음 동기화(cron, 최대 6시간 신선도)까지 카드가 안 보인다.
    ⚠ 동기화가 도는 중에 저장하면 그 패스가 끝날 때 쓰는 인덱스가 이 카드를 모른다(행 목록을 시작 때
    받아 둠) — 그 경우 카드는 다음 동기화에서 다시 들어온다. 버킷에 남는 사본은 인덱스가 안 가리켜 무해. */
+// 앱 화면 블록 → Notion 쓰기 블록(패널에서 칠한 형광펜을 그대로 저장하려고). notionBlocksToApp의 역방향.
+function appBlocksToNotion(blocks) {
+  const TEXT = new Set(['paragraph', 'heading_1', 'heading_2', 'heading_3', 'bulleted_list_item', 'numbered_list_item', 'quote', 'code']);
+  return (blocks || []).map((b) => {
+    if (!b) return null;
+    if (b.type === 'divider') return { type: 'divider', divider: {} };
+    if (b.type === 'table') {
+      const rows = b.rows || [];
+      const width = b.width || (rows[0] || []).length || 1;
+      return { type: 'table', table: { table_width: width, has_column_header: b.headerRow !== false, has_row_header: false,
+        children: rows.map((row) => ({ type: 'table_row', table_row: { cells: Array.from({ length: width }, (_, c) => toNotionRichText(row[c] || [])) } })) } };
+    }
+    const type = TEXT.has(b.type) ? b.type : 'paragraph';
+    const v = { rich_text: toNotionRichText(b.rich) };
+    if (type === 'code') v.language = 'plain text';
+    return { type, [type]: v };
+  }).filter(Boolean).slice(0, 100);
+}
+// 이미 저장한 답을 패널에서 칠할 때(2026-11-04) — 블록 id로 카드 안 블록을 찾아 KV와 Notion을 같이 고친다.
+// 카드 쪽 /api/highlight는 화면 경로(pre/hint/detail 인덱스)로 찾지만, 패널은 카드와 블록 배치가 달라
+// (힌트 분리·「질문:」 제거) id로 찾는다. rich(텍스트 블록) 또는 rowId+cells(표 한 줄 전체)를 받는다.
+async function handleAskHighlight(env, token, body) {
+  const { pageId, blockId, rowId, rich, cells } = body || {};
+  if (!pageId || (!blockId && !rowId)) return json({ error: 'pageId and blockId/rowId required' }, 400);
+  const idx = JSON.parse((await env.KV.get(K_INDEX)) || 'null');
+  const item = idx && idx.items.find((it) => it.id === pageId);
+  if (!item) return json({ error: 'not found' }, 404);
+  const bucket = JSON.parse((await env.KV.get(K_BUCKET + item.bucket)) || 'null');
+  const card = bucket && bucket.cards.find((c) => c.id === pageId);
+  if (!card) return json({ error: 'not found' }, 404);
+  let hit = null;
+  const walk = (list) => {
+    for (const b of list || []) {
+      if (!b || hit) continue;
+      if (rowId && b.type === 'table' && Array.isArray(b.rowIds) && b.rowIds.includes(rowId)) { hit = { b, r: b.rowIds.indexOf(rowId) }; return; }
+      if (blockId && b.id === blockId) { hit = { b }; return; }
+      if (b.children) walk(b.children);
+    }
+  };
+  walk([...(card.pre || []), card.hint, ...(card.detail || [])]);
+  if (!hit) return json({ error: 'block not found' }, 404);
+  let payload, path;
+  if (rowId) {
+    if (!Array.isArray(cells)) return json({ error: 'cells required' }, 400);
+    hit.b.rows[hit.r] = cells;
+    path = `/blocks/${rowId}`; payload = { table_row: { cells: cells.map(toNotionRichText) } };
+  } else {
+    if (!Array.isArray(rich)) return json({ error: 'rich required' }, 400);
+    hit.b.rich = rich;
+    path = `/blocks/${blockId}`; payload = { [hit.b.type]: { rich_text: toNotionRichText(rich) } };
+  }
+  await env.KV.put(K_BUCKET + item.bucket, JSON.stringify(bucket));
+  let notionOk = false;
+  try { await notion(token, path, { method: 'PATCH', body: JSON.stringify(payload) }); notionOk = true; } catch (e) { /* notionOk:false로 알린다 */ }
+  return json({ ok: true, notionOk });
+}
 // 카드 하나의 이동 좌표(subId + 소챕터 안 순번) — handleSearch와 같은 계산.
 function cardCoords(items, id) {
   const r = Math.max(0, sortedByCreated(items).findIndex((it) => it.id === id));
@@ -1628,14 +1685,14 @@ async function handleAskSave(env, token, dbId, body) {
   if ((!question && !text) || !answer) return json({ error: 'Nothing to save' }, 400);
   // 본문: 질문 경로는 「질문: …」 + 답, 📖 드래그 경로는 (문장 인용 + 구분선) + 답 — 확장 saveToNotion과 같다.
   // 제목은 둘 다 답의 첫 예문 우선 — 드래그 경로에서 카드 문장을 제목으로 쓰면 원래 카드와 같은 제목이 된다.
-  const children = question
-    ? markdownToBlocks('질문: ' + question + '\n\n' + answer)
-    : [
-      ...(context && context.toLowerCase() !== text.toLowerCase()
-        ? [{ type: 'quote', quote: { rich_text: [{ type: 'text', text: { content: context.slice(0, 2000) } }] } }, { type: 'divider', divider: {} }]
-        : []),
-      ...markdownToBlocks(answer),
-    ].slice(0, 100);
+  // 답 블록 — 패널에서 형광펜을 칠했으면 클라이언트가 보낸 앱 형식 블록(body.blocks)을 그대로 쓴다(2026-11-04).
+  const answerBlocks = Array.isArray(body.blocks) && body.blocks.length ? appBlocksToNotion(body.blocks) : markdownToBlocks(answer);
+  const prefix = question
+    ? [{ type: 'paragraph', paragraph: { rich_text: [{ type: 'text', text: { content: ('질문: ' + question).slice(0, 2000) } }] } }]
+    : (context && context.toLowerCase() !== text.toLowerCase()
+      ? [{ type: 'quote', quote: { rich_text: [{ type: 'text', text: { content: context.slice(0, 2000) } }] } }, { type: 'divider', divider: {} }]
+      : []);
+  const children = [...prefix, ...answerBlocks].slice(0, 100);
   const title = askPickTitle(question || text, answer);
   const key = cardKey(title);
 
@@ -1675,7 +1732,11 @@ async function handleAskSave(env, token, dbId, body) {
     await env.KV.put(K_BUCKET + num, JSON.stringify({ cards: target }));
     fresh.items.push({ id: page.id, key, front: title, url: null, edited: page.last_edited_time, created: page.created_time, bucket: num });
     await env.KV.put(K_INDEX, JSON.stringify(fresh));
-    return json({ ok: true, indexed: true, key, front: title, pageUrl: page.url, ...cardCoords(fresh.items, page.id) });
+    // 저장 뒤에도 패널에서 형광펜을 칠할 수 있게, 답 블록 순서대로 실제 노션 블록 id를 돌려준다
+    // (앞의 「질문:」/인용·구분선은 뺀다). 개수가 어긋나면 null — 그때는 카드에서 칠하라고 안내한다.
+    const rest = blocks.slice(prefix.length);
+    const answerIds = rest.length === answerBlocks.length ? rest.map((b) => ({ id: b.id, rowIds: b.rowIds || null })) : null;
+    return json({ ok: true, indexed: true, key, front: title, pageId: page.id, pageUrl: page.url, answerIds, ...cardCoords(fresh.items, page.id) });
   } catch (e) {
     return json({ ok: true, indexed: false, key, front: title, pageUrl: page.url, error: String(e.message || e) });
   }
@@ -1756,6 +1817,10 @@ export default {
           try { models = await getModelList(env, cfg, be, false); } catch (e) { models = null; }
           return await handleAsk({ ...cfg, [field]: resolveModel(models, cfg[field]) }, body);
         }
+        catch (e) { return json({ error: String(e.message || e) }, 500); }
+      }
+      if (url.pathname === '/api/ask/highlight' && request.method === 'POST') {
+        try { return await handleAskHighlight(env, token, await request.json()); }
         catch (e) { return json({ error: String(e.message || e) }, 500); }
       }
       if (url.pathname === '/api/ask/save' && request.method === 'POST') {
