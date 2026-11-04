@@ -28,6 +28,9 @@
  *  14. GET  /api/sync             Notion → 카드 변환을 "예산만큼만" 진행하고 커서를 남김
  *  15. GET  /api/search?q=        제목 부분일치 검색(인덱스 대상) — 상태(미확인/확인함/완전히 앎/휴지통)와
  *                                  이동 좌표(subId+소챕터 내 순번)를 같이 반환(2026-09-06 라운드13)
+ *  16. GET  /api/ask/config       암호 확인 + 쓸 수 있는 AI(Gemini/게이트웨이) 목록 — 헤더 X-Ask-Key 필요
+ *  17. POST /api/ask              AI 해설·후속 질문(확장과 같은 프롬프트) — 헤더 X-Ask-Key 필요
+ *  18. POST /api/ask/save         답을 `3. 영어 DB`에 저장 + 인덱스에 바로 붙임 — 헤더 X-Ask-Key 필요
  *
  * ⚠ 왜 Worker가 반드시 필요한가 — api.notion.com은 Access-Control-Allow-Origin을
  *   보내지 않는다(2026-09-03 실측). 크롬 확장은 host_permissions로 CORS를 면제받아
@@ -1246,6 +1249,282 @@ async function handleSearch(env, q) {
   return json({ items, total: matches.length });
 }
 
+/* ── AI에게 묻기(2026-11-04 라운드40) ─────────────────────────
+   폰에서 모르는 표현을 물으면 크롬 확장(youtube_dual_subtitle)과 같은 프롬프트로 AI 해설을
+   받고, 원하면 `3. 영어 DB`에 확장과 같은 형식으로 저장한다 — 저장하면 그대로 복습 카드가 된다.
+   ⚠ 프롬프트는 확장 `src/shared/i18n.ts`의 ko `prompt.explainDefault`·`prompt.question` 복사본이다.
+   확장에서 사용자가 고친 프롬프트는 chrome.storage에 있어 여기서 못 읽는다 — 두 벌로 갈라지는 건 감수.
+   ⚠ AI 키는 Worker secret에만 둔다. 이 Worker엔 원래 인증이 없어서(주소만 알면 누구나 호출)
+   AI·저장 엔드포인트에만 암호(ASK_PASSWORD, 헤더 X-Ask-Key)를 건다 — 기존 복습 API는 그대로. */
+
+const ASK_PROMPT_EXPLAIN = `너는 나의 영어 선생님이야. 내가 영어를 잘 할 수 있도록 최선을 다해. 답변할 때 정보 전달 외 불필요한 인삿말은 하지 마.
+
+답변은 다음과 같이 할것
+- 답변은 한국어로
+- 답변 최상단에는 질문에 적합한 영어예문을 인라인 코드로 작성
+- 예문 아래에 한글 해석 작성
+- 영어 예문들만 인라인 코드로 작성할것
+- 관용어(idiom)의 경우 어원 설명
+- 표로 만들 수 있는건 되도록 표로 제작
+- 의미가 다양할 경우 관통하는 하나의 이미지 표현을 제시, 유연하게 해석할 수 있도록 한다.`;
+// 후속 질문용 — 확장의 질문 프롬프트에서 "자막에서 고른 표현" 문구만 앞 대화로 바꿨다(폰엔 자막이 없다).
+const ASK_PROMPT_QUESTION = `너는 나의 언어 학습 도우미야. 앞의 대화를 참고해 사용자의 질문에 답해.
+- 답변은 한국어로, 핵심만 간결하게.
+- 영어 예문이나 단어는 인라인 코드(\`backtick\`)로 표시.
+- 표로 정리하는 게 더 명확하면 표로.
+- 정보 전달 외 불필요한 인삿말은 하지 마.`;
+const ASK_MAX_TOKENS = 4096;
+
+function askAuthError(request, env) {
+  if (!env.ASK_PASSWORD) return json({ error: 'ASK_PASSWORD not set on the server', code: 'noPassword' }, 503);
+  if ((request.headers.get('X-Ask-Key') || '') !== env.ASK_PASSWORD) return json({ error: 'Wrong password', code: 'auth' }, 401);
+  return null;
+}
+function askBackends(env) {
+  return {
+    gemini: !!env.GEMINI_API_KEY,
+    mindlogic: !!(env.MINDLOGIC_API_KEY && env.MINDLOGIC_BASE_URL),
+  };
+}
+
+// 429/5xx만 1회 1.5초 뒤 재시도 — 확장 explain.ts의 fetchWithRetry와 같은 규칙.
+async function askFetch(url, init) {
+  let res = await fetch(url, init);
+  if ((res.status === 429 || res.status >= 500) && res.status !== 501) {
+    await gap(1500);
+    res = await fetch(url, init);
+  }
+  return res;
+}
+async function askHttpError(name, res) {
+  const body = await res.text().catch(() => '');
+  if (res.status === 401 || res.status === 403) return new Error(`${name} key rejected (HTTP ${res.status})`);
+  if (res.status === 429) return new Error(`${name} rate limit — try again shortly`);
+  return new Error(`${name} error (HTTP ${res.status}) ${body.slice(0, 200)}`);
+}
+async function askGemini(env, system, history, userMsg) {
+  const model = env.GEMINI_MODEL || 'gemini-3.5-flash';
+  const res = await askFetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': env.GEMINI_API_KEY },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: system }] },
+      contents: [...history.map((t) => ({ role: t.role, parts: [{ text: t.text }] })), { role: 'user', parts: [{ text: userMsg }] }],
+      generationConfig: { temperature: 0.3, maxOutputTokens: ASK_MAX_TOKENS },
+    }),
+  });
+  if (!res.ok) throw await askHttpError('Gemini', res);
+  const data = await res.json();
+  const cand = data.candidates?.[0];
+  const text = (cand?.content?.parts || []).map((p) => p.text || '').join('');
+  if (!text.trim()) throw new Error(`Gemini returned no answer (${cand?.finishReason || 'unknown'})`);
+  return { text, model };
+}
+async function askMindlogic(env, system, history, userMsg) {
+  const model = env.MINDLOGIC_MODEL || 'claude-sonnet-4-6';
+  const base = String(env.MINDLOGIC_BASE_URL).replace(/\/+$/, '');
+  const res = await askFetch(`${base}/chat/completions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.MINDLOGIC_API_KEY}` },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: 'system', content: system },
+        ...history.map((t) => ({ role: t.role === 'model' ? 'assistant' : 'user', content: t.text })),
+        { role: 'user', content: userMsg },
+      ],
+      temperature: 0.3, max_tokens: ASK_MAX_TOKENS,
+    }),
+  });
+  if (!res.ok) throw await askHttpError('Gateway', res);
+  const data = await res.json();
+  const choice = data.choices?.[0];
+  const text = choice?.message?.content || '';
+  if (!text.trim()) throw new Error(`Gateway returned no answer (${choice?.finish_reason || 'unknown'})`);
+  return { text, model };
+}
+
+/* markdown → Notion 블록 — 확장 src/background/notion-blocks.ts를 그대로 옮겼다(같은 답이
+   같은 노션 모양으로 저장되게). 화면 표시도 이 블록을 앱 형식으로 바꿔 기존 blockHtml로 그린다. */
+const MD_INLINE_RE = /(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*)/g;
+function mdPushChunks(out, content, annotations) {
+  if (content === '') return;
+  for (let i = 0; i < content.length; i += 2000) {
+    const slice = content.slice(i, i + 2000);
+    out.push(annotations ? { type: 'text', text: { content: slice }, annotations } : { type: 'text', text: { content: slice } });
+  }
+}
+function mdInline(text, base = {}) {
+  const out = [];
+  for (const part of text.split(MD_INLINE_RE)) {
+    if (!part) continue;
+    if (part.startsWith('**') && part.endsWith('**') && part.length >= 4) out.push(...mdInline(part.slice(2, -2), { ...base, bold: true }));
+    else if (part.startsWith('`') && part.endsWith('`') && part.length >= 2) mdPushChunks(out, part.slice(1, -1), { ...base, code: true });
+    else if (part.startsWith('*') && part.endsWith('*') && part.length >= 2) out.push(...mdInline(part.slice(1, -1), { ...base, italic: true }));
+    else mdPushChunks(out, part, (base.bold || base.italic || base.code) ? base : undefined);
+  }
+  return out;
+}
+const mdIsTableRow = (line) => { const t = line.trim(); return t.includes('|') && !/^\|?\s*$/.test(t); };
+const mdIsTableDivider = (line) => { const t = line.trim(); return /^\|?\s*:?-{1,}:?\s*(\|\s*:?-{1,}:?\s*)*\|?$/.test(t) && t.includes('-'); };
+const mdSplitRow = (line) => { let t = line.trim(); if (t.startsWith('|')) t = t.slice(1); if (t.endsWith('|')) t = t.slice(0, -1); return t.split('|').map((c) => c.trim()); };
+const mdIsList = (t) => /^([-*+]\s+|\d+[.)]\s+)/.test(t);
+function markdownToBlocks(md) {
+  const blocks = [];
+  const lines = String(md || '').replace(/\r\n?/g, '\n').split('\n');
+  let i = 0, para = [];
+  const flush = () => { if (para.length) { blocks.push({ type: 'paragraph', paragraph: { rich_text: mdInline(para.join(' ')) } }); para = []; } };
+  while (i < lines.length) {
+    const line = lines[i], trimmed = line.trim();
+    if (trimmed === '') { flush(); i++; continue; }
+    if (/^([-*_])\1{2,}$/.test(trimmed)) { flush(); blocks.push({ type: 'divider', divider: {} }); i++; continue; }
+    if (/^```(\w*)\s*$/.test(trimmed)) {
+      flush(); i++;
+      const code = [];
+      while (i < lines.length && !/^```\s*$/.test(lines[i].trim())) { code.push(lines[i]); i++; }
+      i++;
+      const rich = []; mdPushChunks(rich, code.join('\n'));
+      blocks.push({ type: 'code', code: { rich_text: rich, language: 'plain text' } });
+      continue;
+    }
+    const h = trimmed.match(/^(#{1,6})\s+(.*)$/);
+    if (h) { flush(); const key = 'heading_' + Math.min(3, h[1].length); blocks.push({ type: key, [key]: { rich_text: mdInline(h[2].trim()) } }); i++; continue; }
+    if (mdIsTableRow(line) && i + 1 < lines.length && mdIsTableDivider(lines[i + 1])) {
+      flush();
+      const header = mdSplitRow(line); i += 2;
+      const rows = [];
+      while (i < lines.length && mdIsTableRow(lines[i])) { rows.push(mdSplitRow(lines[i])); i++; }
+      const width = header.length;
+      const toRow = (cells) => ({ type: 'table_row', table_row: { cells: Array.from({ length: width }, (_, c) => mdInline(cells[c] ?? '')) } });
+      blocks.push({ type: 'table', table: { table_width: width, has_column_header: true, has_row_header: false, children: [toRow(header), ...rows.map(toRow)] } });
+      continue;
+    }
+    if (mdIsList(trimmed)) {
+      flush();
+      while (i < lines.length && mdIsList(lines[i].trim())) {
+        const t = lines[i].trim();
+        const key = /^\d+[.)]\s/.test(t) ? 'numbered_list_item' : 'bulleted_list_item';
+        blocks.push({ type: key, [key]: { rich_text: mdInline(t.replace(/^(?:[-*+]|\d+[.)])\s+/, '')) } });
+        i++;
+      }
+      continue;
+    }
+    para.push(trimmed); i++;
+  }
+  flush();
+  return blocks.slice(0, 100); // Notion children 한도
+}
+// Notion 쓰기용 블록 → 앱 화면 블록(compactBlock 결과와 같은 모양). id·rowIds가 없어 형광펜 주소는 안 생긴다.
+function notionRichToApp(arr) {
+  return (arr || []).map((t) => {
+    const o = { t: t.text?.content || '' };
+    const an = t.annotations || {};
+    if (an.bold) o.bold = true;
+    if (an.italic) o.italic = true;
+    if (an.code) o.code = true;
+    return o;
+  });
+}
+function notionBlocksToApp(blocks) {
+  return blocks.map((b) => {
+    if (b.type === 'divider') return { type: 'divider' };
+    if (b.type === 'table') {
+      return { type: 'table', width: b.table.table_width, headerRow: true, rows: b.table.children.map((r) => r.table_row.cells.map(notionRichToApp)) };
+    }
+    return { type: b.type, rich: notionRichToApp(b[b.type].rich_text) };
+  });
+}
+
+// 확장 notion.ts의 pickNotionTitle과 같은 규칙. 폰엔 자막 문맥이 없어 ① 경로가 없다 —
+// 답의 첫 인라인 백틱 예문(프롬프트가 맨 위에 쓰게 시킨다) → 없으면 질문 그대로.
+function askPickTitle(question, markdown) {
+  const example = String(markdown || '').match(/`([^`\n]+)`/)?.[1]?.trim();
+  return (example || String(question || '').trim() || 'Untitled').slice(0, 2000);
+}
+
+async function handleAsk(env, body) {
+  const question = String(body.question || '').trim();
+  if (!question) return json({ error: 'Empty question' }, 400);
+  const backend = body.backend === 'mindlogic' ? 'mindlogic' : 'gemini';
+  if (!askBackends(env)[backend]) return json({ error: (backend === 'gemini' ? 'Gemini' : 'Gateway') + ' key not set on the server', code: 'noBackend' }, 503);
+  // history: [{role:'user'|'model', text}] — 클라이언트가 앞 턴을 그대로 돌려보낸다(서버는 대화를 저장 안 함).
+  const history = (Array.isArray(body.history) ? body.history : [])
+    .filter((t) => t && (t.role === 'user' || t.role === 'model') && typeof t.text === 'string')
+    .slice(-20);
+  // 첫 질문은 풍부한 해설 프롬프트, 후속은 가벼운 질문 프롬프트 — 확장의 Alt+Q 직접질문(isAsk)과 같은 분기.
+  const system = history.length ? ASK_PROMPT_QUESTION : ASK_PROMPT_EXPLAIN;
+  const userMessage = '질문: ' + question; // 확장 msg.question과 같은 모양
+  try {
+    const { text, model } = backend === 'mindlogic'
+      ? await askMindlogic(env, system, history, userMessage)
+      : await askGemini(env, system, history, userMessage);
+    return json({ markdown: text, userMessage, model, blocks: notionBlocksToApp(markdownToBlocks(text)) });
+  } catch (e) {
+    return json({ error: String(e.message || e) }, 502);
+  }
+}
+
+/* 저장 — 확장과 같은 형식(제목 = 예문, 본문 = 「질문: …」 + 답). 앱 파서 splitBody()는 본문 첫 줄이
+   「질문:」이면 걸러내므로 카드에선 답만 보인다. 저장 직후 그 페이지 하나만 다시 읽어 인덱스·마지막
+   버킷에 바로 붙인다 — 안 그러면 다음 동기화(cron, 최대 6시간 신선도)까지 카드가 안 보인다.
+   ⚠ 동기화가 도는 중에 저장하면 그 패스가 끝날 때 쓰는 인덱스가 이 카드를 모른다(행 목록을 시작 때
+   받아 둠) — 그 경우 카드는 다음 동기화에서 다시 들어온다. 버킷에 남는 사본은 인덱스가 안 가리켜 무해. */
+// 카드 하나의 이동 좌표(subId + 소챕터 안 순번) — handleSearch와 같은 계산.
+function cardCoords(items, id) {
+  const r = Math.max(0, sortedByCreated(items).findIndex((it) => it.id === id));
+  return { subId: 'c' + Math.floor(r / (SUB_SIZE * CHAP_SIZE)) + 's' + Math.floor((r % (SUB_SIZE * CHAP_SIZE)) / SUB_SIZE), idx: r % SUB_SIZE };
+}
+async function handleAskSave(env, token, dbId, body) {
+  if (!token || !dbId) return json({ error: 'NOTION_TOKEN / NOTION_DB_ID not set' }, 500);
+  const question = String(body.question || '').trim();
+  const answer = String(body.markdown || '').trim();
+  if (!question || !answer) return json({ error: 'Nothing to save' }, 400);
+  const md = '질문: ' + question + '\n\n' + answer;
+  const title = askPickTitle(question, answer);
+  const key = cardKey(title);
+
+  const idxRaw = await env.KV.get(K_INDEX);
+  const idx = idxRaw ? JSON.parse(idxRaw) : null;
+  // 제목 컬럼 이름 — 인덱스에 동기화 때 찾은 값이 있으면 쓰고, 없으면 노션에 한 번 묻는다(하드코딩 금지).
+  const titleProp = idx?.schema?.title || (await discoverSchema(token, dbId, null)).title;
+  if (!idx) return json({ error: 'Deck is still syncing — try again shortly' }, 503);
+  // 같은 cardKey가 이미 있으면 먼저 알린다(학습 상태가 키로 공유돼 사실상 같은 카드가 된다).
+  const dup = idx.items.find((it) => it.key === key);
+  if (dup && !body.force) return json({ duplicate: true, key: dup.key, front: dup.front, ...cardCoords(idx.items, dup.id) }, 409);
+
+  const page = await notion(token, '/pages', {
+    method: 'POST',
+    body: JSON.stringify({
+      parent: { database_id: dbId },
+      properties: { [titleProp]: { title: [{ text: { content: title.slice(0, 2000) } }] } },
+      children: markdownToBlocks(md),
+    }),
+  });
+
+  // 인덱스에 바로 붙이기 — 실패해도 노션 저장은 이미 끝났으므로 indexed:false로만 알린다.
+  try {
+    const blocks = await pageBlocks(token, page.id, { used: 0, max: 20 });
+    const { context, pre, hint, detail } = splitBody(blocks);
+    const card = {
+      id: page.id, key, front: title, context, pre, hint, detail, url: null, created: page.created_time,
+      fetchedAt: new Date().toISOString(), parserVersion: PARSER_VERSION,
+    };
+    const fresh = JSON.parse((await env.KV.get(K_INDEX)) || 'null') || idx; // 읽는 사이 동기화가 끝났을 수 있다
+    const lastNum = fresh.items.reduce((m, it) => Math.max(m, it.bucket ?? 0), 0);
+    const raw = await env.KV.get(K_BUCKET + lastNum);
+    const cards = raw ? JSON.parse(raw).cards : [];
+    const num = cards.length < BUCKET_SIZE ? lastNum : lastNum + 1;
+    const target = num === lastNum ? cards : [];
+    target.push(card);
+    await env.KV.put(K_BUCKET + num, JSON.stringify({ cards: target }));
+    fresh.items.push({ id: page.id, key, front: title, url: null, edited: page.last_edited_time, created: page.created_time, bucket: num });
+    await env.KV.put(K_INDEX, JSON.stringify(fresh));
+    return json({ ok: true, indexed: true, key, front: title, pageUrl: page.url, ...cardCoords(fresh.items, page.id) });
+  } catch (e) {
+    return json({ ok: true, indexed: false, key, front: title, pageUrl: page.url, error: String(e.message || e) });
+  }
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -1299,6 +1578,21 @@ export default {
     }
 
     if (url.pathname === '/api/search') return handleSearch(env, url.searchParams.get('q') || '');
+
+    if (url.pathname.startsWith('/api/ask')) {
+      const denied = askAuthError(request, env);
+      if (denied) return denied;
+      if (url.pathname === '/api/ask/config') return json({ ok: true, backends: askBackends(env) });
+      if (url.pathname === '/api/ask' && request.method === 'POST') {
+        try { return await handleAsk(env, await request.json()); }
+        catch (e) { return json({ error: String(e.message || e) }, 500); }
+      }
+      if (url.pathname === '/api/ask/save' && request.method === 'POST') {
+        try { return await handleAskSave(env, token, dbId, await request.json()); }
+        catch (e) { return json({ error: String(e.message || e) }, 502); }
+      }
+      return json({ error: 'Not found' }, 404);
+    }
 
     if (url.pathname === '/api/sync') {
       if (!token || !dbId) return json({ error: 'NOTION_TOKEN / NOTION_DB_ID not set' }, 500);
