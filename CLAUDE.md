@@ -54,11 +54,16 @@ Notion DB `3. 영어 DB`에 자동 저장한다. **저장은 되는데 복습이
   대화는 서버에 안 남는다(클라이언트가 history를 매번 다시 보냄).
 - ⚠ **인증은 AI·저장·설정 엔드포인트(`/api/ask*`)에만** — 헤더 `X-Ask-Key` = 암호. 이 Worker의 나머지 API는 원래대로
   무인증. 폰은 암호만 localStorage `sd_askpw`에 둔다(지워지면 잠금 화면이 다시 뜸).
-- **AI 설정창(☰ › AI settings, `#aiSetOv`)** — 사용할 AI(Gemini/게이트웨이, 모든 기기 공통)·모델(`/api/ask/models` 목록
-  datalist, 직접 입력도 됨)·게이트웨이 base URL·API 키·암호 변경. KV `askSettings:v1`(`backend`·`geminiKey`·`geminiModel`·
+- **AI 설정창(☰ › AI settings, `#aiSetOv`)** — 사용할 AI(Gemini/게이트웨이, 모든 기기 공통)·모델(`/api/ask/models` 실시간 목록
+  드롭다운 `select` — 처음엔 datalist 입력칸이었으나 사용자 지적으로 교체)·게이트웨이 base URL·API 키·암호 변경. KV `askSettings:v1`(`backend`·`geminiKey`·`geminiModel`·
   `mindlogicKey`·`mindlogicBase`·`mindlogicModel`·`password`)에 저장되고, **빈 항목은 Worker secret/vars가 기본값**
-  (`ASK_PASSWORD`, `GEMINI_API_KEY`/`GEMINI_MODEL` 기본 `gemini-3.5-flash`, `MINDLOGIC_API_KEY`/`MINDLOGIC_BASE_URL`/
-  `MINDLOGIC_MODEL` 기본 `claude-sonnet-4-6`) — `loadAskConfig()`. ⚠ **키는 응답으로 절대 안 내려간다**(앞 4글자 `keyHint`만),
+  (`ASK_PASSWORD`, `GEMINI_API_KEY`/`GEMINI_MODEL`, `MINDLOGIC_API_KEY`/`MINDLOGIC_BASE_URL`/`MINDLOGIC_MODEL`) — `loadAskConfig()`.
+  ⚠ **모델 기본값은 두 서비스 모두 `auto` = 실시간 목록의 「gemini-<버전>-flash-lite」 중 최고 정식판**(사용자 결정 — 사전은
+  속도가 중요, 확장도 lite가 메인. `resolveModel`/`newestGeminiLite`, 매 질문마다 다시 고름 → 새 lite가 나오면 앱 수정 없이 씀).
+  직접 고른 모델이 단종(게이트웨이 `deprecated_at`·`lifecycle:legacy`)되면 목록의 `replacement`를 끝까지 따라가 대신 부른다
+  (예: `claude-sonnet-4-6`은 2026-08-18 legacy → `claude-sonnet-5`). 목록은 KV `askModels:v1:<backend>` 하루 캐시, 설정창을
+  열 때는 새로. 실측(`Version ID b8643bf6-31b7-4df2-9ad5-acd590a01639`): 게이트웨이 lite 3.0초(sonnet 15초), Gemini 직접 8.0초.
+  **검토한 대안:** `gemini-flash-lite-latest` 별칭 — 기각(언제 최신을 따라가는지 문서 미확인), preview 우선 — 기각(예고 없이 내려감). ⚠ **키는 응답으로 절대 안 내려간다**(앞 4글자 `keyHint`만),
   키 칸이 비어 있으면 「그대로 둠」, 바꾸려면 지금 암호가 필요. base URL은 `https://`만. 앱에서 암호를 바꾸면 KV 값이
   secret을 덮으므로 **secret `ASK_PASSWORD`를 다시 넣어도 무효** — 되돌리려면 KV `askSettings:v1`의 `password`를 지운다.
 - **검색 — 단어 순서 무관**(같은 날 사용자 요청, `handleSearch`) — 입력 단어가 모두 제목 단어의 **앞부분**과 맞으면 통과
