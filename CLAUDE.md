@@ -60,8 +60,9 @@ Notion DB `3. 영어 DB`에 자동 저장한다. **저장은 되는데 복습이
   `User location is not supported`(400), 게이트웨이는 **401**로 거절했다 — 같은 키가 이 PC에선 200이라 키 문제로
   오진하기 쉽다(실제로 사용자도 주소 문제로 봤다). placement 후 둘 다 200. 복습 API 지연은 그대로(콜드스타트 뒤 0.2초).
   무료 요금제에서 placement 힌트가 보장되는지는 문서에 없다 — **AI가 다시 지역 오류를 내면 여기부터 의심.**
-- 지금 secret: `ASK_PASSWORD`, `GEMINI_API_KEY`, `MINDLOGIC_API_KEY` = **학교(JBNU) 키** → `MINDLOGIC_BASE_URL` =
-  `https://factchat-cloud.mindlogic.ai/v1/gateway`(키와 주소 계정이 어긋나면 401).
+- 지금 secret: `ASK_PASSWORD`, `GEMINI_API_KEY`, `MINDLOGIC_API_KEY` = **회사(KAIROS) 키** → `MINDLOGIC_BASE_URL` =
+  `https://factchat.mindlogic-kr-api.com/v1/gateway`(학교 키면 `https://factchat-cloud.mindlogic.ai/v1/gateway` —
+  키와 주소 계정이 어긋나면 401, 홍콩 차단과 증상이 같으니 둘 다 의심).
 - ✓ 프로덕션 실응답(node fetch): Gemini `gemini-3.5-flash` 17.5초, 게이트웨이 `claude-sonnet-4-6` 12.9초, 둘 다 표·헤딩
   블록 정상. **답이 13~18초 걸린다** — 답답하다는 피드백이 오면 스트리밍이 다음 후보.
   **미확인: 실제 노션 페이지 생성 + 인덱스 붙이기(사용자가 폰에서 직접 해 보기로), 실기기 전반.**
