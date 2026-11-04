@@ -35,26 +35,35 @@ Notion DB `3. 영어 DB`에 자동 저장한다. **저장은 되는데 복습이
 폰에선 네이버사전 대신 확장의 AI 해설을 받고 싶고, 물어본 걸 저장하면 그대로 복습 카드가 되게.
 - **📖 사전 버튼(주 진입점, 같은 날 사용자 제안 — "검색 경유는 불편")** `Version ID 57e54be7-7955-48b5-ad19-725984e672db` —
   하단바 `[n/전체] · … · 📖 · ✓ · 🖍 · ☰`. 드래그 → 📖 = 고른 표현 + **그 표현이 든 카드 문장**을 확장 「해설」 메시지
-  (`아래 문장에서 "X" 부분을 설명해줘.\n문장: …`)로 바로 물음. 드래그 없이 📖 = 위쪽 작은 입력줄. 답은 **위쪽에서 내려오는
-  패널**(`#askOv.dictmode`, 아래 시트는 iOS 키보드에 가려져서). 「선택 먼저 → 버튼」은 형광펜의 `lastSelRange`를 공유
+  (`아래 문장에서 "X" 부분을 설명해줘.\n문장: …`)로 바로 물음. 드래그 없이 📖 = 입력줄만. 패널(`#askOv.aipanel`)은
+  **아래에서 올라온다**(같은 날 사용자 요청으로 위→아래, `Version ID fa3cd0e3-875d-4868-96fe-846a0dd26245`) — ⚠ iOS 키보드가
+  가리지 않게 `visualViewport`로 잰 높이(`--kb`)만큼 올린다(`syncKeyboardInset`, **실기기 미확인**). 카드와 구분: 뒤를
+  어둡게(`.aiback`, 탭하면 닫힘)·한 단계 밝은 바탕·위쪽 코랄 띠·`AI` 라벨+모델명·본문보다 작은 글씨. 「선택 먼저 → 버튼」은 형광펜의 `lastSelRange`를 공유
   (`pointerdown` 예외에 `#dictBtn` 추가). 드래그 경로 저장 = 문장 인용 + 구분선 + 답, 제목 = 답의 첫 예문(카드 문장을 쓰면
   원래 카드와 같은 cardKey). ⚠ **휴지통·완전히앎은 「…」(`#moreBtn` → `#morePop`) 안으로 옮겼다** — 버튼 id
   (`trashQuickBtn`/`archiveQuickBtn`)는 팝업 안에 그대로라 상태·핸들러 코드는 무변경. 카드가 그 상태면 「…」 자리에 그
   아이콘이 그 색으로 뜬다(`.st-trash`/`.st-archive`). Q/E 단축키 그대로. **검토한 대안:** 학사모 자리만 사전으로 — 기각(폰에서
   완전히앎을 누를 길이 사라짐), 상단바 — 기각(엄지에서 멂). ✓ 로컬 실제 마우스 드래그·클릭 + 프로덕션 드래그 경로 실응답.
   **실기기 터치 선택·드래그 경로 실제 저장 미확인.**
-- **흐름(보조)** — 검색창에 입력하면 결과 맨 위에 `Ask AI: "…"` 행(Enter도 같음) → `#askOv`에서 답·후속 질문 →
-  답마다 `Save to deck`. 저장 형식은 확장과 같다(제목 = 답의 첫 인라인 백틱 예문, 없으면 질문 /
+- **검색창 경유는 없앴다**(처음엔 검색 결과 맨 위 `Ask AI: "…"` 행·Enter였으나 📖가 생겨 같은 날 제거 — 사용자가
+  "AI 기록이 검색에 남는 것"처럼 느꼈다. 대화는 어디에도 저장되지 않는다). 답마다 `Save to deck`. 저장 형식은 확장과 같다(제목 = 답의 첫 인라인 백틱 예문, 없으면 질문 /
   본문 = `질문: …` + 답 — `splitBody()`가 첫 「질문:」 줄을 거르므로 카드엔 답만 보인다).
 - **서버** — `/api/ask/config`·`/api/ask`·`/api/ask/save`. 프롬프트는 확장 ko `prompt.explainDefault`(첫 질문)·
   `prompt.question`(후속)의 **복사본**이다 — 확장에서 고친 프롬프트는 chrome.storage라 못 읽는다(두 벌 감수).
   `markdownToBlocks`는 확장 `notion-blocks.ts` 이식, 화면 표시도 같은 블록을 앱 형식으로 바꿔 `blockHtml`로 그린다.
   대화는 서버에 안 남는다(클라이언트가 history를 매번 다시 보냄).
-- ⚠ **인증은 AI·저장 엔드포인트에만** — 헤더 `X-Ask-Key` = secret `ASK_PASSWORD`. 이 Worker의 나머지 API는 원래대로
-  무인증. 폰은 암호만 localStorage `sd_askpw`에 둔다(지워지면 잠금 화면이 다시 뜸). AI 키는 secret에만.
-- **AI 둘 다, 앱에서 선택**(사용자 결정, 추천은 Gemini 하나였음) — secret `GEMINI_API_KEY`(모델 `GEMINI_MODEL`,
-  기본 `gemini-3.5-flash`), `MINDLOGIC_API_KEY`+`MINDLOGIC_BASE_URL`(예: `https://factchat.mindlogic-kr-api.com/v1/gateway`,
-  모델 `MINDLOGIC_MODEL`, 기본 `claude-sonnet-4-6`). 키가 없는 쪽은 버튼이 비활성.
+- ⚠ **인증은 AI·저장·설정 엔드포인트(`/api/ask*`)에만** — 헤더 `X-Ask-Key` = 암호. 이 Worker의 나머지 API는 원래대로
+  무인증. 폰은 암호만 localStorage `sd_askpw`에 둔다(지워지면 잠금 화면이 다시 뜸).
+- **AI 설정창(☰ › AI settings, `#aiSetOv`)** — 사용할 AI(Gemini/게이트웨이, 모든 기기 공통)·모델(`/api/ask/models` 목록
+  datalist, 직접 입력도 됨)·게이트웨이 base URL·API 키·암호 변경. KV `askSettings:v1`(`backend`·`geminiKey`·`geminiModel`·
+  `mindlogicKey`·`mindlogicBase`·`mindlogicModel`·`password`)에 저장되고, **빈 항목은 Worker secret/vars가 기본값**
+  (`ASK_PASSWORD`, `GEMINI_API_KEY`/`GEMINI_MODEL` 기본 `gemini-3.5-flash`, `MINDLOGIC_API_KEY`/`MINDLOGIC_BASE_URL`/
+  `MINDLOGIC_MODEL` 기본 `claude-sonnet-4-6`) — `loadAskConfig()`. ⚠ **키는 응답으로 절대 안 내려간다**(앞 4글자 `keyHint`만),
+  키 칸이 비어 있으면 「그대로 둠」, 바꾸려면 지금 암호가 필요. base URL은 `https://`만. 앱에서 암호를 바꾸면 KV 값이
+  secret을 덮으므로 **secret `ASK_PASSWORD`를 다시 넣어도 무효** — 되돌리려면 KV `askSettings:v1`의 `password`를 지운다.
+- **검색 — 단어 순서 무관**(같은 날 사용자 요청, `handleSearch`) — 입력 단어가 모두 제목 단어의 **앞부분**과 맞으면 통과
+  (`i tell can` → `I can tell…`). 부분문자열로 보면 `i`가 거의 모든 제목에 걸려서 앞부분 일치로 했다. 순서까지 같은
+  결과를 먼저. 부작용: `can`이 `cannot`에도 걸린다(의도). **검토한 대안:** 오타 허용 — 기각(결과가 지저분해짐).
 - ⚠ **저장 직후 인덱스에 바로 붙인다** — 페이지를 다시 읽어(`pageBlocks`) 마지막 버킷(꽉 찼으면 새 버킷)과
   `index:v2`에 추가. 안 그러면 cron 신선도(6시간)까지 안 보인다. 새 카드는 생성일 순이라 **마지막 챕터 끝**.
   동기화가 도는 중에 저장하면 그 패스의 최종 인덱스가 덮어써 다음 동기화 때 다시 들어온다(무해).
@@ -700,7 +709,7 @@ pageId를 키로 학습 이력을 저장하면 재저장 한 번에 그 카드�
 | 동기화 커서 | Worker KV `sync:state` | 진행 중일 때만 존재. 끝나면 삭제 |
 | `복습 상태` 컬럼명 캐시 | Worker KV `reviewSchema:v1` | `{ prop: string\|null }`(2026-09-06). 하드코딩 대신 옵션 내용으로 찾은 결과 — 컬럼명이 바뀌면 `wrangler kv key delete`로 지우면 다시 찾는다 |
 | 카드 제목·형광펜·복습 상태 | **Notion 본문/속성 자체** | 미러 아님 — 실제 원본 수정(`/api/retitle`, `/api/highlight`, `/api/answer`\`/archive`\`/trash`가 `복습 상태` PATCH, 2026-09-06 — `/api/archive/restore`\`/trash/restore`는 `미확인`으로 리셋). 실패해도 로컬 KV는 먼저 반영(마찰 최소화), `notionOk`로 정직하게 알림 |
-| 오프라인 캐시 | localStorage | ⚠ 보조일 뿐 — iOS는 영구성을 보장하지 않는다. 글자 크기(`sd_tscale`·`sd_bscale`), 마지막 위치(`sd_pos`), AI에게 묻기 암호(`sd_askpw`)·선택한 AI(`sd_askbackend`, 2026-11-04 라운드40)만 여기 저장. ⚠ **`sd_pos`는 기기별이라 PC·폰이 서로 다른 자리에서 열린다** — 이 기기에 저장된 위치가 없을 때만 서버의 `firstUnknown`(첫 미체크 카드)으로 연다(2026-09-21 라운드35) |
+| 오프라인 캐시 | localStorage | ⚠ 보조일 뿐 — iOS는 영구성을 보장하지 않는다. 글자 크기(`sd_tscale`·`sd_bscale`), 마지막 위치(`sd_pos`), AI 암호(`sd_askpw`, 2026-11-04 라운드40 — 쓸 AI·모델은 서버 KV `askSettings:v1`)만 여기 저장. ⚠ **`sd_pos`는 기기별이라 PC·폰이 서로 다른 자리에서 열린다** — 이 기기에 저장된 위치가 없을 때만 서버의 `firstUnknown`(첫 미체크 카드)으로 연다(2026-09-21 라운드35) |
 
 ⚠ (역사) 예전 `grades`(0~3차+횟수)·`daily:v1:*`(캘린더)·`schema:v1`(진도/난이도 판별 캐시)
 키는 2026-09-05 재설계로 안 쓰게 됐고, 2026-09-06 축5로 프로덕션에서 삭제 완료.
@@ -722,7 +731,7 @@ pageId를 키로 학습 이력을 저장하면 재저장 한 번에 그 카드�
 ```
 npx wrangler kv namespace create KV     # 나온 id를 wrangler.toml에 기입
 npx wrangler secret put NOTION_TOKEN    # 크롬 확장이 쓰는 것과 같은 integration 토큰
-# (선택) AI에게 묻기 — ASK_PASSWORD, GEMINI_API_KEY, MINDLOGIC_API_KEY, MINDLOGIC_BASE_URL (라운드40 참조)
+# (선택) AI 사전 — ASK_PASSWORD만 secret으로 넣고 나머지(키·주소·모델)는 앱 ☰ › AI settings에서도 된다 (라운드40)
 npx wrangler deploy
 ```
 
