@@ -3350,7 +3350,10 @@ function openAsk(req){
   $('askBack').hidden = false; $('askOv').hidden = false;
   $('askInput').value = '';
   renderAskThread(); syncAskHead();
-  checkAskConfig().then((ok) => { if (ok && req) sendAsk(req); else if (ok) $('askInput').focus(); });
+  // ⚠ iOS는 「탭한 그 순간(같은 이벤트 안)」의 focus()에만 키보드를 띄운다 — 서버 응답을 기다린 뒤
+  // focus()하면 커서만 가고 키보드는 안 열려 입력창을 한 번 더 눌러야 했다(2026-11-04 실기기 신고).
+  if (!req) $('askInput').focus();
+  checkAskConfig().then((ok) => { if (ok && req) sendAsk(req); });
 }
 function closeAsk(){ $('askInput').blur(); $('askOv').hidden = true; $('askBack').hidden = true; }
 $('askCloseBtn').addEventListener('click', closeAsk);
