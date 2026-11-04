@@ -19,6 +19,11 @@ NOTION_DB_ID = "277763872455804ebc00cb991e8e3247"
 #   npx wrangler secret put NOTION_TOKEN
 # 로컬 개발은 .dev.vars 파일에 NOTION_TOKEN=... (gitignore됨)
 
+# ⚠ 한국 접속이 홍콩(HKG) 데이터센터로 들어가 Gemini가 「User location is not supported」로
+# 막았다(2026-11-04 실측). Worker를 서울 근처에서 돌게 한다(/api/ask의 AI 호출용).
+[placement]
+region = "gcp:asia-northeast3"
+
 # 동기화는 한 번에 못 끝난다(무료 요금제 서브요청 50회 상한). cron이 이어 돌린다.
 [triggers]
 crons = ["*/5 * * * *"]
