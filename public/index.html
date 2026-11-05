@@ -1483,7 +1483,15 @@ function loadPos(){
   const p = lsGetJSON('sd_pos', null);
   if (p && typeof p.chap === 'number' && typeof p.sub === 'number'){ chapIdx = p.chap; subIdx = p.sub; hasSavedPos = true; }
 }
-function savePos(){ lsSetJSON('sd_pos', { chap: chapIdx, sub: subIdx }); }
+function savePos(){ posPending = false; lsSetJSON('sd_pos', { chap: chapIdx, sub: subIdx }); }
+/* ⚠ 검색·목록에서 카드를 눌러 이동한 자리는 「임시」다(2026-11-06 사용자 신고). 예전엔 바로
+   저장해서, 새로 저장한 카드(20챕터 pioneer)를 한 번 들여다본 것만으로 그 기기가 매번 거기서
+   열렸다 — 저장된 소챕터에 미체크가 남아 있으면 firstUnknown 보정도 안 걸리기 때문. 이제 그
+   자리에서 카드를 한 장이라도 넘겨야(=실제로 읽기 시작해야) 마지막 위치로 확정한다.
+   검토한 대안: 이동 시 저장을 아예 안 함 — 기각(챕터 시트로 일부러 옮겨 가는 것도 같은
+   navigateToCard라 그 이동까지 기억 못 하게 된다). */
+let posPending = false;
+function commitPendingPos(){ if (posPending && !examMode && !reviewMode) savePos(); }
 function subId(){ return 'c' + chapIdx + 's' + subIdx; }
 function chapId(){ return 'c' + chapIdx; }
 let lastShownPos = null;
@@ -2316,7 +2324,7 @@ function goToNext(){
       else if (reviewMode) toast('Last card');
       else if (!maybeShowBoundaryGate()) advanceSubchapter();
     }
-    else { studyIdx++; renderStudyCard(); }
+    else { studyIdx++; renderStudyCard(); commitPendingPos(); }
   });
 }
 function goToPrev(){
@@ -2324,7 +2332,7 @@ function goToPrev(){
   afterCardTransition(() => {
     setDragTransition('none'); resetDragX();
     if (studyIdx - 1 < 0) { if (examMode) toast('First question'); else if (reviewMode) toast('First card'); else retreatSubchapter(); }
-    else { studyIdx--; renderStudyCard(); }
+    else { studyIdx--; renderStudyCard(); commitPendingPos(); }
   });
 }
 /* ── 소챕터 경계의 중간시험 안내면(2026-09-21 사용자 제안) ───────────────────────
@@ -3222,7 +3230,7 @@ function renderSearchResults(items){ renderPickList($('searchResults'), items, '
 // 요청 반영 — 상태와 무관하게 항상 실제 챕터/소챕터로 이동하고 studyMode를 'all'로 강제한다.
 function navigateToCard(it){
   const p = parseSubIdClient(it.subId);
-  chapIdx = p.chap; subIdx = p.sub; savePos();
+  chapIdx = p.chap; subIdx = p.sub; posPending = true;   // 저장은 한 장 넘길 때(commitPendingPos)
   studyMode = 'all';
   loadSubchapter().then(() => {
     syncFilterButtons();
