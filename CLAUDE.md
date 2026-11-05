@@ -753,7 +753,7 @@ pageId를 키로 학습 이력을 저장하면 재저장 한 번에 그 카드�
 | 동기화 커서 | Worker KV `sync:state` | 진행 중일 때만 존재. 끝나면 삭제 |
 | `복습 상태` 컬럼명 캐시 | Worker KV `reviewSchema:v1` | `{ prop: string\|null }`(2026-09-06). 하드코딩 대신 옵션 내용으로 찾은 결과 — 컬럼명이 바뀌면 `wrangler kv key delete`로 지우면 다시 찾는다 |
 | 카드 제목·형광펜·복습 상태 | **Notion 본문/속성 자체** | 미러 아님 — 실제 원본 수정(`/api/retitle`, `/api/highlight`, `/api/answer`\`/archive`\`/trash`가 `복습 상태` PATCH, 2026-09-06 — `/api/archive/restore`\`/trash/restore`는 `미확인`으로 리셋). 실패해도 로컬 KV는 먼저 반영(마찰 최소화), `notionOk`로 정직하게 알림 |
-| 오프라인 캐시 | localStorage | ⚠ 보조일 뿐 — iOS는 영구성을 보장하지 않는다. 글자 크기(`sd_tscale`·`sd_bscale`), 마지막 위치(`sd_pos`), AI 암호(`sd_askpw`, 2026-11-04 라운드40 — 쓸 AI·모델은 서버 KV `askSettings:v1`)만 여기 저장. ⚠ **`sd_pos`는 기기별이라 PC·폰이 서로 다른 자리에서 열린다** — 이 기기에 저장된 위치가 없을 때만 서버의 `firstUnknown`(첫 미체크 카드)으로 연다(2026-09-21 라운드35) |
+| 오프라인 캐시 | localStorage | ⚠ 보조일 뿐 — iOS는 영구성을 보장하지 않는다. 글자 크기(`sd_tscale`·`sd_bscale`), 마지막 위치(`sd_pos`), AI 암호(`sd_askpw`, 2026-11-04 라운드40 — 쓸 AI·모델은 서버 KV `askSettings:v1`)만 여기 저장. ⚠ **`sd_pos`는 기기별이라 PC·폰이 서로 다른 자리에서 열린다** — 이 기기에 저장된 위치가 없을 때만 서버의 `firstUnknown`(첫 미체크 카드)으로 연다(2026-09-21 라운드35). 검색·목록으로 이동한 자리는 그 자리에서 한 장 넘겨야 저장된다(`posPending`, 라운드41) |
 
 ⚠ (역사) 예전 `grades`(0~3차+횟수)·`daily:v1:*`(캘린더)·`schema:v1`(진도/난이도 판별 캐시)
 키는 2026-09-05 재설계로 안 쓰게 됐고, 2026-09-06 축5로 프로덕션에서 삭제 완료.
